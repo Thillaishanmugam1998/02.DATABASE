@@ -40,3 +40,12 @@ DROP COLUMN contact_email ;
 
 ALTER TABLE  employees RENAME TO employee;
 ALTER TABLE employee RENAME TO employees;
+
+ALTER DATABSE "JuwelApp" RENAME TO "juwelapp";
+
+--6. INSERT TABLE:
+------------------
+INSERT INTO  employees (first_name,last_name,department,salary,hire_date,contact_email)
+VALUES
+	('Tamizh','Vani','frontend',150000,'17-01-2003','tamizhvani1714@gmail.com'),
+	('Thillai','Shanmugam','Backend',100000,'14-04-1998','thillaishanmugamsathish@gmail.com');
