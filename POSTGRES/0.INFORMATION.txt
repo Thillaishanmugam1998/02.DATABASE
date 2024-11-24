@@ -1,0 +1,44 @@
+1) SELECT
+---------
+SELECT
+   select_list
+FROM
+   table_name;
+
+PostgreSQL evaluates the FROM clause before the SELECT clause in the SELECT statement:
+==================================================================================================================
+
+==================================================================================================================
+2) COLOUMN ALIAS:
+-----------------
+SELECT column_name AS alias_name
+FROM table_name;
+
+Example: 
+SELECT
+    first_name || ' ' || last_name AS full_name
+FROM
+    customer;
+
+Assign a column or an expression a column alias using the syntax column_name AS alias_name or expression AS alias_name. The AS keyword is optional.
+Use double quotes (“) to surround column aliases that contain spaces.
+==================================================================================================================
+
+==================================================================================================================
+3) PostgreSQL ORDER BY
+----------------------
+SELECT
+  select_list
+FROM
+  table_name
+ORDER BY
+  sort_expression1 [ASC | DESC],
+  sort_expression2 [ASC | DESC],
+  ...;
+
+  PostgreSQL evaluates the clauses in the SELECT statement in the following order: FROM, SELECT, and ORDER BY:
+  ==================================================================================================================
+
+==================================================================================================================
+4) PostgreSQL SELECT DISTINCT
+----------------------------
