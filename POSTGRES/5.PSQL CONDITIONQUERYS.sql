@@ -1,0 +1,73 @@
+--WHERE CONDITION
+SELECT * FROM employees WHERE salary > 60000;
+
+-- AND CONDITION
+SELECT * FROM employees WHERE department = 'IT' AND salary > 40000;
+
+-- OR CONDITION
+SELECT * FROM employees WHERE department = 'IT' OR salary > 60000;
+
+--LIMIT CONDITION
+SELECT * FROM employees LIMIT 5;
+
+SELECT * 
+FROM employees 
+ORDER BY id ASC 
+LIMIT 5 OFFSET 5;
+
+
+--FETCH CONDITION
+SELECT * 
+FROM employees
+ORDER BY id ASC 
+FETCH FIRST 5 ROW ONLY;
+
+SELECT * 
+FROM employees
+ORDER BY id ASC 
+FETCH FIRST 5 ROWS ONLY;
+
+SELECT * 
+FROM employees
+ORDER BY id ASC 
+OFFSET 5 ROWS
+FETCH NEXT 5 ROW ONLY;
+
+--IN CONDITION
+SELECT * 
+FROM employees
+WHERE department IN ('IT','HR')
+
+--NOT IN CONDITION
+SELECT * 
+FROM employees
+WHERE department NOT IN ('IT','HR')
+
+
+--BETWEEN CONDITION
+SELECT * 
+FROM employees
+WHERE salary   BETWEEN 10000 AND 50000
+
+--LIKE CONDITION
+SELECT * 
+FROM employees
+WHERE name LIKE '%2'
+
+SELECT * 
+FROM employees
+WHERE name LIKE 'T%'
+
+SELECT * 
+FROM employees
+WHERE name NOT LIKE 'T%'
+
+--NULL CONDITION
+SELECT * 
+FROM employees
+WHERE department IS NULL;
+
+--NULL CONDITION
+SELECT * 
+FROM employees
+WHERE department NOTNULL;
