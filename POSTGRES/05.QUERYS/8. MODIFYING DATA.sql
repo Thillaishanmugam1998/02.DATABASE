@@ -41,5 +41,11 @@ VALUES ('Thillai', 'Team Leader')
 ON CONFLICT(name) 
 DO UPDATE SET position = EXCLUDED.position
 
+--Above, Query is check the name column, If the name already present in the table then 
+--Only update the position,
+**********************************************************************************************************************
+
+**********************************************************************************************************************
+
 --The ON CONFLICT clause relies on a unique identifier to detect conflicts.
 --If you try to use ON CONFLICT without a primary key or unique constraint, PostgreSQL will throw the error:
