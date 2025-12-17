@@ -52,3 +52,8 @@ GO
 ==========================================================*/
 ALTER DATABASE TestDatabase SET MULTI_USER;
 GO
+
+
+--Use Database Syntax: USE <DATA BASE NAME>
+--Example
+use TestDatabase;
