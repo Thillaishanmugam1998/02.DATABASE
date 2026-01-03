@@ -1,0 +1,49 @@
+📖 Table of Content
+__🟢Beginner Level__
+00:00 Intro
+07:38 Introduction to SQL  
+22:33 Setup Your Environment  
+34:01 Query Data (SELECT)  
+01:32:31 DDL Commands  
+01:43:44 DML Commands  
+
+__🟡Intermediate Level__
+02:08:03 Filtering Data  
+02:47:57 SQL Joins (Basics)
+03:27:29 SQL Joins (Advanced)
+04:02:09 Set Operators  
+04:47:41 SQL Functions  
+04:52:58 String Functions  
+05:18:44 Numeric Functions  
+05:22:48 Date and Time Functions  
+06:59:06 NULL Functions
+08:07:50 Case Statement
+08:43:36 Aggregate Functions  
+08:50:11 Window Functions Basics  
+09:47:00 Window Aggregate  
+10:53:09 Window Ranking  
+11:56:05 Window Value  
+
+__🔴Advanced Level__
+12:40:34 Advanced SQL Techniques  
+12:58:04 Subqueries  
+14:18:08 Common Table Expressions (CTE)  
+15:35:02 Views  
+16:36:40 CTAS and Temp Tables  
+17:17:31 Compare Advanced Techniques  
+17:27:04 Stored Procedures  
+18:12:58 Triggers  
+18:23:42 Indexes 
+20:20:31 Execution Plan 
+21:11:03 Partitions  
+21:43:39 30x Performance Tips  
+22:24:25 AI and SQL  
+
+__🧪Projects__
+23:21:04 Project: SQL Data Warehouse  
+24:32:54 Project DWH | Bronze
+25:10:09 Project DWH | Silver
+26:47:46 Project DWH | Gold 
+27:41:51 Project: Exploratory Data Analysis (EDA)  
+28:30:38 Project: Advanced Data Analytics  
+29:47:24 Thank You  
