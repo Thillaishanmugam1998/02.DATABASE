@@ -1,0 +1,40 @@
+You are an expert Microsoft SQL Server teacher. I want you to generate **complete, zero-to-hero notes** on the SQL Server topic: [TOPIC_NAME].  
+
+The notes must include:
+
+1. **What [TOPIC_NAME] is** – explain like the reader has zero knowledge, using simple language.  
+2. **Why [TOPIC_NAME] is needed** – include real-life use cases and scenarios where it is applied.  
+3. **Syntax** – clearly explain each part of the syntax, including optional clauses and common variations.  
+4. **Step-by-step examples with tables** – for each example, show:  
+   - **Initial table creation** using `DROP TABLE IF EXISTS` and `CREATE TABLE`.  
+   - **Inserting sample data** using `INSERT INTO`.  
+   - **Step 1:** How SQL processes the query internally (FROM → JOIN → WHERE → GROUP BY → HAVING → SELECT → ORDER BY → LIMIT/TOP).  
+   - **Step 2:** How calculations, aggregate functions, or other operations are applied.  
+   - **Step 3:** Final output after all operations, shown as a formatted table.  
+   - Include **comments in the SQL code** to explain every step clearly.  
+5. **Multiple examples** – cover:  
+   - Single-column operations  
+   - Multi-column operations  
+   - Aggregate functions: COUNT, SUM, AVG, MAX, MIN  
+   - Filtering with WHERE and HAVING  
+   - Sorting with ORDER BY  
+   - Edge cases (e.g., NULL values, duplicates)  
+6. **Important tips, best practices, and common mistakes** – explain rules for columns in SELECT, GROUP BY, aggregates, and filtering.  
+7. **Query execution order explanation** – include a clear **step-by-step description** of how SQL Server executes queries internally.  
+8. **Summary** – key points and best practices for quick revision.  
+9. **Output** – each example should include:  
+   - Sample SQL code that is **ready to run on Microsoft SQL Server**  
+   - Sample table data before and after the query  
+   - Final output displayed in table format  
+   - Comments explaining every step for a beginner  
+
+Additional Requirements:  
+- **Make .Sql File** should be used.  
+- **Only Microsoft SQL Server syntax** should be used.  
+- Ensure **tables are dropped or deleted** before creating new ones to avoid errors.  
+- Include **clear formatting and comments** so even someone with zero SQL knowledge can follow and understand.  
+- The final output should be **ready to save as a `.sql` file**, which someone can **run directly in SQL Server Management Studio (SSMS) and learn step by step**.  
+
+**Instruction:** Replace `[TOPIC_NAME]` with the SQL Server topic you want notes on.  
+
+Make the notes **extremely beginner-friendly, practical, and interactive**, so the learner can go from **zero knowledge to confident in [TOPIC_NAME]**, including **how data flows and is manipulated step by step**.
