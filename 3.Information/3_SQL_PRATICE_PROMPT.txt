@@ -1,0 +1,156 @@
+Master SQL Server with Real-Time Bank Project — Full Prompt
+
+I want to learn and master SQL Server by building a real-time bank project database and solving extensive exercises for every topic from beginner to advanced.
+
+Step 1: Create a Realtime Bank Project Database
+
+Database Name: BankDB
+
+Tables: Include realistic banking tables:
+
+Customers (CustomerID, Name, DOB, Address, Phone, Email)
+
+Accounts (AccountID, CustomerID, AccountType, Balance, OpenDate)
+
+Transactions (TransactionID, AccountID, TransactionType, Amount, TransactionDate, Description)
+
+Loans (LoanID, CustomerID, LoanType, Amount, InterestRate, StartDate, EndDate, Status)
+
+Branches (BranchID, BranchName, Location, Manager)
+
+Employees (EmployeeID, Name, BranchID, Position, Salary, HireDate)
+
+ATM (ATMID, BranchID, Location, Status)
+
+Relationships:
+
+Customers → Accounts (one-to-many)
+
+Customers → Loans (one-to-many)
+
+Accounts → Transactions (one-to-many)
+
+Branches → Employees (one-to-many)
+
+Branches → ATM (one-to-many)
+
+Constraints: Primary Keys, Foreign Keys, Not NULL where appropriate
+
+Insert Sample Data:
+
+Add 20–25 realistic records per table
+
+Include multiple account types, transaction types, loan types
+
+SQL Server Compatibility:
+
+Use DROP TABLE IF EXISTS before creating tables
+
+Use proper data types (INT, NVARCHAR, DECIMAL, DATE, etc.)
+
+Add comments explaining each step
+
+Step 2: Topics to Cover with Exercises
+
+I want exercises for each topic that progress from easy → hard, covering everything I need to master SQL:
+
+🟢 Beginner Level:
+
+Intro
+
+Introduction to SQL
+
+Setup Your Environment
+
+Query Data (SELECT)
+
+DDL Commands (CREATE, ALTER, DROP)
+
+DML Commands (INSERT, UPDATE, DELETE)
+
+🟡 Intermediate Level:
+
+Filtering Data (WHERE, LIKE, IN, BETWEEN)
+
+SQL Joins (Basics & Advanced)
+
+Set Operators (UNION, INTERSECT, EXCEPT)
+
+SQL Functions
+
+String Functions
+
+Numeric Functions
+
+Date and Time Functions
+
+NULL Functions
+
+CASE Statement
+
+Aggregate Functions (SUM, COUNT, AVG, MIN, MAX)
+
+🟣 Advanced Level:
+
+Window Functions: Basics, Window Aggregate, Window Ranking, Window Value
+
+Subqueries, Nested Queries
+
+CTEs (Common Table Expressions)
+
+Indexing, Performance Optimization
+
+Transaction Management & ACID concepts
+
+Step 3: Problem Instructions
+
+For each topic, provide realistic, step-by-step problems using the BankDB tables
+
+Include expected output tables for reference
+
+Problems should progress from easy → medium → hard
+
+Provide more than 50–100 practice problems overall, not just 10 or 20
+
+For each exercise, I will write the query, and you will validate my solution, explain mistakes, and suggest improvements
+
+Include edge cases: NULLs, duplicates, zero values, large numbers, date edge cases
+
+Step 4: Goal
+
+By completing these exercises, I will:
+
+Master querying, filtering, joining, and aggregating data
+
+Use functions (string, numeric, date/time, NULL) efficiently
+
+Implement CASE statements and window functions confidently
+
+Solve real-world bank-related problems
+
+Understand query execution order and optimization
+
+Be ready to handle intermediate and advanced SQL tasks in projects or interviews
+
+Step 5: Output Requirements
+
+Provide complete .sql scripts with table creation, relationships, sample inserts, and exercises
+
+Include comments explaining each query
+
+Include expected output in tabular format for each exercise
+
+Make it ready to run in SQL Server Management Studio (SSMS)
+
+Step 6: Iterative Practice
+
+I will solve exercises and paste queries
+
+You will validate, correct, and explain
+
+Gradually increase problem difficulty to cover all beginner → advanced topics
+
+Include challenges that combine multiple tables, joins, aggregations, and window functions
+
+Result:
+I will go from zero knowledge → confident in SQL Server, mastering realistic banking scenarios with hundreds of practice problems, all recorded in the BankDB.
