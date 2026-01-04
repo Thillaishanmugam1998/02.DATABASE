@@ -1,0 +1,176 @@
+#USE THIS PROMPT TO PASTE IN CLADUE 
+# SQL Practice Database Prompt
+
+**Database Setup Requirements:**
+
+Create a realistic e-commerce database (similar to Amazon, Flipkart, Myntra, Ajio, JioMart) with the following specifications:
+
+**Database Structure:**
+- Minimum 10+ interconnected tables
+- Each table must have 25+ records
+- Real-world e-commerce scenario with proper relationships
+
+**Required Tables (Suggested):**
+1. **users** - Customer information (user_id, username, email, phone, registration_date, loyalty_points, account_status, etc.)
+2. **categories** - Product categories (category_id, category_name, parent_category_id, commission_rate, is_active)
+3. **sellers** - Seller/vendor information (seller_id, seller_name, business_name, rating, total_sales, city, state)
+4. **products** - Product catalog (product_id, product_name, category_id, seller_id, price, stock, brand, rating, launch_date)
+5. **orders** - Order details (order_id, user_id, order_date, total_amount, discount, payment_method, order_status, delivery_date)
+6. **order_items** - Individual items in orders (order_item_id, order_id, product_id, quantity, unit_price, discount_applied)
+7. **reviews** - Product reviews (review_id, product_id, user_id, rating, review_text, review_date, helpful_count)
+8. **addresses** - User addresses (address_id, user_id, address_type, street, city, state, pincode, is_default)
+9. **payments** - Payment transactions (payment_id, order_id, payment_date, amount, payment_method, transaction_status)
+10. **wishlists** - User wishlists (wishlist_id, user_id, product_id, added_date)
+11. **inventory_logs** - Stock movement tracking (log_id, product_id, change_type, quantity_change, timestamp, reason)
+12. **coupons** - Discount coupons (coupon_id, coupon_code, discount_type, discount_value, valid_from, valid_until, usage_limit)
+
+---
+
+**SQL Practice Questions - Topic-wise Coverage:**
+
+Generate comprehensive SQL questions covering these topics ONLY:
+
+**🟢 BEGINNER LEVEL:**
+
+1. **Query Data (SELECT)**
+   - Basic SELECT with single/multiple columns
+   - SELECT DISTINCT
+   - SELECT with expressions and calculations
+   - Using aliases
+
+2. **DDL Commands**
+   - CREATE TABLE with constraints
+   - ALTER TABLE (add/modify/drop columns)
+   - DROP/TRUNCATE tables
+   - CREATE INDEX
+
+3. **DML Commands**
+   - INSERT (single/multiple rows)
+   - UPDATE with conditions
+   - DELETE with conditions
+   - REPLACE operations
+
+**🟡 INTERMEDIATE LEVEL:**
+
+4. **Filtering Data**
+   - WHERE clause with conditions
+   - AND, OR, NOT operators
+   - BETWEEN, IN, LIKE, IS NULL
+   - Comparison operators
+
+5. **SQL Joins (Basics)**
+   - INNER JOIN
+   - LEFT JOIN
+   - RIGHT JOIN
+   - Simple 2-table joins
+
+6. **SQL Joins (Advanced)**
+   - FULL OUTER JOIN
+   - CROSS JOIN
+   - Self JOIN
+   - Multiple table joins (3+ tables)
+
+7. **Set Operators**
+   - UNION and UNION ALL
+   - INTERSECT
+   - EXCEPT/MINUS
+
+**🟠 ADVANCED LEVEL:**
+
+8. **SQL Functions**
+   
+   a. **String Functions**
+   - CONCAT, SUBSTRING, LENGTH
+   - UPPER, LOWER, TRIM
+   - REPLACE, LEFT, RIGHT
+   - INSTR, LPAD, RPAD
+
+   b. **Numeric Functions**
+   - ROUND, CEILING, FLOOR
+   - ABS, MOD, POWER
+   - GREATEST, LEAST
+
+   c. **Date and Time Functions**
+   - CURRENT_DATE, CURRENT_TIME, NOW()
+   - DATE_ADD, DATE_SUB, DATEDIFF
+   - YEAR, MONTH, DAY, HOUR, MINUTE
+   - DATE_FORMAT, STR_TO_DATE
+   - TIMESTAMPDIFF, LAST_DAY
+
+9. **NULL Functions**
+   - COALESCE
+   - IFNULL / ISNULL
+   - NULLIF
+   - Handling NULL in calculations
+
+10. **CASE Statement**
+    - Simple CASE
+    - Searched CASE
+    - Nested CASE
+    - CASE in SELECT, WHERE, ORDER BY
+
+11. **Aggregate Functions**
+    - COUNT, SUM, AVG
+    - MIN, MAX
+    - GROUP BY clause
+    - HAVING clause
+    - GROUP BY with multiple columns
+
+12. **Window Functions**
+    
+    a. **Window Functions Basics**
+    - OVER clause
+    - PARTITION BY
+    - ORDER BY in window functions
+    - Frame specifications (ROWS/RANGE)
+
+    b. **Window Aggregate**
+    - SUM() OVER
+    - AVG() OVER
+    - COUNT() OVER
+    - Running totals and moving averages
+
+    c. **Window Ranking**
+    - ROW_NUMBER()
+    - RANK()
+    - DENSE_RANK()
+    - NTILE()
+
+    d. **Window Value**
+    - LEAD()
+    - LAG()
+    - FIRST_VALUE()
+    - LAST_VALUE()
+
+---
+
+**Question Format Requirements:**
+
+For each topic, provide:
+- **Easy Questions** (5-8): Basic understanding, single concept
+- **Medium Questions** (5-8): Combining 2-3 concepts, practical scenarios
+- **Hard Questions** (3-5): Complex queries, multiple concepts, real-world business problems
+
+**Question Structure:**
+1. Clear problem statement in Tamil/English
+2. Expected output description
+3. Hints if needed (for hard questions)
+4. Business context (realistic e-commerce scenarios)
+
+**Example Question Types:**
+- "Find all active users who registered in the last 6 months"
+- "Calculate total revenue per category for December 2024"
+- "Show top 5 products with highest average rating (minimum 10 reviews)"
+- "Find customers who placed orders but never left reviews"
+- "Calculate running total of daily sales using window functions"
+- "Rank sellers by revenue within each category"
+
+---
+
+**Important Notes:**
+- Questions should ONLY cover the topics mentioned above
+- No subqueries, CTEs, stored procedures, or triggers
+- Each question should be solvable using the given database structure
+- Progressive difficulty within each topic
+- Real business scenarios from e-commerce domain
+- Total 80-100+ questions covering all topics thoroughly
