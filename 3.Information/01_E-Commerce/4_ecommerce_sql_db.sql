@@ -878,7 +878,7 @@ EASY QUESTIONS:
 -- Q5: Show all order statuses from orders table without duplicates
 -- Expected: Unique order statuses (Pending, Confirmed, Shipped, etc.)
 
--- Q6: Calculate price after 10% discount for all products (display product_name, price, discounted_price)
+-- Q6: Calculate price after 10% discount for all products (display product_name, price,    )
 -- Expected: Products with original and discounted prices
 
 -- Q7: Display product names in UPPERCASE from products table
