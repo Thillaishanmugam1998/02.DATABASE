@@ -182,7 +182,12 @@ GO
 -- 9) USING CAST TO PRESERVE DECIMAL PRECISION
 -- ===============================================================
 -- Integer division truncates decimals by default
+
+SELECT 10/3
+--Here output is 3 because treat as int
+
 SELECT CAST(10 AS DECIMAL(5,2)) / 3 AS DecimalResult;
+
 GO
 /*
  OUTPUT:

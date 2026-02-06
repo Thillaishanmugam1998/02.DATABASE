@@ -64,6 +64,8 @@ Explanation:
 -- 4. STEP-BY-STEP EXAMPLES WITH TABLES
 -- ===============================================================
 
+Drop Table Sales;
+
 -- Sample table: Sales
 CREATE TABLE Sales (
     id INT,

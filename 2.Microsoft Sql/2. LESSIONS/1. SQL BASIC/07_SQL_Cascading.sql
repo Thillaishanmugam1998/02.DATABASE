@@ -191,8 +191,8 @@ INSERT INTO Orders VALUES
 (2, 'Kumar', 4, 2);
 
 -- UPDATE parent PK
-UPDATE Products SET ProductCode = 3 WHERE ProductCode = 3;
--- ✔ Orders.ProductID auto updates from 3 → 3 (example)
+UPDATE Products SET ProductCode = 6 WHERE ProductCode = 3;
+-- ✔ Orders.ProductID auto updates from 3 → 6 (example)
 
 -- DELETE parent PK
 DELETE FROM Products WHERE ProductCode = 4;
@@ -203,7 +203,7 @@ SELECT * FROM Orders;
 Sample Output:
 OrderID | CustomerName | ProductID | Quantity
 ---------------------------------------------
-1       | Arun         | 3         | 1
+1       | Arun         | 6         | 1
 */
 
 /*--------------------------------------------------------------
