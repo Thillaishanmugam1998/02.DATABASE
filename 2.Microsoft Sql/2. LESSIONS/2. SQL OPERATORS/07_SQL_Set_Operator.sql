@@ -128,6 +128,8 @@ GO
 */
 
 -- Notes: UNION removes duplicate rows
+-- If You Get 2 columns from both tables, that 2 column will same on both table then only remove, if one column have same and another 
+-- Not means not remove and not consider as duplicate.
 
 /*========================================================
 5) UNION ALL OPERATOR

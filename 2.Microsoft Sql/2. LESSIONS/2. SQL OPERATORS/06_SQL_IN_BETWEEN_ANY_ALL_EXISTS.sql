@@ -113,7 +113,8 @@ GO
 ========================================================*/
 SELECT * 
 FROM Students
-WHERE Score BETWEEN 70 AND 90;
+WHERE Score BETWEEN 72 AND 90
+ORDER BY Score;
 GO
 
 SELECT *
@@ -131,7 +132,7 @@ GO
 
 SELECT * 
 FROM Students
-WHERE StudentName LIKE '%a';
+WHERE StudentName LIKE '%A';
 GO
 
 SELECT * 
