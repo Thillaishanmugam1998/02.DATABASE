@@ -140,7 +140,7 @@ OUTPUT: All departments shown, including any dept without employees (if existed)
 Returns all rows from both tables. Non-matching rows get NULLs
 */
 
-SELECT E.EmpID, E.EmpName, D.DeptName, E.Salary
+SELECT *
 FROM Employee E
 FULL OUTER JOIN Department D
 ON E.DeptID = D.DeptID;
