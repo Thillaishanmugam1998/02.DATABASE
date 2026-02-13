@@ -33,6 +33,7 @@ SELECT
     AVG(COALESCE(Score, 0)) OVER () AS AvgScores2
 FROM Sales.Customers;
 
+
 /* ==============================================================================
    HANDLE NULL - MATHEMATICAL OPERATORS
 ===============================================================================*/

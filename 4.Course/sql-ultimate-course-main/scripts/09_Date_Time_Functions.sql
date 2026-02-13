@@ -226,7 +226,7 @@ FROM Sales.Orders;
 SELECT
     EmployeeID,
     BirthDate,
-    DATEDIFF(year, BirthDate, GETDATE()) AS Age
+    DATEDIFF(YEAR, BirthDate, GETDATE()) AS Age
 FROM Sales.Employees;
 
 /* TASK 16:
