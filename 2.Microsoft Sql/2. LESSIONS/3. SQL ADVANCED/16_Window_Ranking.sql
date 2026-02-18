@@ -7,11 +7,12 @@
    distributions on ordered data.
 
    Table of Contents:
-     1. ROW_NUMBER
-     2. RANK
-     3. DENSE_RANK
-     4. NTILE
-     5. CUME_DIST
+     1. ROW_NUMBER -- Assign unique number for each row 
+     2. RANK  -- Assign number for each row if 2 row have same value then asign same number and skip the number to assign with gap 
+     3. DENSE_RANK -- Assign number same for 2 rows but without skip the gap
+     4. NTILE -- (bucketsize = number of rows/number of bucket)
+     5. CUME_DIST -- (position number of row / number of row) cumulative_rank -- The position of the last occurance of the same value 
+     6. PERCENT_RANK() -- (position number of row  - 1 / number of row - 1) -- The position of the first occurance of the same value 
 =================================================================================
 */
 

@@ -13,6 +13,55 @@
 */
 
 /* ==============================================================================
+01. SQL SERVER ?
+---- This is Top of the Hireachy Level
+---- Stores, manages and provides access to databases for users or applications.
+
+02. DATA BASE?
+---- Collection of information that is stored in a structed way.
+
+03. SCHEMA?
+---- Logical layer that groups related objects together.
+
+04. TABLE?
+---- A place where data is stored and organized into rows and columns.
+
+05. VIEW?
+---- Is a virtual table that shows data without storing it physically.
+
+06. DDL?
+---- (data definition language)
+---- A set of commands that allows us to define and manage the structure of a database.
+---- Create, Alter, Drop 
+
+===============================================================================
+*/
+
+
+/* ==============================================================================
+
+PHYSICAL DATA (TABLES) ----------> (Original query) VIRTUAL TABLE (VIEW) -------> QUERY(Select * From View)
+REAL DATA ----> ABSTRACTION LAYER ---------> YOU 
+
+DIFFERENCE BW VIEW VS TABLE:
+VIEW:
+1. No Persistance data
+2. easy to maintain
+3. Slow response
+4. Read
+
+
+TABLE:
+1. Persisted Data
+2. Hard to maintain
+3. Fast response
+4. Read/Write
+===============================================================================
+*/
+
+
+
+/* ==============================================================================
    CREATE, DROP, MODIFY VIEW
 ===============================================================================*/
 

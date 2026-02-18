@@ -207,7 +207,7 @@ WHERE Gender = 'F'
 */
 SELECT
     *,
-    (SELECT COUNT(*)
+    (SELECT COUNT(*) 
      FROM Sales.Orders o
      WHERE o.CustomerID = c.CustomerID) AS TotalSales
 FROM Sales.Customers AS c;

@@ -6,8 +6,8 @@
    analysis on ordered data.
 
    Table of Contents:
-     1. LEAD
-     2. LAG
+     1. LEAD -- Access a value from the next row within a window
+     2. LAG -- Access a value from the previous row within a window 
      3. FIRST_VALUE
      4. LAST_VALUE
 =================================================================================

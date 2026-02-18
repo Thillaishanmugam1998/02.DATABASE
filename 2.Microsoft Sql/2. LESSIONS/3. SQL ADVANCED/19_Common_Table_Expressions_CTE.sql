@@ -6,15 +6,84 @@
    as well as recursive CTEs for generating sequences and building hierarchical data.
 
    Table of Contents:
-     1. NON-RECURSIVE CTE
+     1. NON-RECURSIVE CTE ----(1. STAND ALONE  CTE, 2. NESTED CTE)
      2. RECURSIVE CTE | GENERATE SEQUENCE
      3. RECURSIVE CTE | BUILD HIERARCHY
+   
+   NOTE: Order By Not Allowed In CTE 
+
+   CTE - Common table expression is temporary named result set that can be used multiple times when the query.
+   -- Result of cte is like table but cant be used cte in from multiple queries. 
+   -- Dont create more then 5 cte  
+
+   01. STAND ALONE CTE Syntax:
+   ---------------------------
+   WITH CTE-Name AS
+   (
+     SELECT ...
+     FROM ....
+     WHERE ...
+   )
+
+   SELECT ....
+   FROM CTE-Name
+   WHERE ....
+
+    02. NESTED CTE Syntax:
+   ---------------------------
+   WITH CTE-Name AS
+   (
+     SELECT ...
+     FROM ....
+     WHERE ...
+   ),
+   CTE-Name2 AS
+   (
+     SELECT ....
+     FROM CTE-Name1
+     WHERE ...
+   )
+
+   SELECT ....
+   FROM CTE-Name2
+   WHERE ....
 ===============================================================================
+
+-- 01. STAND ALONE CTE (NON-RECURSIVE CTE)
+---Defined and used independently.
+---Runs independently as it is self-contained and doesnot rely on other CTE's or queries.
+
+-- 02. NESTED CTE (NON-RECURSIVE CTE)
+---CTE inside another CTE
+---A nested CTE uses the result of another CTE, so it can't run independently.
+
+
+WITH CTE_Total_Sales AS
+(
+    SELECT
+        CustomerID,
+        SUM(Sales) AS TotalSales
+    FROM Sales.Orders
+    GROUP BY CustomerID
+)
+--- MAIN QUERY
+SELECT
+    c.CustomerID,
+    c.FirstName,
+    c.LastName,
+    cts.TotalSales
+FROM Sales.Customers AS c
+LEFT JOIN CTE_Total_Sales AS cts ON cts.CustomerID = c.CustomerID
 
 /* ==============================================================================
    NON-RECURSIVE CTE
 ===============================================================================*/
 
+01. WHAT IS NON - RECURSIVE CTE ?
+ --- It Is executed only once without any repetition.
+
+02. WHAT IS RECURSIVE - CTE?
+ --- Self-referencing query that repeatedly processes data untill a specific condition is met.
 
 -- Step1: Find the total Sales Per Customer (Standalone CTE)
 WITH CTE_Total_Sales AS
@@ -29,7 +98,7 @@ WITH CTE_Total_Sales AS
 , CTE_Last_Order AS
 (
     SELECT
-        CustomerID,
+        CustomerID, 
         MAX(OrderDate) AS Last_Order
     FROM Sales.Orders
     GROUP BY CustomerID
@@ -78,6 +147,27 @@ LEFT JOIN CTE_Customer_Segments AS ccs
 /* ==============================================================================
    RECURSIVE CTE | GENERATE SEQUENCE
 ===============================================================================*/
+
+SYNTAX FOR RECURSIVE CTE:
+-------------------------
+WITH CTE-NAME AS
+(
+  SELECT ...
+  FROM ....
+  WHERE ....
+
+  UNINON ALL /UNION
+
+  SELECT ....
+  FROM CTE-NAME
+  WHERE [Break Condition]
+)
+
+SELECT ...
+FROM CTE-NAME
+WHERE ...
+
+// -- Note Here first part is anchor query and secound one recursive query
 
 /* TASK 2:
    Generate a sequence of numbers from 1 to 20.
