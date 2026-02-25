@@ -5,6 +5,8 @@
    It covers result types, subqueries in the FROM clause, in SELECT, in JOIN clauses,
    with comparison operators, IN, ANY, correlated subqueries, and EXISTS.
    
+   SUBQUERY - A Query Inside Another Query Is Called SubQuery 
+
    Table of Contents:
      1. SUBQUERY - RESULT TYPES
      2. SUBQUERY - FROM CLAUSE
