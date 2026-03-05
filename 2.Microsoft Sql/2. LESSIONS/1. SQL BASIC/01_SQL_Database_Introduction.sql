@@ -1,203 +1,182 @@
-/*==========================================================
-    SQL SERVER BASIC DATABASE NOTES
-    For Beginners (YouTube Class Friendly)
+﻿/*=============================================================================
+    FILE: 01_SQL_Database_Introduction.sql
+    TOPIC: DATABASE CREATION + RENAME + SINGLE_USER/MULTI_USER
+    DB   : SQL Server
 
-    File Type   : .sql
-    Purpose     : Learn What is Database + Why we need it
-                  + Types of Databases
-                  + Basic Database Commands
+    GOAL OF THIS LESSON:
+    - Learn database commands from zero level.
+    - Understand syntax and why each command is used.
+    - Understand safe rename flow in real projects.
+=============================================================================*/
 
-==========================================================*/
-
-
-/*==========================================================
-    WHAT IS A DATABASE?
-==========================================================*/
+/*=============================================================================
+    1) WHAT IS A DATABASE?
+=============================================================================*/
 /*
-    A Database is a place where data is stored
-    in an organized and secure way.
+A database is a structured storage system used by applications.
 
-    Example (Real Life):
-    --------------------
-    - School stores student details
-    - Bank stores customer & transaction details
-    - YouTube stores videos, likes, comments
-    - WhatsApp stores messages and contacts
+Example:
+- In an e-commerce app, customers, products, orders, and payments
+  are stored in database tables.
 
-    All this data is stored inside DATABASES.
+Without database:
+- data duplication increases
+- search/reporting becomes difficult
+- multi-user access is unreliable
 */
 
-
-/*==========================================================
-    WHY DO WE NEED A DATABASE?
-==========================================================*/
+/*=============================================================================
+    2) CREATE DATABASE - SYNTAX AND EXAMPLE
+=============================================================================*/
 /*
-    Without a database:
-    -------------------
-    - Data will be lost
-    - No security
-    - Hard to search
-    - Cannot handle large data
+Syntax:
+CREATE DATABASE DatabaseName;
 
-    With a database:
-    ----------------
-    - Data is safe and secure
-    - Fast searching
-    - Multiple users can access data
-    - Easy backup and recovery
+Use case:
+- First step when starting a new project.
+- Creates a new logical container for all project tables.
 */
 
-
-/*==========================================================
-    TYPES OF DATABASES (WITH REAL-TIME EXAMPLES)
-==========================================================*/
-/*
-    1. Relational Database (RDBMS)
-       ----------------------------
-       - Data stored in tables (rows & columns)
-       - Uses SQL language
-
-       Examples:
-       - SQL Server
-       - MySQL
-       - Oracle
-
-       Real-Time Use:
-       - Banking systems
-       - School management
-       - Employee records
-
-
-    2. NoSQL Database
-       ----------------
-       - Data not stored in table format
-       - Used for big data & fast applications
-
-       Examples:
-       - MongoDB
-       - Cassandra
-
-       Real-Time Use:
-       - Facebook
-       - Instagram
-       - Amazon
-
-
-    3. Cloud Database
-       ----------------
-       - Database stored on cloud (internet)
-
-       Examples:
-       - Azure SQL Database
-       - Amazon RDS
-
-       Real-Time Use:
-       - Online apps
-       - Web applications
-
-
-    4. In-Memory Database
-       -------------------
-       - Data stored in RAM (very fast)
-
-       Example:
-       - Redis
-
-       Real-Time Use:
-       - Live chat apps
-       - Gaming applications
-*/
-
-
-/*==========================================================
-    DATABASE CREATION
-    Syntax: CREATE DATABASE <DatabaseName>
-==========================================================*/
-CREATE DATABASE TestDB;
+IF DB_ID('RetailLearningDB') IS NULL
+BEGIN
+    CREATE DATABASE RetailLearningDB;
+END
 GO
 
-
-/*==========================================================
-    RENAME DATABASE
-    Method 1 (Recommended):
-    ALTER DATABASE
-==========================================================*/
-/*
-    We are renaming database:
-    Old Name : TestDB
-    New Name : TestDatabase
-*/
-ALTER DATABASE TestDB MODIFY NAME = TestDatabase;
+/* Verify */
+SELECT name AS DatabaseName
+FROM sys.databases
+WHERE name = 'RetailLearningDB';
 GO
 
-
-/*==========================================================
-    RENAME DATABASE
-    Method 2 (Old Method):
-    sp_renamedb (Stored Procedure)
-==========================================================*/
+/*=============================================================================
+    3) USE DATABASE - WHY IMPORTANT?
+=============================================================================*/
 /*
-    This method still works but NOT recommended
-    for new projects.
+Syntax:
+USE DatabaseName;
+
+Why:
+- SQL Server can host many databases.
+- USE tells SQL Server where your next commands should execute.
 */
-EXEC sp_renamedb 'TestDatabase', 'TestDB';
+
+USE RetailLearningDB;
 GO
 
-
-/*==========================================================
-    IMPORTANT NOTE ABOUT DATABASE LOCKING
-==========================================================*/
+/*=============================================================================
+    4) RENAME DATABASE - WHY / WHEN?
+=============================================================================*/
 /*
-    SQL Server will NOT allow rename or delete
-    if users are connected to the database.
+Common situations:
+- Temporary name during development, final name needed later.
+- Naming standard changes (example: TestDB -> RetailLearningDB).
+- Organization-level naming policy updates.
 
-    Solution:
-    ----------
-    Set database to SINGLE_USER mode.
-    This disconnects all users immediately.
+Important:
+- Rename can fail if users or applications are connected.
+- So we usually switch to SINGLE_USER mode first.
 */
 
+/*=============================================================================
+    5) SINGLE_USER MODE - WHY WE CHANGE?
+=============================================================================*/
+/*
+SINGLE_USER mode allows only one connection.
 
-/*==========================================================
-    SET DATABASE TO SINGLE_USER MODE
-==========================================================*/
-ALTER DATABASE TestDB
+Why change to SINGLE_USER before rename/drop/maintenance?
+- Prevents active user sessions from locking the database.
+- Avoids "database is in use" errors.
+- Ensures maintenance command succeeds immediately.
+*/
+
+ALTER DATABASE RetailLearningDB
 SET SINGLE_USER
 WITH ROLLBACK IMMEDIATE;
 GO
 
-
-/*==========================================================
-    DROP DATABASE
-    (Delete Database Completely)
-==========================================================*/
 /*
-    WARNING:
-    --------
-    This command permanently deletes the database.
+WITH ROLLBACK IMMEDIATE:
+- Disconnects other active users instantly.
+- Rolls back their running transactions.
 */
-DROP DATABASE TestDB;
+
+/*=============================================================================
+    6) RENAME DATABASE - SAFE FLOW
+=============================================================================*/
+/*
+Syntax:
+ALTER DATABASE OldName MODIFY NAME = NewName;
+
+Real demonstration:
+RetailLearningDB -> RetailLearningDB_Training
+*/
+
+ALTER DATABASE RetailLearningDB
+MODIFY NAME = RetailLearningDB_Training;
 GO
 
+/* Check renamed database */
+SELECT name
+FROM sys.databases
+WHERE name IN ('RetailLearningDB', 'RetailLearningDB_Training');
+GO
 
-/*==========================================================
-    SET DATABASE BACK TO MULTI_USER MODE
-==========================================================*/
+/*=============================================================================
+    7) MULTI_USER MODE - WHY WE CHANGE BACK?
+=============================================================================*/
 /*
-    After rename or maintenance,
-    allow multiple users again.
+After maintenance, production/test users must connect again.
+So change SINGLE_USER back to MULTI_USER.
 */
-ALTER DATABASE TestDatabase
+
+ALTER DATABASE RetailLearningDB_Training
 SET MULTI_USER;
 GO
 
-
-/*==========================================================
-    USE DATABASE
-==========================================================*/
+/*=============================================================================
+    8) RENAME BACK FOR THIS COURSE CONTINUITY
+=============================================================================*/
 /*
-    This command tells SQL Server
-    which database you want to work with.
+All remaining lesson files use RetailLearningDB.
+So we rename back to keep the full course consistent.
 */
-USE TestDatabase;
+
+ALTER DATABASE RetailLearningDB_Training
+SET SINGLE_USER
+WITH ROLLBACK IMMEDIATE;
 GO
+
+ALTER DATABASE RetailLearningDB_Training
+MODIFY NAME = RetailLearningDB;
+GO
+
+ALTER DATABASE RetailLearningDB
+SET MULTI_USER;
+GO
+
+USE RetailLearningDB;
+GO
+
+/*=============================================================================
+    9) FINAL RECAP (FULL UNDERSTANDING)
+=============================================================================*/
+/*
+1. CREATE DATABASE:
+   Creates a new database container.
+
+2. USE:
+   Switches execution context to selected database.
+
+3. SINGLE_USER:
+   Use before rename/drop/maintenance when active connections exist.
+
+4. ALTER DATABASE ... MODIFY NAME:
+   Renames database safely.
+
+5. MULTI_USER:
+   Restore normal access after maintenance.
+
+Golden practical flow:
+SINGLE_USER -> RENAME/MAINTENANCE -> MULTI_USER
+*/

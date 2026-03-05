@@ -1,130 +1,235 @@
-﻿/*==============================================================
-    SQL SUB-TYPES (SQL COMMAND CATEGORIES)
-==============================================================*/
--- SQL commands are divided into 5 main types:
+﻿/*=============================================================================
+    FILE: 02_SQL_Table_Operations.sql
+    TOPIC: SQL COMMAND TYPES + TABLE OPERATIONS
+    DB   : RetailLearningDB
 
--- 1) DDL (Data Definition Language)
---    Used to CREATE or MODIFY database objects
---    Commands: CREATE, ALTER, DROP, TRUNCATE, sp_rename
+    LEARNING GOAL:
+    - First understand SQL command categories completely
+    - Then practice table operations with real examples
+=============================================================================*/
 
--- 2) DML (Data Manipulation Language)
---    Used to INSERT, UPDATE, DELETE data
---    Commands: INSERT, UPDATE, DELETE
+IF DB_ID('RetailLearningDB') IS NULL
+BEGIN
+    CREATE DATABASE RetailLearningDB;
+END
+GO
 
--- 3) DQL / DRL (Data Query / Retrieval Language)
---    Used to FETCH data from tables
---    Commands: SELECT
+USE RetailLearningDB;
+GO
 
--- 4) TCL (Transaction Control Language)
---    Used to manage transactions
---    Commands: COMMIT, ROLLBACK, SAVEPOINT
+/*=============================================================================
+    1) SQL COMMAND CATEGORIES - FULL EXPLANATION
+=============================================================================*/
+/*
+SQL commands are commonly grouped into 5 families:
 
--- 5) DCL (Data Control Language)
---    Used to control user permissions
---    Commands: GRANT, REVOKE
+1. DDL (Data Definition Language)
+   Purpose:
+   - Create or change database objects (database, table, column, constraint)
 
+   Commands:
+   - CREATE
+   - ALTER
+   - DROP
+   - TRUNCATE
+   - RENAME (in SQL Server usually via sp_rename)
 
-/*==============================================================
-    01. CREATE TABLE
-==============================================================*/
--- Used to create a new table in the database
+   Real-time example:
+   - When a new module starts, developer creates tables.
+   - When business adds a new field (ex: GSTNumber), table is altered.
 
--- Syntax:
--- CREATE TABLE <TableName>
--- (
---      <ColumnName1> <DataType> [Size],
---      <ColumnName2> <DataType> [Size],
---      ...
--- );
+2. DML (Data Manipulation Language)
+   Purpose:
+   - Add, update, delete actual row data inside tables
 
--- Example:
-CREATE TABLE Student
+   Commands:
+   - INSERT
+   - UPDATE
+   - DELETE
+
+   Real-time example:
+   - Insert new customer
+   - Update mobile number
+   - Delete cancelled test records
+
+3. DQL (Data Query Language)
+   Purpose:
+   - Read/fetch data
+
+   Command:
+   - SELECT
+
+   Real-time example:
+   - Fetch all active customers
+   - Generate dashboard reports
+
+4. TCL (Transaction Control Language)
+   Purpose:
+   - Control transaction behavior (all-or-nothing changes)
+
+   Commands:
+   - BEGIN TRANSACTION
+   - COMMIT
+   - ROLLBACK
+
+   Real-time example:
+   - Transfer money: debit and credit must both succeed.
+
+5. DCL (Data Control Language)
+   Purpose:
+   - Control access/security permissions
+
+   Commands:
+   - GRANT
+   - REVOKE
+
+   Real-time example:
+   - Give read-only access to reporting user.
+*/
+
+/*=============================================================================
+    2) WHY TABLE OPERATIONS MATTER?
+=============================================================================*/
+/*
+Table operations are part of DDL and are used in every project phase:
+
+- Initial development: CREATE TABLE
+- Requirement changes: ALTER TABLE
+- Data reset in testing: TRUNCATE TABLE
+- Cleanup/decommission: DROP TABLE
+
+If these are not understood clearly:
+- You may lose data accidentally.
+- You may break dependent queries/procedures.
+- Production changes can fail.
+*/
+
+/*=============================================================================
+    3) PRACTICAL SAMPLE FLOW (STEP-BY-STEP)
+    Use case: Customer master table in retail app
+=============================================================================*/
+
+/*---------------------------------------------------------------------
+  STEP 1: CREATE TABLE (DDL)
+---------------------------------------------------------------------*/
+DROP TABLE IF EXISTS DemoCustomer;
+GO
+
+CREATE TABLE DemoCustomer
 (
-    StId    INT,                -- Student ID
-    SName   VARCHAR(MAX),       -- Student Name
-    Salary  DECIMAL(6,2)        -- Student Salary
+    CustomerID INT,
+    CustomerName VARCHAR(100),
+    City VARCHAR(50)
 );
+GO
 
+/*
+Explanation:
+- CustomerID: customer numeric id
+- CustomerName: name of customer
+- City: location
+*/
 
-/*==============================================================
-    02. ALTER TABLE
-    (Modify Existing Table Structure)
-==============================================================*/
+/*---------------------------------------------------------------------
+  STEP 2: INSERT DATA (DML) - to verify table works
+---------------------------------------------------------------------*/
+INSERT INTO DemoCustomer (CustomerID, CustomerName, City)
+VALUES
+(1, 'Arun', 'Chennai'),
+(2, 'Meena', 'Coimbatore');
 
--- 1) Change column size (width)
--- Syntax:
--- ALTER TABLE <TableName>
--- ALTER COLUMN <ColumnName> <DataType>(NewSize);
-ALTER TABLE Student
-ALTER COLUMN SName VARCHAR(100);
+SELECT * FROM DemoCustomer;
+GO
 
+/*---------------------------------------------------------------------
+  STEP 3: ALTER TABLE (DDL)
+---------------------------------------------------------------------*/
 
--- 2) Change data type of column
--- Syntax:
--- ALTER TABLE <TableName>
--- ALTER COLUMN <ColumnName> <NewDataType>;
-ALTER TABLE Student
-ALTER COLUMN SName NVARCHAR(100);
+-- 3.1 Change data type/size (support larger multilingual names)
+ALTER TABLE DemoCustomer
+ALTER COLUMN CustomerName NVARCHAR(120);
 
+-- 3.2 Add new column (new business requirement)
+ALTER TABLE DemoCustomer
+ADD MobileNo CHAR(10) NULL;
 
--- 3) Change NULL to NOT NULL or NOT NULL to NULL
--- Syntax:
--- ALTER TABLE <TableName>
--- ALTER COLUMN <ColumnName> <DataType> NOT NULL;
--- ALTER TABLE <TableName>
--- ALTER COLUMN <ColumnName> <DataType> NULL;
-ALTER TABLE Student
-ALTER COLUMN StId INT NOT NULL;
+-- 3.3 Drop old column (if no longer needed)
+ALTER TABLE DemoCustomer
+DROP COLUMN City;
 
-ALTER TABLE Student
-ALTER COLUMN StId INT NULL;
+-- 3.4 Rename column for better naming clarity
+EXEC sp_rename 'DemoCustomer.CustomerName', 'FullName', 'COLUMN';
 
+-- 3.5 Rename table
+EXEC sp_rename 'DemoCustomer', 'DemoCustomerMaster';
+GO
 
--- 4) Add a new column
--- Syntax:
--- ALTER TABLE <TableName>
--- ADD <ColumnName> <DataType>(Size);
-ALTER TABLE Student
-ADD Branch VARCHAR(50);
+SELECT * FROM DemoCustomerMaster;
+GO
 
+/*---------------------------------------------------------------------
+  STEP 4: TRUNCATE TABLE (DDL)
+---------------------------------------------------------------------*/
+/*
+TRUNCATE TABLE DemoCustomerMaster;
 
--- 5) Delete (Drop) a column
--- Syntax:
--- ALTER TABLE <TableName>
--- DROP COLUMN <ColumnName>;
-ALTER TABLE Student
-DROP COLUMN Branch;
+What it does:
+- Deletes all rows quickly
+- Keeps table structure
 
+Important points:
+- WHERE clause not allowed
+- Usually used in test/staging cleanup
+- Cannot be used when table is referenced by active foreign key
+*/
 
--- 6) Rename column or table
--- Using system stored procedure: sp_rename
+TRUNCATE TABLE DemoCustomerMaster;
+SELECT * FROM DemoCustomerMaster;
+GO
 
--- Syntax:
--- EXEC sp_rename 'TableName.OldColumnName', 'NewColumnName';
--- EXEC sp_rename 'OldTableName', 'NewTableName';
+/*---------------------------------------------------------------------
+  STEP 5: DROP TABLE (DDL)
+---------------------------------------------------------------------*/
+/*
+DROP TABLE removes:
+- all rows
+- full table structure
 
-EXEC sp_rename 'Student.SName', 'StudentName';
+After DROP, table no longer exists.
+*/
+DROP TABLE DemoCustomerMaster;
+GO
 
+/*=============================================================================
+    4) IMPORTANT DIFFERENCE: DELETE vs TRUNCATE vs DROP
+=============================================================================*/
+/*
+DELETE:
+- DML command
+- Removes rows (can use WHERE)
+- Table structure stays
 
-/*==============================================================
-    03. TRUNCATE TABLE
-==============================================================*/
--- Deletes ALL rows from table
--- WHERE clause is NOT allowed
--- Table structure remains
--- Faster than DELETE
+TRUNCATE:
+- DDL command
+- Removes all rows only (no WHERE)
+- Table structure stays
+- Faster for full table cleanup
 
--- Syntax:
--- TRUNCATE TABLE <TableName>;
-TRUNCATE TABLE Student;
+DROP:
+- DDL command
+- Removes complete object (structure + data)
+*/
 
+/*=============================================================================
+    5) QUICK RECAP
+=============================================================================*/
+/*
+- DDL changes structure.
+- DML changes data.
+- DQL reads data.
+- TCL controls transaction safety.
+- DCL controls permissions.
 
-/*==============================================================
-    04. DROP TABLE
-==============================================================*/
--- Permanently deletes the table
--- Both data and structure are removed
-
--- Syntax:
--- DROP TABLE <TableName>;
-DROP TABLE Student;
+Most used table lifecycle:
+CREATE -> ALTER -> (INSERT/UPDATE/DELETE/SELECT) -> TRUNCATE or DROP
+*/

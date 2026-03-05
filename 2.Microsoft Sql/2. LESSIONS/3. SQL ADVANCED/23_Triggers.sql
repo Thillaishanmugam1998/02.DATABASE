@@ -7,6 +7,27 @@
 =================================================================================
 */
 
+--- What is triggers
+Special stored procedure that automatically runs in response to a specific event on a table or view
+
+Example
+If I have a one table When this table hit a event (insert/update/delete) 
+then trigger will 
+
+--sql treigger types
+1. DML ( Insert/update/delete) => (after trigger, Instead of)
+    1.1 After Trigger (Runs after ebvent)
+    1.2 Instead of (Runs during event)
+2. DDL  (create/alter/drop)
+3.LOGGON
+
+--- Trigger Syntax:
+CREATE TRIGGER <TriggerName> ON <TableName>
+AFTER INSERT, UPDATE, DELETE --- When this trigger will happen
+BEGIN
+    --- SQL STATEMENTS GO HERE ( What happen)
+END
+
 -- Step 1: Create Log Table
 CREATE TABLE Sales.EmployeeLogs
 (
@@ -31,6 +52,10 @@ BEGIN
     FROM INSERTED;
 END;
 GO
+
+--NOTE:
+Inserted means it is a virtual table that holds a copy of rows that are being 
+inserted into the target table 
 
 -- Step 3: Insert New Data Into Employees
 INSERT INTO Sales.Employees

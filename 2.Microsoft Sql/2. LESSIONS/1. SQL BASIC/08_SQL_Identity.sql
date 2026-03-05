@@ -1,242 +1,251 @@
-﻿/*==============================================================
-  FILE  : 07_identity_practice_clean.sql
-  TOPIC : SQL SERVER IDENTITY
-  PURPOSE:
-    - Understand IDENTITY
-    - Auto increment behavior
-    - Manual insert using IDENTITY_INSERT
-    - Delete vs Truncate
-    - Reset (RESEED)
-    - Check identity values
-==============================================================*/
+﻿/*=============================================================================
+    FILE: 08_SQL_Identity.sql
+    TOPIC: SQL SERVER IDENTITY - COMPLETE CONCEPT
+    DB   : RetailLearningDB
 
-/*==============================================================
-  1) WHAT IS IDENTITY?
---------------------------------------------------------------
-- IDENTITY is a property of a column in SQL Server.
-- It automatically generates sequential numbers for new rows.
-- Think of it like a counter that increases automatically every time you add a row.
-- Example: EmpID 1, 2, 3, 4 …
-==============================================================*/
+    LEARNING GOAL:
+    - What IDENTITY is and why used
+    - Syntax and behavior
+    - Manual identity insert
+    - Identity gap after DELETE
+    - Duplicate identity behavior
+    - DELETE vs TRUNCATE and identity reset
+    - Identity value functions (SCOPE_IDENTITY, @@IDENTITY, IDENT_CURRENT)
+=============================================================================*/
 
-/*==============================================================
-  2) SYNTAX
---------------------------------------------------------------
-IDENTITY(seed, increment)
-- seed      → starting value (default 1)
-- increment → step value (default 1)
-- Example: IDENTITY(1,1) → starts at 1 and increases by 1 each row
-==============================================================*/
+IF DB_ID('RetailLearningDB') IS NULL
+BEGIN
+    CREATE DATABASE RetailLearningDB;
+END
+GO
 
-/*==============================================================
-  3) CREATE TABLE WITH IDENTITY
-==============================================================*/
+USE RetailLearningDB;
+GO
 
-IF OBJECT_ID('employee') IS NOT NULL
-    DROP TABLE employee;
+/*=============================================================================
+    1) WHAT IS IDENTITY?
+=============================================================================*/
+/*
+IDENTITY is an auto-number generator for a column.
 
-CREATE TABLE employee
+Commonly used for surrogate primary key.
+Each new row gets next numeric value automatically.
+
+Syntax inside CREATE TABLE:
+ColumnName INT IDENTITY(seed, increment)
+
+Seed - Starting value for first row
+Increment - Value added to previous identity for next row
+
+Example:
+TicketID INT IDENTITY(1000,1)
+- First row  : 1000
+- Next rows  : 1001, 1002, ...
+*/
+
+/*=============================================================================
+    2) BASE TABLE SETUP
+=============================================================================*/
+DROP TABLE IF EXISTS SupportTickets_IdentityDemo;
+GO
+
+CREATE TABLE SupportTickets_IdentityDemo
 (
-    empid   INT IDENTITY(1,1) PRIMARY KEY, -- Auto-increment ID
-    empname VARCHAR(30)
+    TicketID INT IDENTITY(1000,1) PRIMARY KEY,
+    CustomerName NVARCHAR(100) NOT NULL,
+    IssueTitle NVARCHAR(150) NOT NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSDATETIME()
 );
+GO
 
+/*=============================================================================
+    3) NORMAL INSERT (IDENTITY AUTO GENERATION)
+=============================================================================*/
+INSERT INTO SupportTickets_IdentityDemo (CustomerName, IssueTitle)
+VALUES
+(N'Arun', N'Payment failed'),
+(N'Meena', N'Unable to login'),
+(N'Vikram', N'Address update issue');
+
+SELECT * FROM SupportTickets_IdentityDemo ORDER BY TicketID;
+GO
+
+/*=============================================================================
+    4) CHECK GENERATED IDENTITY VALUES
+=============================================================================*/
 /*
-NOTE:
-- If a column already exists without IDENTITY, you cannot just "add" IDENTITY.
-- You must create a new column with IDENTITY or recreate the table.
+Important functions:
+1) SCOPE_IDENTITY() -> last identity in current scope/session (most preferred)
+2) @@IDENTITY      -> last identity in current session, any scope (trigger risk)
+3) IDENT_CURRENT('TableName') -> last identity for that table, any session
 */
 
-/*==============================================================
-  4) INSERT DATA (AUTO-GENERATED ID)
-==============================================================*/
+INSERT INTO SupportTickets_IdentityDemo (CustomerName, IssueTitle)
+VALUES (N'Sneha', N'Refund not received');
 
-INSERT INTO employee VALUES
-('Thillai'),
-('Senthil'),
-('Shanmugam'),
-('Tamil');
+SELECT
+    SCOPE_IDENTITY() AS ScopeIdentityValue,
+    @@IDENTITY AS AtAtIdentityValue,
+    IDENT_CURRENT('SupportTickets_IdentityDemo') AS IdentCurrentValue;
+GO
 
-SELECT * FROM employee;
+/*=============================================================================
+    5) DELETE ROW AND CHECK IDENTITY GAP
+=============================================================================*/
+/*
+DELETE removes row only.
+Identity counter does NOT go backward.
+Gap is normal behavior.
+*/
+DELETE FROM SupportTickets_IdentityDemo
+WHERE TicketID = 1001;
+
+INSERT INTO SupportTickets_IdentityDemo (CustomerName, IssueTitle)
+VALUES (N'Kavin', N'Address change request');
+
+SELECT * FROM SupportTickets_IdentityDemo ORDER BY TicketID;
+GO
 
 /*
-OUTPUT:
-empid | empname
------------------
-1     | Thillai
-2     | Senthil
-3     | Shanmugam
-4     | Tamil
+Observe:
+- TicketID 1001 deleted.
+- New row does not reuse 1001.
+- Next value continues forward.
 */
 
-/*==============================================================
-  5) MANUAL INSERT INTO IDENTITY (ERROR)
-==============================================================*/
-
--- ERROR: Cannot insert explicit value without enabling IDENTITY_INSERT
---INSERT INTO employee VALUES (5,'Dharshini');
-
---INSERT INTO employee(empid, empname)
---VALUES (5,'Dharshini');
-
-/*==============================================================
-  6) DELETE RECORD AND CHECK IDENTITY GAP
-==============================================================*/
-
-DELETE FROM employee WHERE empname = 'Senthil';
-
-SELECT * FROM employee;
-
+/*=============================================================================
+    6) MANUAL IDENTITY INSERT (IDENTITY_INSERT)
+=============================================================================*/
 /*
-OUTPUT:
-empid | empname
------------------
-1     | Thillai
-3     | Shanmugam
-4     | Tamil
-
-NOTE: The deleted empid (2) is NOT reused automatically.
+Default behavior: cannot directly insert identity column value.
+To do manual insert, enable IDENTITY_INSERT for one table at a time.
 */
 
-/*==============================================================
-  7) INSERT AFTER DELETE (IDENTITY NOT REUSED)
-==============================================================*/
+SET IDENTITY_INSERT SupportTickets_IdentityDemo ON;
 
-INSERT INTO employee VALUES ('Dharshini');
+INSERT INTO SupportTickets_IdentityDemo (TicketID, CustomerName, IssueTitle, CreatedAt)
+VALUES (2000, N'Migrated User', N'Old ticket migrated', SYSDATETIME());
 
-SELECT * FROM employee;
+SET IDENTITY_INSERT SupportTickets_IdentityDemo OFF;
+GO
 
+SELECT * FROM SupportTickets_IdentityDemo ORDER BY TicketID;
+GO
+
+/*=============================================================================
+    7) DUPLICATE MANUAL IDENTITY VALUE (EXPECTED ERROR)
+=============================================================================*/
+BEGIN TRY
+    SET IDENTITY_INSERT SupportTickets_IdentityDemo ON;
+
+    INSERT INTO SupportTickets_IdentityDemo (TicketID, CustomerName, IssueTitle, CreatedAt)
+    VALUES (2000, N'Duplicate User', N'Duplicate key test', SYSDATETIME());
+
+    SET IDENTITY_INSERT SupportTickets_IdentityDemo OFF;
+END TRY
+BEGIN CATCH
+    -- Ensure OFF in error scenario too
+    IF (SELECT OBJECTPROPERTY(OBJECT_ID('SupportTickets_IdentityDemo'), 'TableHasIdentity')) = 1
+    BEGIN TRY
+        SET IDENTITY_INSERT SupportTickets_IdentityDemo OFF;
+    END TRY
+    BEGIN CATCH
+    END CATCH;
+
+    SELECT 'DUPLICATE IDENTITY ERROR' AS Demo, ERROR_MESSAGE() AS SqlServerMessage;
+END CATCH;
+GO
+
+/*=============================================================================
+    8) DELETE VS TRUNCATE WITH IDENTITY
+=============================================================================*/
 /*
-OUTPUT:
-empid | empname
------------------
-1     | Thillai
-3     | Shanmugam
-4     | Tamil
-5     | Dharshini
+DELETE:
+- Removes rows
+- Identity current value is NOT reset
 
-NOTE: IDENTITY continues from the last value (4 → 5)
+TRUNCATE:
+- Removes all rows quickly
+- Identity value is reset to seed (for most normal tables)
+- Cannot run if table is referenced by foreign key
 */
 
-/*==============================================================
-  8) ENABLE MANUAL IDENTITY INSERT
-==============================================================*/
+DROP TABLE IF EXISTS Identity_DeleteVsTruncate;
+GO
 
-SET IDENTITY_INSERT employee ON;
+CREATE TABLE Identity_DeleteVsTruncate
+(
+    RowID INT IDENTITY(1,1) PRIMARY KEY,
+    Remarks VARCHAR(50)
+);
+GO
 
-INSERT INTO employee (empid, empname)
-VALUES (2,'Senthil');
+INSERT INTO Identity_DeleteVsTruncate (Remarks)
+VALUES ('A'), ('B'), ('C');
 
-SELECT * FROM employee;
+SELECT IDENT_CURRENT('Identity_DeleteVsTruncate') AS CurrentAfterInsert;
 
+DELETE FROM Identity_DeleteVsTruncate;
+
+INSERT INTO Identity_DeleteVsTruncate (Remarks)
+VALUES ('AfterDelete');
+
+SELECT * FROM Identity_DeleteVsTruncate;
+SELECT IDENT_CURRENT('Identity_DeleteVsTruncate') AS CurrentAfterDeleteInsert;
+GO
+
+TRUNCATE TABLE Identity_DeleteVsTruncate;
+
+INSERT INTO Identity_DeleteVsTruncate (Remarks)
+VALUES ('AfterTruncate');
+
+SELECT * FROM Identity_DeleteVsTruncate;
+SELECT IDENT_CURRENT('Identity_DeleteVsTruncate') AS CurrentAfterTruncateInsert;
+GO
+
+/*=============================================================================
+    9) RESEED / RESET IDENTITY MANUALLY
+=============================================================================*/
 /*
-OUTPUT:
-empid | empname
------------------
-1     | Thillai
-2     | Senthil
-3     | Shanmugam
-4     | Tamil
-5     | Dharshini
+DBCC CHECKIDENT can set next identity position.
+
+Syntax:
+DBCC CHECKIDENT ('TableName', RESEED, NewCurrentValue)
+
+If set RESEED, 500 then next insert becomes 501.
 */
+DBCC CHECKIDENT ('SupportTickets_IdentityDemo', RESEED, 5000);
+GO
 
-/*==============================================================
-  9) DUPLICATE IDENTITY VALUE (PRIMARY KEY ERROR)
-==============================================================*/
+INSERT INTO SupportTickets_IdentityDemo (CustomerName, IssueTitle)
+VALUES (N'Reseed User', N'Test after reseed');
 
--- ERROR: Cannot insert duplicate primary key
---INSERT INTO employee (empid, empname)
---VALUES (2,'Duplicate');
+SELECT TOP 5 *
+FROM SupportTickets_IdentityDemo
+ORDER BY TicketID DESC;
+GO
 
-SET IDENTITY_INSERT employee OFF;
-
-/*==============================================================
- 10) DELETE VS IDENTITY RESET
-==============================================================*/
-
-DELETE FROM employee;
-
-INSERT INTO employee VALUES ('ABI');
-
-SELECT * FROM employee;
-
+/*=============================================================================
+    10) BEST PRACTICES
+=============================================================================*/
 /*
-OUTPUT:
-empid | empname
------------------
-6     | ABI
-
-NOTE:
-- DELETE removes rows but DOES NOT reset the IDENTITY counter.
-- Next inserted ID continues from last number.
+1) Prefer SCOPE_IDENTITY() after insert in application code.
+2) Do not depend on gap-free identity values.
+3) Do not use identity value as business meaning (invoice logic, etc.)
+   unless requirement is explicit.
+4) Use IDENTITY_INSERT only for migration/repair scenarios.
+5) Use DBCC CHECKIDENT carefully in production.
 */
 
-/*==============================================================
- 11) RESET IDENTITY USING DBCC CHECKIDENT
-==============================================================*/
-
-DBCC CHECKIDENT (employee, RESEED, 0); -- Reset identity to 0
-
-INSERT INTO employee VALUES ('DHARSHI');
-
-SELECT * FROM employee;
-
+/*=============================================================================
+    11) FINAL RECAP
+=============================================================================*/
 /*
-OUTPUT:
-empid | empname
------------------
-1     | DHARSHI
-
-NOTE: Now IDENTITY starts again from 1
+- IDENTITY auto-generates numeric keys.
+- DELETE does not reuse deleted identity numbers.
+- TRUNCATE usually resets identity to seed.
+- Manual insert requires SET IDENTITY_INSERT ON.
+- Duplicate identity value fails if PK/UNIQUE exists.
+- Identity value check tools:
+  SCOPE_IDENTITY(), @@IDENTITY, IDENT_CURRENT().
 */
-
-/*==============================================================
- 12) TRUNCATE TABLE (BEST WAY TO RESET IDENTITY)
-==============================================================*/
-
-TRUNCATE TABLE employee; -- Removes all rows and resets identity
-
-INSERT INTO employee VALUES ('ARUN');
-
-SELECT * FROM employee;
-
-/*
-OUTPUT:
-empid | empname
------------------
-1     | ARUN
-
-NOTE:
-- TRUNCATE is faster than DELETE and also resets IDENTITY.
-*/
-
-/*==============================================================
- 13) CHECK IDENTITY VALUES
-==============================================================*/
-
--- Last identity value generated in current scope
-SELECT SCOPE_IDENTITY() AS ScopeIdentity;
-
--- Last identity value generated in current session (all tables)
-SELECT @@IDENTITY AS SessionIdentity;
-
--- Current identity value of a table
-SELECT IDENT_CURRENT('employee') AS CurrentIdentity;
-
-/*
-NOTE:
-- SCOPE_IDENTITY() → safe for single table/process
-- @@IDENTITY → may include triggers/other tables
-- IDENT_CURRENT → table-specific but not safe in multi-user insert
-*/
-
-/*==============================================================
- 14) INTERVIEW NOTES / KEY POINTS
---------------------------------------------------------------
-1) IDENTITY automatically generates sequential numbers.
-2) Deleted IDENTITY values are NOT reused.
-3) DELETE does NOT reset IDENTITY; TRUNCATE does.
-4) You can insert manual values only when IDENTITY_INSERT is ON.
-5) SCOPE_IDENTITY() is safest to get last inserted value.
-6) Only one table can have IDENTITY_INSERT ON at a time.
-==============================================================*/

@@ -1,333 +1,274 @@
-﻿/*==============================================================
- FILE      : cascading_referential_integrity_demo.sql
- DB        : SQL SERVER
- TOPIC     : CASCADING REFERENTIAL INTEGRITY (Simple Notes)
- NOTE      : Easy, beginner-friendly, step-by-step with outputs
-==============================================================*/
+﻿/*=============================================================================
+    FILE: 07_SQL_Cascading.sql
+    TOPIC: CASCADE ACTIONS IN FOREIGN KEY
+    DB   : RetailLearningDB
 
-/*==============================================================
-  IMPORTANT NOTE ABOUT CASCADING
-==============================================================*/
+    LEARNING GOAL:
+    - What cascading is
+    - Why cascading is needed
+    - Types of cascade actions
+    - Real examples for each action
+=============================================================================*/
 
+IF DB_ID('RetailLearningDB') IS NULL
+BEGIN
+    CREATE DATABASE RetailLearningDB;
+END
+GO
+
+USE RetailLearningDB;
+GO
+
+/*=============================================================================
+    1) WHAT IS CASCADING?
+=============================================================================*/
 /*
-1) Cascading rules (CASCADE, SET NULL, SET DEFAULT, NO ACTION) 
-   are allowed **ONLY for FOREIGN KEY columns**.
+Cascading means SQL Server automatically applies parent table changes
+to child table rows through a FOREIGN KEY rule.
 
-2) What this means:
-   - Only columns that reference another table (child → parent) 
-     can use cascading.
-   - Regular columns (non-foreign key) cannot have cascade rules.
-   - Example: 
-       • Orders.pid → references Products.pcode  → can have CASCADE
-       • Orders.quantity → just a number → cannot have CASCADE
+Parent table: master table (example: Customers)
+Child table: dependent table (example: Orders)
 
-3) Why:
-   - Cascade is all about keeping **parent-child relationship consistent**.
-   - Non-key columns are independent, so no need for cascade.
+Why needed:
+- Prevent orphan rows
+- Keep related data consistent
+- Reduce manual update/delete coding
 */
 
-/*==============================================================
-  0) WHY CASCADING IS NEEDED?
-==============================================================*/
+/*=============================================================================
+    2) TYPES OF CASCADE ACTIONS
+=============================================================================*/
 /*
-Problem:
-- Parent table = Products
-- Child table = Orders
-- If we remove a product from the Products table, 
-  the orders that are using that product will have a problem or error.
-- Default behavior (NO ACTION) → SQL Server gives an error.
-
-Solution:
-- Cascading lets child rows automatically update or delete.
-- Makes database consistent without manual changes.
-*/
-
-/*==============================================================
-  1) PARENT TABLE : PRODUCTS
-==============================================================*/
-DROP TABLE IF EXISTS Orders;
-DROP TABLE IF EXISTS Products;
-
-CREATE TABLE Products
-(
-    ProductCode INT PRIMARY KEY,     -- Unique product ID
-    ProductName VARCHAR(50),
-    ProductCategory VARCHAR(50)
-);
-
-INSERT INTO Products VALUES
-(1, 'Samsung Galaxy S22', 'Mobile'),
-(2, 'iPhone 15', 'Mobile'),
-(3, 'Dell XPS 13', 'Laptop'),
-(4, 'Canon EOS 1500D', 'Camera');
-
-SELECT * FROM Products;
-/*
-Output:
-ProductCode | ProductName         | ProductCategory
---------------------------------------------------
-1           | Samsung Galaxy S22  | Mobile
-2           | iPhone 15           | Mobile
-3           | Dell XPS 13         | Laptop
-4           | Canon EOS 1500D     | Camera
-*/
-
-/*==============================================================
-  2) CHILD TABLE WITHOUT CASCADE (NO ACTION)
-==============================================================*/
-DROP TABLE IF EXISTS Orders;
-
-CREATE TABLE Orders
-(
-    OrderID INT PRIMARY KEY,
-    CustomerName VARCHAR(50),
-    ProductID INT,
-    Quantity INT,
-
-    CONSTRAINT FK_Orders_NoAction
-    FOREIGN KEY (ProductID) REFERENCES Products(ProductCode)
-    -- NO CASCADE by default
-);
-
-INSERT INTO Orders VALUES
-(1, 'Thillai', 1, 2),
-(2, 'Senthil', 2, 1);
-
-SELECT * FROM Orders;
-/*
-Output:
-OrderID | CustomerName | ProductID | Quantity
----------------------------------------------
-1       | Thillai      | 1         | 2
-2       | Senthil      | 2         | 1
-*/
-
--- ❌ Try deleting ProductCode = 1 → Error
--- DELETE FROM Products WHERE ProductCode = 1;
-
--- ✔ Updating ProductName works fine
-UPDATE Products SET ProductName = 'Samsung Galaxy S22 Ultra' WHERE ProductCode = 1;
-
-/*==============================================================
-  3) CASCADING TYPES - EXPLAINED BEFORE EXAMPLES
-==============================================================*/
-
-/*
-CASCADING TYPES:
-----------------
-Cascading rules are instructions for what should happen in a child table
-when a related record in the parent table is UPDATED or DELETED.
+When parent row is UPDATED or DELETED, FK can use:
 
 1) CASCADE
-   - What it is: Child rows automatically change or get deleted 
-     when the parent row changes or is deleted.
-   - Why we use it: To keep child tables consistent without manual updates.
-   - What happens:
-        • Delete parent → child rows deleted automatically
-        • Update parent key → child foreign key updated automatically
+   - Child rows are automatically updated/deleted.
 
 2) SET NULL
-   - What it is: Child foreign key becomes NULL when parent row changes or is deleted.
-   - Why we use it: When we want to keep child rows but show that the parent no longer exists.
-   - What happens:
-        • Delete parent → child foreign key set to NULL
-        • Update parent key → child foreign key set to NULL
+   - Child FK column becomes NULL.
+   - Child FK column must allow NULL.
 
 3) SET DEFAULT
-   - What it is: Child foreign key is set to a default value when parent row changes or is deleted.
-   - Why we use it: When we want a default/fallback value instead of leaving NULL.
-   - What happens:
-        • Delete parent → child foreign key set to DEFAULT
-        • Update parent key → child foreign key set to DEFAULT
+   - Child FK column set to its default value.
+   - FK column must have a DEFAULT value.
 
-4) NO ACTION / RESTRICT (Default behavior)
-   - What it is: Prevents deletion or update of parent row if child rows exist.
-   - Why we use it: To avoid accidentally breaking child data.
-   - What happens:
-        • Delete parent → Error
-        • Update parent key → Error
-        • Non-key column changes → Allowed
+4) NO ACTION (default behavior)
+   - Blocks parent update/delete if child rows exist.
 */
 
+/*=============================================================================
+    3) SYNTAX TEMPLATE
+=============================================================================*/
 /*
-SIMPLE EXAMPLE FOR THINKING:
-- Parent table: Products
-- Child table: Orders
-- ProductID in Orders references ProductCode in Products
-
-IF we remove a product without cascade:
-   → Orders with that product will stop working or give an error
-   → Database becomes inconsistent
-
-With cascading:
-   → Child table reacts automatically based on cascade type
+CREATE TABLE ChildTable
+(
+    ChildID INT PRIMARY KEY,
+    ParentID INT,
+    CONSTRAINT FK_Child_Parent
+        FOREIGN KEY (ParentID)
+        REFERENCES ParentTable(ParentID)
+        ON DELETE CASCADE_ACTION
+        ON UPDATE CASCADE_ACTION
+);
 */
 
+/*=============================================================================
+    4) DEMO A: ON DELETE CASCADE + ON UPDATE CASCADE
+=============================================================================*/
+DROP TABLE IF EXISTS OrderItems_Cas;
+DROP TABLE IF EXISTS Orders_Cas;
+DROP TABLE IF EXISTS Customers_Cas;
+GO
 
-/*==============================================================
-  3) CASCADING TYPES WITH EXAMPLES
-==============================================================*/
-
-/*--------------------------------------------------------------
-  3.1) CASCADE → child follows parent
---------------------------------------------------------------*/
-DROP TABLE IF EXISTS Orders;
-
-CREATE TABLE Orders
+CREATE TABLE Customers_Cas
 (
-    OrderID INT PRIMARY KEY,
-    CustomerName VARCHAR(50),
-    ProductID INT,
-    Quantity INT,
-
-    CONSTRAINT FK_Orders_Cascade
-    FOREIGN KEY (ProductID) REFERENCES Products(ProductCode)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE
+    CustomerID INT PRIMARY KEY,
+    CustomerName NVARCHAR(100) NOT NULL
 );
 
-INSERT INTO Orders VALUES
-(1, 'Arun', 3, 1),
-(2, 'Kumar', 4, 2);
-
--- UPDATE parent PK
-UPDATE Products SET ProductCode = 6 WHERE ProductCode = 3;
--- ✔ Orders.ProductID auto updates from 3 → 6 (example)
-
--- DELETE parent PK
-DELETE FROM Products WHERE ProductCode = 4;
--- ✔ Orders row for Kumar deleted automatically
-
-SELECT * FROM Orders;
-/*
-Sample Output:
-OrderID | CustomerName | ProductID | Quantity
----------------------------------------------
-1       | Arun         | 6         | 1
-*/
-
-/*--------------------------------------------------------------
-  3.2) SET NULL → child FK becomes NULL
---------------------------------------------------------------*/
-DROP TABLE IF EXISTS Orders;
-
-CREATE TABLE Orders
+CREATE TABLE Orders_Cas
 (
     OrderID INT PRIMARY KEY,
-    CustomerName VARCHAR(50),
-    ProductID INT NULL,
-    Quantity INT,
-
-    CONSTRAINT FK_Orders_SetNull
-    FOREIGN KEY (ProductID) REFERENCES Products(ProductCode)
-    ON DELETE SET NULL
-    ON UPDATE SET NULL
+    CustomerID INT NOT NULL,
+    CONSTRAINT FK_OrdersCas_Customers
+        FOREIGN KEY (CustomerID)
+        REFERENCES Customers_Cas(CustomerID)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
 );
 
-INSERT INTO Orders VALUES
-(1, 'Thillai', 1, 2),
-(2, 'Senthil', 2, 1);
+CREATE TABLE OrderItems_Cas
+(
+    OrderItemID INT PRIMARY KEY,
+    OrderID INT NOT NULL,
+    ProductName VARCHAR(100) NOT NULL,
+    Qty INT NOT NULL,
+    CONSTRAINT FK_OrderItemsCas_Orders
+        FOREIGN KEY (OrderID)
+        REFERENCES Orders_Cas(OrderID)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+);
+GO
 
--- DELETE parent PK
-DELETE FROM Products WHERE ProductCode = 1;
--- ✔ Orders.ProductID = NULL for Thillai
+INSERT INTO Customers_Cas VALUES (1, N'Arun'), (2, N'Meena');
+INSERT INTO Orders_Cas VALUES (101, 1), (102, 1), (103, 2);
+INSERT INTO OrderItems_Cas VALUES
+(1, 101, 'Laptop', 1),
+(2, 101, 'Mouse', 2),
+(3, 102, 'Keyboard', 1),
+(4, 103, 'Phone', 1);
+GO
 
--- UPDATE parent PK
-UPDATE Products SET ProductCode = 2 WHERE ProductCode = 2;
--- ✔ Orders.ProductID = NULL for Senthil
+-- ON DELETE CASCADE demo
+DELETE FROM Customers_Cas WHERE CustomerID = 1;
 
-SELECT * FROM Orders;
-/*
-Sample Output:
-OrderID | CustomerName | ProductID | Quantity
----------------------------------------------
-1       | Thillai      | NULL      | 2
-2       | Senthil      | NULL      | 1
-*/
+SELECT * FROM Customers_Cas;
+SELECT * FROM Orders_Cas;
+SELECT * FROM OrderItems_Cas;
+GO
 
-/*--------------------------------------------------------------
-  3.3) SET DEFAULT → child FK becomes default
---------------------------------------------------------------*/
-DROP TABLE IF EXISTS Orders;
+-- ON UPDATE CASCADE demo
+UPDATE Customers_Cas
+SET CustomerID = 22
+WHERE CustomerID = 2;
 
-CREATE TABLE Orders
+SELECT * FROM Customers_Cas;
+SELECT * FROM Orders_Cas;
+GO
+
+/*=============================================================================
+    5) DEMO B: ON DELETE SET NULL
+=============================================================================*/
+DROP TABLE IF EXISTS Tickets_SetNull;
+DROP TABLE IF EXISTS Agent_SetNull;
+GO
+
+CREATE TABLE Agent_SetNull
+(
+    AgentID INT PRIMARY KEY,
+    AgentName NVARCHAR(100) NOT NULL
+);
+
+CREATE TABLE Tickets_SetNull
+(
+    TicketID INT PRIMARY KEY,
+    AgentID INT NULL, -- must allow NULL
+    IssueTitle NVARCHAR(120) NOT NULL,
+    CONSTRAINT FK_TicketsSetNull_Agent
+        FOREIGN KEY (AgentID)
+        REFERENCES Agent_SetNull(AgentID)
+        ON DELETE SET NULL
+        ON UPDATE NO ACTION
+);
+GO
+
+INSERT INTO Agent_SetNull VALUES (10, N'Sneha');
+INSERT INTO Tickets_SetNull VALUES (1001, 10, N'Payment failed');
+
+DELETE FROM Agent_SetNull WHERE AgentID = 10;
+
+SELECT * FROM Tickets_SetNull; -- AgentID becomes NULL
+GO
+
+/*=============================================================================
+    6) DEMO C: ON DELETE SET DEFAULT
+=============================================================================*/
+DROP TABLE IF EXISTS Tickets_SetDefault;
+DROP TABLE IF EXISTS Agent_SetDefault;
+GO
+
+CREATE TABLE Agent_SetDefault
+(
+    AgentID INT PRIMARY KEY,
+    AgentName NVARCHAR(100) NOT NULL
+);
+
+-- 0 = Unassigned (default parent row)
+INSERT INTO Agent_SetDefault VALUES (0, N'Unassigned');
+INSERT INTO Agent_SetDefault VALUES (20, N'Rahul');
+
+CREATE TABLE Tickets_SetDefault
+(
+    TicketID INT PRIMARY KEY,
+    AgentID INT NOT NULL CONSTRAINT DF_TicketsSetDefault_AgentID DEFAULT (0),
+    IssueTitle NVARCHAR(120) NOT NULL,
+    CONSTRAINT FK_TicketsSetDefault_Agent
+        FOREIGN KEY (AgentID)
+        REFERENCES Agent_SetDefault(AgentID)
+        ON DELETE SET DEFAULT
+        ON UPDATE NO ACTION
+);
+GO
+
+INSERT INTO Tickets_SetDefault VALUES (2001, 20, N'Unable to login');
+
+DELETE FROM Agent_SetDefault WHERE AgentID = 20;
+
+SELECT * FROM Tickets_SetDefault; -- AgentID becomes 0
+GO
+
+/*=============================================================================
+    7) DEMO D: NO ACTION (BLOCK OPERATION)
+=============================================================================*/
+DROP TABLE IF EXISTS Orders_NoAction;
+DROP TABLE IF EXISTS Customers_NoAction;
+GO
+
+CREATE TABLE Customers_NoAction
+(
+    CustomerID INT PRIMARY KEY,
+    CustomerName NVARCHAR(100) NOT NULL
+);
+
+CREATE TABLE Orders_NoAction
 (
     OrderID INT PRIMARY KEY,
-    CustomerName VARCHAR(50),
-    ProductID INT DEFAULT 0,
-    Quantity INT,
-
-    CONSTRAINT FK_Orders_SetDefault
-    FOREIGN KEY (ProductID) REFERENCES Products(ProductCode)
-    ON DELETE SET DEFAULT
-    ON UPDATE SET DEFAULT
+    CustomerID INT NOT NULL,
+    CONSTRAINT FK_OrdersNoAction_Customers
+        FOREIGN KEY (CustomerID)
+        REFERENCES Customers_NoAction(CustomerID)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION
 );
+GO
 
-INSERT INTO Orders VALUES
-(1, 'Tamil', 3, 1),
-(2, 'Arun', 4, 1);
+INSERT INTO Customers_NoAction VALUES (1, N'Vikram');
+INSERT INTO Orders_NoAction VALUES (3001, 1);
 
--- DELETE parent PK
-DELETE FROM Products WHERE ProductCode = 3;
--- ✔ Orders.ProductID = 0 for Tamil
+BEGIN TRY
+    DELETE FROM Customers_NoAction WHERE CustomerID = 1;
+END TRY
+BEGIN CATCH
+    SELECT 'NO ACTION BLOCKED DELETE' AS Demo, ERROR_MESSAGE() AS SqlServerMessage;
+END CATCH;
+GO
 
--- UPDATE parent PK
-UPDATE Products SET ProductCode = 4 WHERE ProductCode = 4;
--- ✔ Orders.ProductID = 0 for Arun
-
-SELECT * FROM Orders;
+/*=============================================================================
+    8) WHICH CASCADE TYPE TO CHOOSE?
+=============================================================================*/
 /*
-Sample Output:
-OrderID | CustomerName | ProductID | Quantity
----------------------------------------------
-1       | Tamil        | 0         | 1
-2       | Arun         | 0         | 1
+Use CASCADE:
+- When child data should never exist without parent.
+  Example: OrderItems without Order should not exist.
+
+Use SET NULL:
+- Relationship can become optional.
+  Example: Ticket can exist without assigned agent.
+
+Use SET DEFAULT:
+- Need fallback relationship.
+  Example: move to "Unassigned" owner.
+
+Use NO ACTION:
+- Want strict manual control; parent cannot be deleted by mistake.
 */
 
-/*--------------------------------------------------------------
-  3.4) NO ACTION / RESTRICT → default behavior
---------------------------------------------------------------*/
-DROP TABLE IF EXISTS Orders;
-
-CREATE TABLE Orders
-(
-    OrderID INT PRIMARY KEY,
-    CustomerName VARCHAR(50),
-    ProductID INT,
-    Quantity INT,
-
-    CONSTRAINT FK_Orders_NoAction2
-    FOREIGN KEY (ProductID) REFERENCES Products(ProductCode)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION
-);
-
-INSERT INTO Orders VALUES
-(1, 'Kumar', 1, 1),
-(2, 'Ravi', 2, 1);
-
--- ❌ DELETE parent PK → Error
--- ❌ UPDATE parent PK → Error
-
-SELECT * FROM Orders;
-
-/*==============================================================
-  4) SUMMARY
-==============================================================*/
+/*=============================================================================
+    9) FINAL RECAP
+=============================================================================*/
 /*
-CASCADING RULES:
------------------------------------------------
-1) CASCADE
-   - Child row follows parent
-   - Example: delete product → order deleted
-2) SET NULL
-   - Child FK becomes NULL
-   - Example: delete product → order shows ProductID = NULL
-3) SET DEFAULT
-   - Child FK becomes DEFAULT value
-   - Example: delete product → order shows ProductID = 0
-4) NO ACTION / RESTRICT
-   - Blocks update/delete parent if referenced
-   - Default behavior
------------------------------------------------
+Cascading is an FK behavior that keeps parent-child data consistent.
+Main types: CASCADE, SET NULL, SET DEFAULT, NO ACTION.
+Choose based on business rules, not only technical convenience.
 */

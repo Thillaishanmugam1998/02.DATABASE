@@ -1,175 +1,163 @@
-/*==============================================================
-    FILE NAME : realworld_constraints.sql
-    TOPIC     : SQL SERVER CONSTRAINTS (REAL-WORLD EXAMPLES)
-    PURPOSE   : YouTube Coaching Notes
-==============================================================*/
+﻿/*=========================================================================
+    FILE  : 06_SQL_Primary_Foreign_Key.sql
+    TOPIC : PRIMARY KEY + FOREIGN KEY (Beginner to Practical)
+    DB    : RetailLearningDB
 
-/*==============================================================
-    DATABASE CREATION
-==============================================================*/
-CREATE DATABASE RetailDB;
+    GOAL:
+    - Understand PK and FK from zero
+    - See real-world e-commerce relationship
+    - Understand problems without keys
+=========================================================================*/
+
+IF DB_ID('RetailLearningDB') IS NULL
+BEGIN
+    CREATE DATABASE RetailLearningDB;
+END
 GO
 
-USE RetailDB;
+USE RetailLearningDB;
 GO
 
+DROP TABLE IF EXISTS OrderItems;
+DROP TABLE IF EXISTS Orders;
+DROP TABLE IF EXISTS Products;
+DROP TABLE IF EXISTS Customers;
+DROP TABLE IF EXISTS BadOrders_NoKeys;
+GO
 
-/*==============================================================
-    1) CUSTOMER TABLE
-    Stores customer information
-==============================================================*/
-CREATE TABLE Customer
-(
-    CustomerID INT PRIMARY KEY,        -- PRIMARY KEY ensures unique customer
-    CustomerName VARCHAR(50) NOT NULL, -- Cannot be NULL
-    MobileNo CHAR(10)                  -- Mobile number as CHAR(10)
-);
-
--- Insert sample data
-INSERT INTO Customer VALUES (1, 'Thillai',  '8675692630');
-INSERT INTO Customer VALUES (2, 'Senthil',  '7598397824');
-INSERT INTO Customer VALUES (3, 'Tamil',    '9080323760');
-
-
-/*==============================================================
-    2) PRODUCTS TABLE
-    Stores product information
-==============================================================*/
-CREATE TABLE Products
-(
-    ProductCode INT PRIMARY KEY,       -- Unique product ID
-    ProductName VARCHAR(40) NOT NULL,
-    Price MONEY
-);
-
--- Insert sample products
-INSERT INTO Products VALUES (1, 'Camera',     24500);
-INSERT INTO Products VALUES (2, 'iPhone',    245000);
-INSERT INTO Products VALUES (3, 'Tab',        75500);
-INSERT INTO Products VALUES (4, 'PS5',        50000);
-INSERT INTO Products VALUES (5, 'HeadPhone',   2500);
-
-
-/*==============================================================
-    3) ORDERS TABLE
-    Stores orders, demonstrates FOREIGN KEY relationships
-==============================================================*/
-CREATE TABLE Orders
-(
-    OrderID   INT PRIMARY KEY,         -- Unique order ID
-    OrderDate DATETIME NOT NULL,
-    Quantity  INT NOT NULL,
-
-    CustomerID INT,                    -- FK to Customer
-    ProductCode INT,                   -- FK to Product
-
-    CONSTRAINT FK_Orders_Customer FOREIGN KEY (CustomerID)
-        REFERENCES Customer(CustomerID),
-
-    CONSTRAINT FK_Orders_Product FOREIGN KEY (ProductCode)
-        REFERENCES Products(ProductCode)
-);
-
--- Sample orders
-INSERT INTO Orders VALUES (1, GETDATE(), 2, 1, 2); -- Customer 1 buys 2 iPhones
-INSERT INTO Orders VALUES (2, GETDATE(), 1, 3, 4); -- Customer 3 buys 1 PS5
-INSERT INTO Orders VALUES (3, GETDATE(), 3, 2, 5); -- Customer 2 buys 3 HeadPhones
-
-
-/*==============================================================
-    4) EMPLOYEE TABLE
-    Adding constraints after table creation
-==============================================================*/
-DROP TABLE IF EXISTS Employee;
-
-CREATE TABLE Employee
-(
-    EmpID INT,
-    EmpName VARCHAR(50),
-    Age INT,
-    ProductCode INT
-);
-
--- 1) Add PRIMARY KEY
-ALTER TABLE Employee
-ALTER COLUMN EmpID INT NOT NULL;
-
-ALTER TABLE Employee
-ADD CONSTRAINT PK_Employee PRIMARY KEY (EmpID);
-
--- 2) Add UNIQUE constraint
-ALTER TABLE Employee
-ADD CONSTRAINT UQ_EmployeeName UNIQUE (EmpName);
-
--- 3) Add CHECK constraint
-ALTER TABLE Employee
-ADD CONSTRAINT CHK_EmployeeAge CHECK (Age >= 10);
-
--- 4) Add FOREIGN KEY constraint
-ALTER TABLE Employee
-ADD CONSTRAINT FK_Employee_Product
-FOREIGN KEY (ProductCode) REFERENCES Products(ProductCode);
-
-
-/*==============================================================
-    5) DROP CONSTRAINTS
-==============================================================*/
--- Drop CHECK constraint
-ALTER TABLE Employee DROP CONSTRAINT CHK_EmployeeAge;
-
--- Drop UNIQUE constraint
-ALTER TABLE Employee DROP CONSTRAINT UQ_EmployeeName;
-
--- Drop FOREIGN KEY constraint
-ALTER TABLE Employee DROP CONSTRAINT FK_Employee_Product;
-
-
-/*==============================================================
-    6) EXPLANATIONS
-==============================================================*/
-
+/*=========================================================================
+    1) CONCEPTS
+=========================================================================*/
 /*
-PRIMARY KEY:
-- Uniquely identifies each row in a table.
-- Cannot be NULL.
-- Example: CustomerID in Customer table.
-- Ensures no duplicate customer exists.
+PRIMARY KEY (PK)
+- Uniquely identifies each row
+- Cannot be NULL
 
-FOREIGN KEY:
-- References a PRIMARY KEY in another table.
-- Ensures referential integrity (no orphan records).
-- Example: CustomerID in Orders table references Customer(CustomerID).
+FOREIGN KEY (FK)
+- Column in child table referencing parent table PK/UNIQUE
+- Prevents invalid references (orphan rows)
 
-UNIQUE:
-- Ensures values in a column (or combination of columns) are unique.
-
-CHECK:
-- Enforces a condition on column values (e.g., Age >= 10).
-
-DEFAULT:
-- Sets a default value for a column if no value is provided.
-
-NOT NULL:
-- Column must have a value; cannot be empty.
+Memory line:
+PK = row identity
+FK = table relationship
 */
 
+/*=========================================================================
+    2) WITHOUT KEYS: PROBLEM DEMO
+=========================================================================*/
+CREATE TABLE BadOrders_NoKeys
+(
+    OrderID INT,
+    CustomerID INT,
+    ProductID INT,
+    Quantity INT
+);
 
-/*==============================================================
-    7) SELECT EXAMPLES
-==============================================================*/
--- View customers
-SELECT * FROM Customer;
+INSERT INTO BadOrders_NoKeys VALUES (1001, 1, 101, 2);
+INSERT INTO BadOrders_NoKeys VALUES (1001, 1, 101, 5); -- duplicate order id
+INSERT INTO BadOrders_NoKeys VALUES (1002, 9999, 5555, 1); -- invalid references
 
--- View products
-SELECT * FROM Products;
-
--- View orders with customer and product info
-SELECT o.OrderID, o.OrderDate, o.Quantity,
-       c.CustomerName, p.ProductName, p.Price
-FROM Orders o
-JOIN Customer c ON o.CustomerID = c.CustomerID
-JOIN Products p ON o.ProductCode = p.ProductCode;
-
--- View employee table
-SELECT * FROM Employee;
+SELECT * FROM BadOrders_NoKeys;
 GO
+
+/*=========================================================================
+    3) WITH KEYS: REAL DESIGN
+=========================================================================*/
+CREATE TABLE Customers
+(
+    CustomerID INT PRIMARY KEY,
+    CustomerName NVARCHAR(100) NOT NULL,
+    Email VARCHAR(120) UNIQUE
+);
+
+CREATE TABLE Products
+(
+    ProductID INT PRIMARY KEY,
+    ProductName VARCHAR(100) NOT NULL,
+    Price DECIMAL(10,2) NOT NULL CHECK (Price > 0)
+);
+
+CREATE TABLE Orders
+(
+    OrderID INT PRIMARY KEY,
+    OrderDate DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    CustomerID INT NOT NULL,
+    CONSTRAINT FK_Orders_Customers FOREIGN KEY (CustomerID)
+        REFERENCES Customers(CustomerID)
+);
+
+CREATE TABLE OrderItems
+(
+    OrderItemID INT PRIMARY KEY,
+    OrderID INT NOT NULL,
+    ProductID INT NOT NULL,
+    Quantity INT NOT NULL CHECK (Quantity > 0),
+    UnitPrice DECIMAL(10,2) NOT NULL CHECK (UnitPrice > 0),
+    CONSTRAINT FK_OrderItems_Orders FOREIGN KEY (OrderID) REFERENCES Orders(OrderID),
+    CONSTRAINT FK_OrderItems_Products FOREIGN KEY (ProductID) REFERENCES Products(ProductID)
+);
+GO
+
+INSERT INTO Customers VALUES
+(1, N'Arun Kumar', 'arun@email.com'),
+(2, N'Meena Ravi', 'meena@email.com');
+
+INSERT INTO Products VALUES
+(101, 'Laptop', 65000.00),
+(102, 'Phone', 35000.00),
+(103, 'Headphones', 2500.00);
+
+INSERT INTO Orders (OrderID, CustomerID) VALUES
+(5001, 1),
+(5002, 2);
+
+INSERT INTO OrderItems VALUES
+(9001, 5001, 101, 1, 65000.00),
+(9002, 5001, 103, 2, 2500.00),
+(9003, 5002, 102, 1, 35000.00);
+GO
+
+/*=========================================================================
+    4) PROOF: CONSTRAINT ERRORS (EXPECTED)
+=========================================================================*/
+BEGIN TRY
+    INSERT INTO Customers VALUES (1, N'Duplicate', 'dup@email.com');
+END TRY
+BEGIN CATCH
+    SELECT 'PK ERROR' AS Demo, ERROR_MESSAGE() AS SqlServerMessage;
+END CATCH;
+
+BEGIN TRY
+    INSERT INTO Orders (OrderID, CustomerID) VALUES (5003, 999);
+END TRY
+BEGIN CATCH
+    SELECT 'FK ERROR - INVALID CUSTOMER' AS Demo, ERROR_MESSAGE() AS SqlServerMessage;
+END CATCH;
+GO
+
+/*=========================================================================
+    5) RELIABLE JOIN OUTPUT
+=========================================================================*/
+SELECT
+    o.OrderID,
+    o.OrderDate,
+    c.CustomerName,
+    p.ProductName,
+    oi.Quantity,
+    oi.UnitPrice,
+    oi.Quantity * oi.UnitPrice AS LineTotal
+FROM Orders o
+JOIN Customers c ON c.CustomerID = o.CustomerID
+JOIN OrderItems oi ON oi.OrderID = o.OrderID
+JOIN Products p ON p.ProductID = oi.ProductID
+ORDER BY o.OrderID, oi.OrderItemID;
+GO
+
+/*=========================================================================
+    6) RECAP
+=========================================================================*/
+/*
+Without PK/FK: duplicate and orphan data.
+With PK/FK: trusted data and safe relationships.
+PK identifies rows, FK connects rows.
+*/

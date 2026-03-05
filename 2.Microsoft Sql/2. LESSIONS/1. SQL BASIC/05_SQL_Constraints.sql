@@ -1,394 +1,294 @@
-﻿/*========================================================
-    TOPIC : SQL SERVER CONSTRAINTS – COMPLETE GUIDE
-    FILE  : sql_constraints_practice.sql
-========================================================*/
+﻿/*=============================================================================
+    FILE: 05_SQL_Constraints.sql
+    TOPIC: SQL CONSTRAINTS - COMPLETE GUIDE
+    DB   : RetailLearningDB
 
+    LEARNING GOAL:
+    - Understand what constraints are and why we use them
+    - Learn all major constraint types with examples
+    - Learn column-level vs table-level constraints
+    - Learn two implementation styles:
+      1) Add constraints during CREATE TABLE
+      2) Create table first, then add constraints using ALTER TABLE
+=============================================================================*/
+
+IF DB_ID('RetailLearningDB') IS NULL
+BEGIN
+    CREATE DATABASE RetailLearningDB;
+END
+GO
+
+USE RetailLearningDB;
+GO
+
+/*=============================================================================
+    1) WHAT IS A CONSTRAINT?
+=============================================================================*/
 /*
-    1) WHAT ARE CONSTRAINTS?
-    --------------------------------------------------------
-    - Constraints enforce rules at the column or table level.
-    - They ensure **data integrity** in your database.
-    - Examples of why we need constraints:
-        • Prevent duplicate values (UNIQUE, PRIMARY KEY)
-        • Prevent invalid data (CHECK, NOT NULL)
-        • Automatically set default values (DEFAULT)
-        • Ensure relationships between tables (FOREIGN KEY)
+Constraint is a rule enforced by the database on table data.
+
+Why constraints are important:
+- Prevent invalid data
+- Protect data integrity even if application code has bugs
+- Keep data consistent for reporting and analytics
+- Reduce manual data cleanup effort
+
+Simple idea:
+"Constraint = safety rule for columns/tables"
 */
 
-/*========================================================
-    2) DEFAULT CONSTRAINT
-========================================================*/
+/*=============================================================================
+    2) TYPES OF CONSTRAINTS
+=============================================================================*/
+/*
+1) NOT NULL
+   - Column must have value
 
--- DEFAULT sets a default value for a column if user doesn't provide one
+2) PRIMARY KEY (PK)
+   - Uniquely identifies each row
+   - Unique + Not Null
 
--- Example: Real-world car table
-CREATE TABLE CarsDefaultCreate
+3) UNIQUE
+   - No duplicate values in column (or column combination)
+
+4) CHECK
+   - Value must satisfy a condition
+
+5) DEFAULT
+   - If no value given, database inserts default value
+
+6) FOREIGN KEY (FK)
+   - Child column must match existing value in parent table
+   - Maintains relationship integrity
+*/
+
+/*=============================================================================
+    3) COLUMN-LEVEL VS TABLE-LEVEL CONSTRAINTS
+=============================================================================*/
+/*
+COLUMN-LEVEL CONSTRAINT:
+- Defined next to a single column
+- Best when rule belongs to one column
+
+Example:
+Email VARCHAR(120) UNIQUE
+Age INT CHECK (Age >= 18)
+
+TABLE-LEVEL CONSTRAINT:
+- Defined after all columns
+- Best for:
+  - multi-column constraints
+  - explicit naming
+  - readability in bigger tables
+
+Example:
+CONSTRAINT PK_Table PRIMARY KEY (CustomerID)
+CONSTRAINT UQ_Table UNIQUE (Email)
+
+Which is preferred?
+- In real projects, TABLE-LEVEL with explicit names is often preferred
+  because maintenance/debugging is easier.
+- For simple quick demos, column-level is fine.
+*/
+
+/*=============================================================================
+    4) CREATE CONSTRAINTS DURING TABLE CREATION
+=============================================================================*/
+
+DROP TABLE IF EXISTS OrderHeader_ConstraintCreate;
+DROP TABLE IF EXISTS Customer_ConstraintCreate;
+GO
+
+CREATE TABLE Customer_ConstraintCreate
 (
-    CarID INT,
-    CarBrand VARCHAR(50),
-    WheelCount SMALLINT DEFAULT 4   -- Default 4 wheels
+    CustomerID INT NOT NULL,
+    CustomerName NVARCHAR(100) NOT NULL,
+    Email VARCHAR(120) NULL,
+    Age INT NOT NULL,
+    Country VARCHAR(40) NOT NULL,
+
+    -- Table-level constraints (preferred for named constraints)
+    CONSTRAINT PK_Customer_ConstraintCreate PRIMARY KEY (CustomerID),
+    CONSTRAINT UQ_Customer_ConstraintCreate_Email UNIQUE (Email),
+    CONSTRAINT CHK_Customer_ConstraintCreate_Age CHECK (Age >= 18),
+    CONSTRAINT DF_Customer_ConstraintCreate_Country DEFAULT ('India') FOR Country
 );
+GO
 
--- Insert without specifying WheelCount
-INSERT INTO CarsDefaultCreate (CarID, CarBrand)
-VALUES (1, 'Tata Nexon');
-
-SELECT * FROM CarsDefaultCreate; -- WheelCount = 4 automatically
-
--- Add DEFAULT constraint using ALTER TABLE
-CREATE TABLE CarsDefaultAlter
+CREATE TABLE OrderHeader_ConstraintCreate
 (
-    CarID INT,
-    CarBrand VARCHAR(50),
-    WheelCount SMALLINT
+    OrderID INT NOT NULL,
+    CustomerID INT NOT NULL,
+    OrderAmount DECIMAL(12,2) NOT NULL,
+
+    CONSTRAINT PK_OrderHeader_ConstraintCreate PRIMARY KEY (OrderID),
+    CONSTRAINT CHK_OrderHeader_ConstraintCreate_OrderAmount CHECK (OrderAmount > 0),
+    CONSTRAINT FK_OrderHeader_ConstraintCreate_Customer
+        FOREIGN KEY (CustomerID)
+        REFERENCES Customer_ConstraintCreate(CustomerID)
 );
+GO
 
-ALTER TABLE CarsDefaultAlter
-ADD CONSTRAINT DF_WheelCount DEFAULT 4 FOR WheelCount;
+/*=============================================================================
+    5) VALID INSERT EXAMPLES (CREATE-TIME CONSTRAINTS)
+=============================================================================*/
+INSERT INTO Customer_ConstraintCreate (CustomerID, CustomerName, Email, Age, Country)
+VALUES
+(1, N'Arun', 'arun@email.com', 25, DEFAULT),
+(2, N'Meena', 'meena@email.com', 29, 'India');
 
-INSERT INTO CarsDefaultAlter (CarID, CarBrand)
-VALUES (2, 'Audi A6');
+INSERT INTO OrderHeader_ConstraintCreate (OrderID, CustomerID, OrderAmount)
+VALUES
+(1001, 1, 65000.00),
+(1002, 2, 12000.00);
 
-SELECT * FROM CarsDefaultAlter;
+SELECT * FROM Customer_ConstraintCreate;
+SELECT * FROM OrderHeader_ConstraintCreate;
+GO
 
--- Cleanup
-DROP TABLE CarsDefaultCreate;
-DROP TABLE CarsDefaultAlter;
+/*=============================================================================
+    6) INVALID INSERT EXAMPLES (EXPECTED ERRORS)
+=============================================================================*/
 
+-- PK violation (duplicate CustomerID)
+BEGIN TRY
+    INSERT INTO Customer_ConstraintCreate (CustomerID, CustomerName, Email, Age, Country)
+    VALUES (1, N'Duplicate Arun', 'dup1@email.com', 27, 'India');
+END TRY
+BEGIN CATCH
+    SELECT 'PK ERROR' AS Demo, ERROR_MESSAGE() AS SqlServerMessage;
+END CATCH;
 
-/*========================================================
-    3) NOT NULL CONSTRAINT
-========================================================*/
+-- UNIQUE violation (duplicate Email)
+BEGIN TRY
+    INSERT INTO Customer_ConstraintCreate (CustomerID, CustomerName, Email, Age, Country)
+    VALUES (3, N'Duplicate Email', 'arun@email.com', 31, 'India');
+END TRY
+BEGIN CATCH
+    SELECT 'UNIQUE ERROR' AS Demo, ERROR_MESSAGE() AS SqlServerMessage;
+END CATCH;
 
--- NOT NULL ensures a column **cannot have NULL values**
-CREATE TABLE EmployeesNotNull
+-- CHECK violation (Age < 18)
+BEGIN TRY
+    INSERT INTO Customer_ConstraintCreate (CustomerID, CustomerName, Email, Age, Country)
+    VALUES (4, N'Under Age', 'underage@email.com', 16, 'India');
+END TRY
+BEGIN CATCH
+    SELECT 'CHECK ERROR' AS Demo, ERROR_MESSAGE() AS SqlServerMessage;
+END CATCH;
+
+-- NOT NULL violation (CustomerName)
+BEGIN TRY
+    INSERT INTO Customer_ConstraintCreate (CustomerID, CustomerName, Email, Age, Country)
+    VALUES (5, NULL, 'nullname@email.com', 22, 'India');
+END TRY
+BEGIN CATCH
+    SELECT 'NOT NULL ERROR' AS Demo, ERROR_MESSAGE() AS SqlServerMessage;
+END CATCH;
+
+-- FK violation (CustomerID does not exist in parent table)
+BEGIN TRY
+    INSERT INTO OrderHeader_ConstraintCreate (OrderID, CustomerID, OrderAmount)
+    VALUES (1003, 999, 500.00);
+END TRY
+BEGIN CATCH
+    SELECT 'FOREIGN KEY ERROR' AS Demo, ERROR_MESSAGE() AS SqlServerMessage;
+END CATCH;
+GO
+
+/*=============================================================================
+    7) CREATE TABLE FIRST, THEN ADD CONSTRAINTS (ALTER TABLE METHOD)
+=============================================================================*/
+
+DROP TABLE IF EXISTS Employee_ConstraintAlter;
+GO
+
+CREATE TABLE Employee_ConstraintAlter
 (
     EmpID INT,
-    EmpName VARCHAR(50) NOT NULL  -- Employee name is required
+    EmpName NVARCHAR(100),
+    Email VARCHAR(120),
+    Age INT,
+    Department NVARCHAR(50),
+    CreatedOn DATE
 );
+GO
 
--- Insert example
--- INSERT INTO EmployeesNotNull (EmpID) VALUES (1); -- ❌ Error, EmpName is NULL
-INSERT INTO EmployeesNotNull (EmpID, EmpName) VALUES (1, 'John Doe');
+/* 7.1 Add NOT NULL using ALTER COLUMN */
+ALTER TABLE Employee_ConstraintAlter
+ALTER COLUMN EmpID INT NOT NULL;
 
--- Add NOT NULL using ALTER TABLE (only works if no NULL exists)
-ALTER TABLE EmployeesNotNull
-ALTER COLUMN EmpName VARCHAR(50) NOT NULL;
+ALTER TABLE Employee_ConstraintAlter
+ALTER COLUMN EmpName NVARCHAR(100) NOT NULL;
 
-SELECT * FROM EmployeesNotNull;
+/* 7.2 Add PRIMARY KEY */
+ALTER TABLE Employee_ConstraintAlter
+ADD CONSTRAINT PK_Employee_ConstraintAlter PRIMARY KEY (EmpID);
 
-DROP TABLE EmployeesNotNull;
+/* 7.3 Add UNIQUE */
+ALTER TABLE Employee_ConstraintAlter
+ADD CONSTRAINT UQ_Employee_ConstraintAlter_Email UNIQUE (Email);
 
+/* 7.4 Add CHECK */
+ALTER TABLE Employee_ConstraintAlter
+ADD CONSTRAINT CHK_Employee_ConstraintAlter_Age CHECK (Age >= 18);
 
-/*========================================================
-    4) UNIQUE CONSTRAINT
-========================================================*/
+/* 7.5 Add DEFAULT */
+ALTER TABLE Employee_ConstraintAlter
+ADD CONSTRAINT DF_Employee_ConstraintAlter_CreatedOn DEFAULT (CAST(GETDATE() AS DATE)) FOR CreatedOn;
+GO
 
--- UNIQUE ensures no duplicate values
-CREATE TABLE UsersUnique
-(
-    UserID INT,
-    Email VARCHAR(100) UNIQUE   -- Each email must be unique
-);
+INSERT INTO Employee_ConstraintAlter (EmpID, EmpName, Email, Age, Department)
+VALUES
+(101, N'Sneha', 'sneha@email.com', 24, N'Sales'),
+(102, N'Rahul', 'rahul@email.com', 28, N'HR');
 
-INSERT INTO UsersUnique VALUES (1, 'john@example.com');
--- INSERT INTO UsersUnique VALUES (2, 'john@example.com'); -- ❌ Error
+SELECT * FROM Employee_ConstraintAlter;
+GO
 
--- Add UNIQUE using ALTER TABLE
-CREATE TABLE UsersUniqueAlter
-(
-    UserID INT,
-    Email VARCHAR(100)
-);
-
--- Make sure existing data has no duplicates
-ALTER TABLE UsersUniqueAlter
-ADD CONSTRAINT UQ_Email UNIQUE (Email);
-
-DROP TABLE UsersUnique;
-DROP TABLE UsersUniqueAlter;
-
-
-/*========================================================
-    5) CHECK CONSTRAINT
-========================================================*/
-
--- CHECK ensures values meet a condition
-CREATE TABLE StudentsCheck
-(
-    StudentID INT,
-    Age SMALLINT CONSTRAINT CHK_StudentAge CHECK (Age >= 18)
-);
-
-INSERT INTO StudentsCheck VALUES (1, 18); -- OK
-INSERT INTO StudentsCheck VALUES (2, 25); -- OK
--- INSERT INTO StudentsCheck VALUES (3, 15); -- ❌ Error
-
--- Add CHECK using ALTER TABLE
-CREATE TABLE StudentsCheckAlter
-(
-    StudentID INT,
-    Age SMALLINT
-);
-
--- Ensure data meets condition
-ALTER TABLE StudentsCheckAlter
-ADD CONSTRAINT CHK_StudentAgeAge CHECK (Age >= 18);
-
-DROP TABLE StudentsCheck;
-DROP TABLE StudentsCheckAlter;
-
-
-/*========================================================
-    6) PRIMARY KEY CONSTRAINT
-========================================================*/
-
--- PRIMARY KEY ensures **unique and not null** (one per table)
-CREATE TABLE BranchesPK
-(
-    BranchCode INT PRIMARY KEY,
-    BranchName VARCHAR(50),
-    BranchLocation CHAR(6)
-);
-
-INSERT INTO BranchesPK VALUES (1, 'HDFC', '612001');
--- INSERT INTO BranchesPK VALUES (1, 'KVB', '612001'); -- ❌ Duplicate
--- INSERT INTO BranchesPK VALUES (NULL, 'IOB', '612002'); -- ❌ NULL not allowed
-
--- Add PRIMARY KEY using ALTER TABLE
-CREATE TABLE BranchesPKAlter
-(
-    BranchCode INT NOT NULL,
-    BranchName VARCHAR(50),
-    BranchLocation CHAR(6)
-);
-
-ALTER TABLE BranchesPKAlter
-ADD CONSTRAINT PK_Branches PRIMARY KEY (BranchCode);
-
--- Composite PRIMARY KEY
-CREATE TABLE BranchesCompositePK
-(
-    BranchCode INT,
-    BranchName VARCHAR(50),
-    BranchLocation CHAR(6),
-    CONSTRAINT PK_BranchComposite PRIMARY KEY (BranchCode, BranchName)
-);
-
-INSERT INTO BranchesCompositePK VALUES (1, 'HDFC', '612001'); -- OK
-INSERT INTO BranchesCompositePK VALUES (1, 'KVB', '612001');  -- OK
--- INSERT INTO BranchesCompositePK VALUES (1, 'HDFC', '612005'); -- ❌ Duplicate
-
-DROP TABLE BranchesPK;
-DROP TABLE BranchesPKAlter;
-DROP TABLE BranchesCompositePK;
-
-
-/*========================================================
-    7) FOREIGN KEY CONSTRAINT
-========================================================*/
-
--- FOREIGN KEY enforces relationship between tables
-CREATE TABLE BranchesFK
-(
-    BranchCode INT PRIMARY KEY,
-    BranchName VARCHAR(50)
-);
-
-CREATE TABLE BankFK
-(
-    BankID INT PRIMARY KEY,
-    BranchCode INT,
-    Income MONEY,
-    CONSTRAINT FK_BankBranch
-        FOREIGN KEY (BranchCode) REFERENCES BranchesFK(BranchCode)
-);
-
-INSERT INTO BranchesFK VALUES (1, 'HDFC');
-INSERT INTO BankFK VALUES (1, 1, 500000);
--- INSERT INTO BankFK VALUES (2, 5, 600000); -- ❌ No matching PK
-
-DROP TABLE BankFK;
-DROP TABLE BranchesFK;
-
-
-/*========================================================
-    SQL SERVER CONSTRAINTS – COLUMN-LEVEL & TABLE-LEVEL
-    FILE  : sql_constraints_guide.sql
-========================================================*/
-
+/*=============================================================================
+    8) DROP CONSTRAINTS EXAMPLE
+=============================================================================*/
 /*
-    WHAT ARE CONSTRAINTS?
-    - Constraints enforce rules to maintain **data integrity**.
-    - Examples:
-        • NOT NULL → ensures column must have value
-        • UNIQUE → prevents duplicate values
-        • PRIMARY KEY → unique + not null
-        • FOREIGN KEY → enforces relationships
-        • CHECK → restricts values based on condition
-        • DEFAULT → sets default value if not provided
+Business rules can change, then constraints may need to be replaced.
+Syntax:
+ALTER TABLE TableName DROP CONSTRAINT ConstraintName;
 */
 
-/*========================================================
-    1) NOT NULL / NULL (COLUMN PROPERTY)
-========================================================*/
--- Column-level only (cannot name)
-CREATE TABLE Employees
-(
-    EmpID INT NOT NULL,          -- Column-level NOT NULL
-    EmpName VARCHAR(50) NULL     -- Column can accept NULL
-);
+ALTER TABLE Employee_ConstraintAlter DROP CONSTRAINT DF_Employee_ConstraintAlter_CreatedOn;
+ALTER TABLE Employee_ConstraintAlter DROP CONSTRAINT CHK_Employee_ConstraintAlter_Age;
+ALTER TABLE Employee_ConstraintAlter DROP CONSTRAINT UQ_Employee_ConstraintAlter_Email;
+GO
 
--- Change column to NOT NULL
-ALTER TABLE Employees
-ALTER COLUMN EmpName VARCHAR(50) NOT NULL;
+/*=============================================================================
+    9) BEST PRACTICES (MOST PREFERRED IN PROJECTS)
+=============================================================================*/
+/*
+1) Prefer explicit constraint names
+   Example: PK_Customer, FK_Order_Customer
 
--- Allow NULL again
-ALTER TABLE Employees
-ALTER COLUMN EmpName VARCHAR(50) NULL;
+2) Prefer table-level named constraints for maintainability
 
+3) Keep business validation in DB + application both
+   (defense in depth)
 
-/*========================================================
-    2) DEFAULT CONSTRAINT
-========================================================*/
--- Column-level DEFAULT (named constraint)
-CREATE TABLE Cars
-(
-    CarID INT,
-    WheelCount INT CONSTRAINT DF_WheelCount DEFAULT 4
-);
+4) Use CHECK for business rules (age > 18, price > 0)
 
--- Add DEFAULT after table creation
-ALTER TABLE Cars
-ADD CONSTRAINT DF_WheelCount2 DEFAULT 4 FOR WheelCount;
+5) Add FK for all true parent-child relationships
 
+6) Before adding constraints on existing table,
+   clean bad data first or operation may fail.
+*/
 
-/*========================================================
-    3) UNIQUE CONSTRAINT
-========================================================*/
--- Column-level UNIQUE
-CREATE TABLE Users
-(
-    UserID INT,
-    Email VARCHAR(100) CONSTRAINT UQ_Email UNIQUE
-);
-
--- Table-level UNIQUE (can include multiple columns)
-CREATE TABLE UsersComposite
-(
-    UserID INT,
-    FirstName VARCHAR(50),
-    LastName VARCHAR(50),
-    CONSTRAINT UQ_FullName UNIQUE (FirstName, LastName)
-);
-
-
-/*========================================================
-    4) CHECK CONSTRAINT
-========================================================*/
--- Column-level CHECK (applies only to that column)
-CREATE TABLE Students
-(
-    StudentID INT,
-    Age INT CONSTRAINT CHK_Age CHECK (Age >= 18)
-);
-
--- Table-level CHECK (can reference multiple columns)
-CREATE TABLE StudentsTableCheck
-(
-    StudentID INT,
-    Age INT,
-    Score INT,
-    CONSTRAINT CHK_AgeScore CHECK (Age >= 18 AND Score >= 0)
-);
-
-
-/*========================================================
-    5) PRIMARY KEY
-========================================================*/
--- Column-level PRIMARY KEY
-CREATE TABLE Branches
-(
-    BranchCode INT CONSTRAINT PK_Branch PRIMARY KEY,
-    BranchName VARCHAR(50)
-);
-
--- Table-level PRIMARY KEY (can be composite)
-CREATE TABLE BranchesComposite
-(
-    BranchCode INT,
-    BranchName VARCHAR(50),
-    BranchLocation CHAR(6),
-    CONSTRAINT PK_BranchComposite PRIMARY KEY (BranchCode, BranchName)
-);
-
-
-/*========================================================
-    6) FOREIGN KEY
-========================================================*/
--- Column-level FOREIGN KEY
-CREATE TABLE Bank
-(
-    BankID INT PRIMARY KEY,
-    BranchCode INT CONSTRAINT FK_BankBranch FOREIGN KEY REFERENCES Branches(BranchCode),
-    Income MONEY
-);
-
--- Table-level FOREIGN KEY (can reference multiple columns)
-CREATE TABLE BankTableFK
-(
-    BankID INT PRIMARY KEY,
-    BranchCode INT,
-    BranchName VARCHAR(50),
-    CONSTRAINT FK_BankBranchTable FOREIGN KEY (BranchCode, BranchName)
-        REFERENCES BranchesComposite(BranchCode, BranchName)
-);
-
-
-/*========================================================
-    7) REAL-TIME EXAMPLE
-========================================================*/
--- Car model table with multiple constraints
-CREATE TABLE CarModel
-(
-    CarID INT,
-    CarBrand VARCHAR(50),
-    CarFuelType VARCHAR(20),
-    CarWheel SMALLINT CONSTRAINT DF_CarWheel DEFAULT 4,  -- Column-level default
-    CarModel VARCHAR(50) NOT NULL,                        -- Column-level NOT NULL
-    CONSTRAINT UQ_Car UNIQUE (CarBrand, CarModel)        -- Table-level unique
-);
-
-INSERT INTO CarModel (CarID, CarBrand, CarFuelType, CarModel)
-VALUES
-(1, 'TATA', 'PETROL', 'NEXON'),
-(2, 'AUDI', 'PETROL', 'A6');
-
-SELECT * FROM CarModel;
-
-
-/*========================================================
-    8) DROP CONSTRAINT SYNTAX
-========================================================*/
--- Drop a named constraint
-ALTER TABLE CarModel DROP CONSTRAINT DF_CarWheel;
-ALTER TABLE CarModel DROP CONSTRAINT UQ_Car;
-
--- NOT NULL cannot be dropped using DROP CONSTRAINT
-ALTER TABLE CarModel ALTER COLUMN CarModel VARCHAR(50) NULL;  -- Use ALTER COLUMN instead
-
-
-/*========================================================
-    9) DROP CONSTRAINT
-========================================================*/
-
--- Drop a constraint using ALTER TABLE
--- Syntax: ALTER TABLE table_name DROP CONSTRAINT constraint_name
-
--- Example: Drop default constraint
--- ALTER TABLE CarModel DROP CONSTRAINT DF_CarWheel;  -- If existed
-
--- Drop unique constraint
--- ALTER TABLE CarModel DROP CONSTRAINT UQ_Car;
-
-
+/*=============================================================================
+    10) QUICK RECAP
+=============================================================================*/
+/*
+- Constraint = database rule for valid data.
+- Main types: NOT NULL, PK, UNIQUE, CHECK, DEFAULT, FK.
+- Can be added:
+  1) while creating table
+  2) later using ALTER TABLE
+- Column-level: for single-column simple rules.
+- Table-level: preferred for named and multi-column rules.
+*/

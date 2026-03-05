@@ -1,126 +1,246 @@
-﻿/*==============================================================
-    FILE NAME:
-    03_SQL_DML_And_Alter_Table_Example.sql
-==============================================================*/
+﻿/*=============================================================================
+    FILE: 03_SQL_DML_And_Alter_Table_Example.sql
+    TOPIC: DML + COMPLETE ALTER TABLE OPERATIONS
+    DB   : RetailLearningDB
 
+    LEARNING GOAL:
+    - Understand DML quickly (INSERT, UPDATE, DELETE)
+    - Master ALTER TABLE operations with syntax + examples
+=============================================================================*/
 
-/*==============================================================
-    01. CREATE TABLE
-==============================================================*/
--- Creating a table to store international cricket teams
+IF DB_ID('RetailLearningDB') IS NULL
+BEGIN
+    CREATE DATABASE RetailLearningDB;
+END
+GO
 
-CREATE TABLE international_teams
+USE RetailLearningDB;
+GO
+
+/*=============================================================================
+    1) DML QUICK REFERENCE
+=============================================================================*/
+/*
+INSERT  -> add new rows
+UPDATE  -> modify existing rows
+DELETE  -> remove rows
+*/
+
+/*=============================================================================
+    2) BASE TABLES FOR DEMO
+=============================================================================*/
+DROP TABLE IF EXISTS ProductCatalog;
+DROP TABLE IF EXISTS ProductCategoryMaster;
+GO
+
+CREATE TABLE ProductCategoryMaster
 (
-    team_id     INT,             -- Team ID
-    team_name   VARCHAR(50),     -- Team Name
-    team_rank   INT              -- Team Ranking
+    CategoryID INT PRIMARY KEY,
+    CategoryName VARCHAR(50) NOT NULL
 );
 
+INSERT INTO ProductCategoryMaster VALUES
+(1, 'Electronics'),
+(2, 'Furniture'),
+(3, 'Accessories');
+GO
 
-/*==============================================================
-    02. VIEW TABLE DATA
-==============================================================*/
--- Display all records from table
+CREATE TABLE ProductCatalog
+(
+    ProductID INT,
+    ProductName VARCHAR(80),
+    CategoryID INT,
+    Price DECIMAL(10,2)
+);
+GO
 
-SELECT * 
-FROM international_teams;
-
-
-/*==============================================================
-    03. INSERT DATA INTO TABLE
-==============================================================*/
--- Method 1: Insert data by specifying column names
-
-INSERT INTO international_teams (team_id, team_name, team_rank)
+INSERT INTO ProductCatalog (ProductID, ProductName, CategoryID, Price)
 VALUES
-    (1, 'India', 1),
-    (2, 'Australia', 3),
-    (3, 'England', 2);
+(101, 'Laptop', 1, 65000.00),
+(102, 'Phone', 1, 35000.00),
+(103, 'Office Chair', 2, 7500.00),
+(104, 'Headphones', 3, 2500.00);
+GO
 
+/*=============================================================================
+    3) DML EXAMPLES
+=============================================================================*/
 
--- Method 2: Insert data without column names
--- (Order of values must match table structure)
+-- INSERT
+INSERT INTO ProductCatalog (ProductID, ProductName, CategoryID, Price)
+VALUES (105, 'Desk Lamp', 3, 1500.00);
 
-INSERT INTO international_teams
-VALUES
-    (4, 'West Indians', 5),
-    (5, 'South Africa', 4);
+-- UPDATE
+UPDATE ProductCatalog
+SET Price = 68000.00
+WHERE ProductID = 101;
 
+-- DELETE
+DELETE FROM ProductCatalog
+WHERE ProductID = 105;
 
-/*==============================================================
-    04. ALTER TABLE (MODIFY COLUMN)
-==============================================================*/
+SELECT * FROM ProductCatalog;
+GO
 
--- Change column size
-ALTER TABLE international_teams
-ALTER COLUMN team_name VARCHAR(15);
+/*=============================================================================
+    4) ALTER TABLE - WHAT OPERATIONS WE CAN DO?
+=============================================================================*/
+/*
+A) Add column
+   Syntax:
+   ALTER TABLE TableName ADD ColumnName DataType [NULL | NOT NULL];
 
--- Change data type
-ALTER TABLE international_teams
-ALTER COLUMN team_name NVARCHAR(15);
+B) Drop column
+   Syntax:
+   ALTER TABLE TableName DROP COLUMN ColumnName;
 
--- Make column NOT NULL
-ALTER TABLE international_teams
-ALTER COLUMN team_name VARCHAR(15) NOT NULL;
+C) Change data type / change length
+   Syntax:
+   ALTER TABLE TableName ALTER COLUMN ColumnName NewDataType(NewLength);
 
--- ❌ ERROR: Data type is mandatory while altering column
--- ALTER TABLE international_teams ALTER COLUMN team_name NOT NULL;
+D) Change NULL to NOT NULL
+   Syntax:
+   ALTER TABLE TableName ALTER COLUMN ColumnName DataType NOT NULL;
 
--- Change column to allow NULL values
-ALTER TABLE international_teams
-ALTER COLUMN team_name NVARCHAR(20) NULL;
+E) Change NOT NULL to NULL
+   Syntax:
+   ALTER TABLE TableName ALTER COLUMN ColumnName DataType NULL;
 
+F) Add PRIMARY KEY constraint
+   Syntax:
+   ALTER TABLE TableName ADD CONSTRAINT ConstraintName PRIMARY KEY (ColumnName);
 
-/*==============================================================
-    05. ADD NEW COLUMN
-==============================================================*/
+G) Add UNIQUE constraint
+   Syntax:
+   ALTER TABLE TableName ADD CONSTRAINT ConstraintName UNIQUE (ColumnName);
 
--- ❌ ERROR: COLUMN keyword not used in SQL Server
--- ALTER TABLE international_teams ADD COLUMN team_type VARCHAR(50) NULL;
+H) Add CHECK constraint
+   Syntax:
+   ALTER TABLE TableName ADD CONSTRAINT ConstraintName CHECK (Condition);
 
--- ❌ ERROR: NOT NULL column requires default value
--- ALTER TABLE international_teams ADD team_type VARCHAR(50) NOT NULL;
+I) Add DEFAULT constraint
+   Syntax:
+   ALTER TABLE TableName ADD CONSTRAINT ConstraintName DEFAULT (Value) FOR ColumnName;
 
--- ✅ Correct way to add column
-ALTER TABLE international_teams
-ADD team_type VARCHAR(50) NULL;
+J) Add FOREIGN KEY constraint
+   Syntax:
+   ALTER TABLE ChildTable
+   ADD CONSTRAINT ConstraintName
+   FOREIGN KEY (ChildColumn) REFERENCES ParentTable(ParentColumn);
 
+K) Drop constraint
+   Syntax:
+   ALTER TABLE TableName DROP CONSTRAINT ConstraintName;
 
--- Drop the added column
-ALTER TABLE international_teams
-DROP COLUMN team_type;
+L) Rename column (SQL Server)
+   Syntax:
+   EXEC sp_rename 'TableName.OldColumnName', 'NewColumnName', 'COLUMN';
+*/
 
+/*=============================================================================
+    5) ALTER TABLE PRACTICAL DEMO (ALL MAJOR OPERATIONS)
+=============================================================================*/
 
-/*==============================================================
-    06. RENAME TABLE & COLUMN
-==============================================================*/
+/*---------------------------------------------------------------------
+  5.1 Add column
+---------------------------------------------------------------------*/
+ALTER TABLE ProductCatalog
+ADD StockQty INT NULL;
 
--- Rename table
-EXEC sp_rename 'international_teams', 'i_teams';
+/*---------------------------------------------------------------------
+  5.2 Change data type and length
+---------------------------------------------------------------------*/
+ALTER TABLE ProductCatalog
+ALTER COLUMN ProductName NVARCHAR(120);
 
--- Rename column
-EXEC sp_rename 'i_teams.team_rank', 'world_rank';
+/*---------------------------------------------------------------------
+  5.3 Change NULL / NOT NULL
+  Important: Before making NOT NULL, fill existing NULL values
+---------------------------------------------------------------------*/
+UPDATE ProductCatalog
+SET StockQty = 0
+WHERE StockQty IS NULL;
 
+ALTER TABLE ProductCatalog
+ALTER COLUMN StockQty INT NOT NULL;
 
-/*==============================================================
-    07. TRUNCATE TABLE
-==============================================================*/
--- Deletes all rows but keeps table structure
+-- If business later allows unknown stock, switch back to NULL
+ALTER TABLE ProductCatalog
+ALTER COLUMN StockQty INT NULL;
 
-TRUNCATE TABLE i_teams;
+/*---------------------------------------------------------------------
+  5.4 Add PRIMARY KEY
+---------------------------------------------------------------------*/
+ALTER TABLE ProductCatalog
+ALTER COLUMN ProductID INT NOT NULL;
 
+ALTER TABLE ProductCatalog
+ADD CONSTRAINT PK_ProductCatalog PRIMARY KEY (ProductID);
 
-/*==============================================================
-    08. VIEW TABLE AFTER TRUNCATE
-==============================================================*/
+/*---------------------------------------------------------------------
+  5.5 Add UNIQUE, CHECK, DEFAULT
+---------------------------------------------------------------------*/
+ALTER TABLE ProductCatalog
+ADD CONSTRAINT UQ_ProductCatalog_ProductName UNIQUE (ProductName);
 
-SELECT * 
-FROM i_teams;
+ALTER TABLE ProductCatalog
+ADD CONSTRAINT CHK_ProductCatalog_Price CHECK (Price > 0);
 
+ALTER TABLE ProductCatalog
+ADD CONSTRAINT DF_ProductCatalog_StockQty DEFAULT (0) FOR StockQty;
 
-/*==============================================================
-    09. DROP TABLE
-==============================================================*/
--- Permanently deletes table and data
+/*---------------------------------------------------------------------
+  5.6 Add FOREIGN KEY
+---------------------------------------------------------------------*/
+ALTER TABLE ProductCatalog
+ADD CONSTRAINT FK_ProductCatalog_Category
+FOREIGN KEY (CategoryID)
+REFERENCES ProductCategoryMaster(CategoryID);
 
-DROP TABLE i_teams;
+/*---------------------------------------------------------------------
+  5.7 Rename column
+---------------------------------------------------------------------*/
+EXEC sp_rename 'ProductCatalog.ProductName', 'ProductTitle', 'COLUMN';
+
+/*---------------------------------------------------------------------
+  5.8 Drop constraints (remove rules when business changes)
+---------------------------------------------------------------------*/
+ALTER TABLE ProductCatalog DROP CONSTRAINT FK_ProductCatalog_Category;
+ALTER TABLE ProductCatalog DROP CONSTRAINT DF_ProductCatalog_StockQty;
+ALTER TABLE ProductCatalog DROP CONSTRAINT CHK_ProductCatalog_Price;
+ALTER TABLE ProductCatalog DROP CONSTRAINT UQ_ProductCatalog_ProductName;
+
+/*---------------------------------------------------------------------
+  5.9 Drop column
+---------------------------------------------------------------------*/
+ALTER TABLE ProductCatalog
+DROP COLUMN StockQty;
+GO
+
+SELECT * FROM ProductCatalog;
+GO
+
+/*=============================================================================
+    6) IMPORTANT NOTES FOR LEARNERS
+=============================================================================*/
+/*
+1. ALTER TABLE changes structure, not data directly.
+2. Some ALTER operations fail if existing data violates new rule.
+3. Before NOT NULL, ensure no NULL values exist.
+4. Before FK, ensure child values exist in parent table.
+5. Naming constraints clearly helps maintenance.
+*/
+
+/*=============================================================================
+    7) FINAL RECAP
+=============================================================================*/
+/*
+Using ALTER TABLE you can:
+- add/drop columns
+- change datatype and length
+- switch NULL/NOT NULL
+- add/drop PK, FK, UNIQUE, CHECK, DEFAULT constraints
+- rename columns (sp_rename)
+
+This is the core skill for handling changing business requirements.
+*/
