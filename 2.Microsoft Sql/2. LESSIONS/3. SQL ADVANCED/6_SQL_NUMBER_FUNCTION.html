@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL Number Functions — Lesson 5</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg:     #0d1117;
+  --panel:  #161b22;
+  --panel2: #1c2330;
+  --border: #21262d;
+  --bd2:    #30363d;
+  --text:   #e6edf3;
+  --muted:  #8b949e;
+  --dim:    #484f58;
+  --cyan:   #39d0d8;
+  --orange: #f0883e;
+  --purple: #bc8cff;
+  --green:  #3fb950;
+  --yellow: #e3b341;
+  --blue:   #58a6ff;
+  --red:    #f85149;
+  --font:   'JetBrains Mono', monospace;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+.page { max-width: 860px; margin: 0 auto; padding: 48px 24px 80px; }
+
+/* PAGE HEADER */
+.page-header {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 26px;
+  margin-bottom: 36px;
+  animation: fadeIn .5s ease;
+}
+.breadcrumb {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: .5px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.breadcrumb .sep { color: var(--dim); }
+.page-title {
+  font-size: 21px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -.3px;
+  margin-bottom: 8px;
+}
+.page-title em { font-style: normal; color: var(--cyan); }
+.page-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.meta-item { padding-right: 16px; }
+.meta-item::after { content: '·'; margin-left: 16px; color: var(--dim); }
+.meta-item:last-child::after { content: ''; margin-left: 0; }
+
+/* TOC */
+.toc {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 32px;
+  animation: fadeIn .5s ease .05s both;
+}
+.toc-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.toc ul { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+.toc li { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+.toc-n { color: var(--dim); width: 20px; flex-shrink: 0; }
+.toc a { color: var(--blue); text-decoration: none; }
+.toc a:hover { color: var(--cyan); text-decoration: underline; }
+
+/* SECTION CARD */
+.fn-section {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 28px;
+  overflow: hidden;
+  animation: fadeIn .5s ease both;
+}
+.fn-section:nth-of-type(2) { animation-delay: .08s; }
+.fn-section:nth-of-type(3) { animation-delay: .15s; }
+
+.fn-header {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel2);
+}
+.accent-bar { width: 3px; flex-shrink: 0; }
+.accent-bar.c { background: var(--cyan); }
+.accent-bar.o { background: var(--orange); }
+
+.fn-header-inner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 14px 20px;
+  flex: 1;
+}
+.fn-name { font-size: 15px; font-weight: 700; letter-spacing: .3px; }
+.fn-name.c { color: var(--cyan); }
+.fn-name.o { color: var(--orange); }
+.fn-sig {
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--bd2);
+  border-radius: 4px;
+  padding: 2px 10px;
+}
+.fn-cat {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--dim);
+  padding-right: 2px;
+}
+
+/* BODY */
+.fn-body { padding: 22px 22px 26px; }
+
+/* INFO BOX */
+.info-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--purple);
+  border-radius: 6px;
+  padding: 13px 16px;
+  margin-bottom: 22px;
+  font-size: 12.5px;
+  color: #9db1cc;
+  line-height: 1.8;
+}
+.info-box .lbl {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.info-box code {
+  background: var(--panel2);
+  color: var(--yellow);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 12px;
+  font-family: var(--font);
+}
+.info-box strong { color: var(--text); font-weight: 600; }
+
+/* SQL BLOCK */
+.sql-wrap {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+.sql-titlebar {
+  background: var(--panel2);
+  border-bottom: 1px solid var(--border);
+  padding: 7px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.traffic { display: flex; gap: 6px; align-items: center; }
+.dot { width: 11px; height: 11px; border-radius: 50%; }
+.dr { background: #ff5f57; }
+.dy { background: #febc2e; }
+.dg { background: #28c840; }
+.sql-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+/* SQL INLINE BLOCK */
+.sql-inline {
+  background: var(--bg);
+  padding: 14px 18px;
+  font-family: var(--font);
+  font-size: 13px;
+  overflow-x: auto;
+}
+.sql-line {
+  white-space: pre;
+  line-height: 26px;
+  display: block;
+}
+.sql-line + .sql-line { margin-top: 0; }
+.sql-indent {
+  display: inline-block;
+  width: 7ch;   /* aligns under first column after "SELECT " */
+}
+
+/* Tokens */
+.kw  { color: #ff7b72; }
+.fn  { color: #39d0d8; }
+.fn2 { color: #f0883e; }
+.num { color: #79c0ff; }
+.al  { color: #e3b341; }
+.cm  { color: #484f58; font-style: italic; }
+.op  { color: #bc8cff; }
+.pu  { color: #8b949e; }
+
+/* DIVIDER */
+.divider { border: none; border-top: 1px dashed var(--border); margin: 20px 0; }
+
+/* PLAYGROUND */
+.pg-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pg-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+.controls { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; margin-bottom: 18px; }
+.ctrl { display: flex; flex-direction: column; gap: 5px; }
+.ctrl label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.rv { color: var(--cyan); font-weight: 700; }
+
+input[type="number"] {
+  background: var(--bg);
+  border: 1px solid var(--bd2);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 7px 11px;
+  border-radius: 5px;
+  width: 128px;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+}
+input[type="number"]:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 2px rgba(57,208,216,.12);
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 130px; height: 4px;
+  border-radius: 2px;
+  background: var(--bd2);
+  outline: none;
+  cursor: pointer;
+  margin-top: 4px;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--cyan);
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(57,208,216,.45);
+}
+
+.btn {
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  padding: 8px 18px;
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+  transition: opacity .15s, transform .1s;
+}
+.btn:hover { opacity: .85; transform: translateY(-1px); }
+.btn:active { transform: none; }
+.btn-c { background: var(--cyan);   color: #0d1117; }
+.btn-o { background: var(--orange); color: #0d1117; }
+
+/* RESULTS TABLE */
+.res-wrap {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 18px;
+}
+.res-bar {
+  background: var(--panel2);
+  border-bottom: 1px solid var(--border);
+  padding: 6px 14px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.res-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+
+.res-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font);
+  font-size: 12.5px;
+  background: var(--bg);
+}
+.res-table th {
+  padding: 8px 14px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.res-table td { padding: 8px 14px; border-bottom: 1px solid var(--border); }
+.res-table tr:last-child td { border-bottom: none; }
+.res-table tr { transition: background .1s; animation: rowIn .25s ease both; }
+.res-table tr:hover td { background: rgba(255,255,255,.02); }
+.tc { color: var(--yellow); }
+.te { color: var(--cyan); }
+.te-o { color: var(--orange); }
+.tv { color: var(--green); font-weight: 600; }
+
+/* BAR CHART */
+.chart-wrap {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  padding: 16px 16px 12px;
+}
+.chart-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.bars {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  height: 76px;
+  border-bottom: 1px solid var(--bd2);
+  padding: 0 2px;
+}
+.bc { display: flex; flex-direction: column; align-items: center; flex: 1; }
+.bi {
+  width: 100%;
+  border-radius: 3px 3px 0 0;
+  transition: height .4s cubic-bezier(.34,1.3,.64,1);
+  min-height: 4px;
+  opacity: .82;
+}
+.bl { font-size: 10px; color: var(--muted); text-align: center; margin-top: 5px; white-space: nowrap; }
+.bv { font-size: 10px; color: var(--text); font-weight: 600; text-align: center; margin-top: 2px; }
+
+/* NUMBER LINE */
+.nl-wrap {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  padding: 18px 16px 12px;
+}
+.nl-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+#abs-canvas { display: block; width: 100%; height: 90px; }
+.nl-cap { margin-top: 8px; font-size: 11px; color: var(--muted); text-align: center; }
+.nl-cap b { color: var(--cyan); }
+.nl-cap em { font-style: normal; color: var(--orange); font-weight: 700; }
+
+/* FOOTER */
+.footer {
+  margin-top: 44px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 12px;
+  animation: fadeIn .5s ease .2s both;
+}
+.footer-copy { color: var(--muted); }
+.footer-copy strong { color: var(--text); font-weight: 600; }
+.footer-link {
+  color: var(--blue);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.footer-link:hover { color: var(--cyan); text-decoration: underline; }
+
+@keyframes fadeIn { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: none; } }
+@keyframes rowIn  { from { opacity:0; transform: translateX(-6px); } to { opacity:1; transform: none; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- PAGE HEADER -->
+  <header class="page-header">
+    <div class="breadcrumb">
+      SQL Guide <span class="sep">/</span> Number Functions <span class="sep">/</span> Lesson 5
+    </div>
+    <div class="page-title">SQL <em>Number Functions</em></div>
+    <div class="page-meta">
+      <span class="meta-item">Lesson 5</span>
+      <span class="meta-item">ROUND() &nbsp;·&nbsp; ABS()</span>
+      <span class="meta-item">Mathematical Operations</span>
+    </div>
+  </header>
+
+  <!-- TABLE OF CONTENTS -->
+  <nav class="toc">
+    <div class="toc-label">Table of Contents</div>
+    <ul>
+      <li><span class="toc-n">1.</span> <a href="#s-round">ROUND() — Rounding Numbers</a></li>
+      <li><span class="toc-n">2.</span> <a href="#s-abs">ABS() — Absolute Value</a></li>
+    </ul>
+  </nav>
+
+  <!-- ══════════════════ ROUND ══════════════════ -->
+  <section class="fn-section" id="s-round">
+
+    <div class="fn-header">
+      <div class="accent-bar c"></div>
+      <div class="fn-header-inner">
+        <span class="fn-name c">ROUND()</span>
+        <span class="fn-sig">ROUND( number, decimal_places )</span>
+        <span class="fn-cat"># Rounding</span>
+      </div>
+    </div>
+
+    <div class="fn-body">
+
+      <div class="info-box">
+        <span class="lbl">What is ROUND()?</span>
+        The <code>ROUND()</code> function rounds a numeric value to a specified number of decimal places.
+        It accepts two arguments: the <strong>number</strong> to round, and the <strong>decimal places</strong> to retain.
+        When the digit after the rounding position is <strong>&ge; 5</strong> the value rounds up; otherwise it rounds down.
+        Commonly used in <strong>financial calculations</strong>, <strong>reports</strong>, and anywhere precise decimal control is required.
+      </div>
+
+      <!-- SQL -->
+      <div class="sql-wrap">
+        <div class="sql-titlebar">
+          <div class="traffic">
+            <span class="dot dr"></span><span class="dot dy"></span><span class="dot dg"></span>
+          </div>
+          <span class="sql-tag">SQL Query</span>
+        </div>
+        <div class="sql-inline">
+          <div class="sql-line"><span class="cm">-- Demonstrate rounding a number to different decimal places</span></div>
+          <div class="sql-line"><span class="kw">SELECT</span> <span class="num">3.516</span>                    <span class="kw">AS</span> <span class="al">original_number</span><span class="pu">,</span></div>
+          <div class="sql-line"><span class="sql-indent"></span><span class="fn">ROUND</span><span class="op">(</span><span class="num">3.516</span><span class="pu">,</span> <span class="num">2</span><span class="op">)</span>          <span class="kw">AS</span> <span class="al">round_2_decimal</span><span class="pu">,</span></div>
+          <div class="sql-line"><span class="sql-indent"></span><span class="fn">ROUND</span><span class="op">(</span><span class="num">3.516</span><span class="pu">,</span> <span class="num">1</span><span class="op">)</span>          <span class="kw">AS</span> <span class="al">round_1_decimal</span><span class="pu">,</span></div>
+          <div class="sql-line"><span class="sql-indent"></span><span class="fn">ROUND</span><span class="op">(</span><span class="num">3.516</span><span class="pu">,</span> <span class="num">0</span><span class="op">)</span>          <span class="kw">AS</span> <span class="al">round_0_decimal</span><span class="pu">;</span></div>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <div class="pg-label">Interactive Playground</div>
+      <div class="controls">
+        <div class="ctrl">
+          <label>Input Number</label>
+          <input type="number" id="round-input" value="3.516" step="0.001">
+        </div>
+        <div class="ctrl">
+          <label>Decimal Places &nbsp;<span class="rv" id="dp-val">2</span></label>
+          <input type="range" id="dp-range" min="0" max="5" value="2">
+        </div>
+        <button class="btn btn-c" onclick="runRound()">&#9654;&nbsp; Run Query</button>
+      </div>
+
+      <div class="res-wrap">
+        <div class="res-bar"><span class="res-dot"></span> Query Results</div>
+        <table class="res-table">
+          <thead><tr>
+            <th>Column Alias</th>
+            <th>Expression</th>
+            <th>Result</th>
+          </tr></thead>
+          <tbody id="round-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="chart-wrap">
+        <div class="chart-title">Visual — Rounding Precision Comparison</div>
+        <div class="bars" id="round-bars"></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ══════════════════ ABS ══════════════════ -->
+  <section class="fn-section" id="s-abs">
+
+    <div class="fn-header">
+      <div class="accent-bar o"></div>
+      <div class="fn-header-inner">
+        <span class="fn-name o">ABS()</span>
+        <span class="fn-sig">ABS( number )</span>
+        <span class="fn-cat"># Absolute Value</span>
+      </div>
+    </div>
+
+    <div class="fn-body">
+
+      <div class="info-box">
+        <span class="lbl">What is ABS()?</span>
+        The <code>ABS()</code> function returns the <strong>absolute (non-negative) value</strong> of any number.
+        It strips the sign: <code>ABS(-10)</code> returns <strong>10</strong>, and <code>ABS(10)</code> also returns <strong>10</strong>.
+        Conceptually it represents the <strong>distance from zero</strong> on a number line, regardless of direction.
+        Useful for calculating <strong>differences</strong>, <strong>deviations</strong>, and guaranteeing positive values in analytical queries.
+      </div>
+
+      <!-- SQL -->
+      <div class="sql-wrap">
+        <div class="sql-titlebar">
+          <div class="traffic">
+            <span class="dot dr"></span><span class="dot dy"></span><span class="dot dg"></span>
+          </div>
+          <span class="sql-tag">SQL Query</span>
+        </div>
+        <div class="sql-inline">
+          <div class="sql-line"><span class="cm">-- Demonstrate the absolute value function</span></div>
+          <div class="sql-line"><span class="kw">SELECT</span> <span class="num">-10</span>                     <span class="kw">AS</span> <span class="al">original_number</span><span class="pu">,</span></div>
+          <div class="sql-line"><span class="sql-indent"></span><span class="fn2">ABS</span><span class="op">(</span><span class="num">-10</span><span class="op">)</span>               <span class="kw">AS</span> <span class="al">absolute_value_negative</span><span class="pu">,</span></div>
+          <div class="sql-line"><span class="sql-indent"></span><span class="fn2">ABS</span><span class="op">(</span><span class="num">10</span><span class="op">)</span>                <span class="kw">AS</span> <span class="al">absolute_value_positive</span><span class="pu">;</span></div>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <div class="pg-label">Interactive Playground</div>
+      <div class="controls">
+        <div class="ctrl">
+          <label>Input Number</label>
+          <input type="number" id="abs-input" value="-10" step="1">
+        </div>
+        <button class="btn btn-o" onclick="runAbs()">&#9654;&nbsp; Run Query</button>
+      </div>
+
+      <div class="res-wrap">
+        <div class="res-bar"><span class="res-dot"></span> Query Results</div>
+        <table class="res-table">
+          <thead><tr>
+            <th>Column Alias</th>
+            <th>Expression</th>
+            <th>Result</th>
+          </tr></thead>
+          <tbody id="abs-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="nl-wrap">
+        <div class="nl-title">Visual — Number Line Representation</div>
+        <canvas id="abs-canvas" width="800" height="90"></canvas>
+        <div class="nl-cap">
+          Input: <b id="nl-in">-10</b> &nbsp;&#8594;&nbsp; Distance from zero &nbsp;=&nbsp; <em id="nl-out">10</em>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="footer-copy">
+      &copy; Copyrights belong to <strong>Thillai Shanmugam</strong> &nbsp;&middot;&nbsp; Lesson 5 &nbsp;&middot;&nbsp; SQL Number Functions
+    </div>
+    <a class="footer-link" href="https://github.com/Thillaishanmugam1998" target="_blank">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      github.com/Thillaishanmugam1998
+    </a>
+  </footer>
+
+</div>
+
+<script>
+const COLORS = ['#39d0d8','#3fb950','#bc8cff','#f0883e','#e3b341','#f85149'];
+
+// Range slider
+const dpRange = document.getElementById('dp-range');
+const dpVal   = document.getElementById('dp-val');
+dpRange.addEventListener('input', () => dpVal.textContent = dpRange.value);
+
+// ── ROUND ──────────────────────────────────────────────
+function runRound() {
+  const val  = parseFloat(document.getElementById('round-input').value);
+  const maxDp = parseInt(dpRange.value);
+  if (isNaN(val)) return;
+
+  const tbody = document.getElementById('round-tbody');
+  tbody.innerHTML = '';
+
+  appendRow(tbody, 'original_number', String(val), val, false, 0);
+
+  for (let dp = maxDp; dp >= 0; dp--) {
+    const m  = Math.pow(10, dp);
+    const rv = parseFloat((Math.round(val * m) / m).toFixed(dp));
+    appendRow(tbody, `round_${dp}_decimal`, `ROUND(${val}, ${dp})`, rv, false, maxDp - dp + 1);
+  }
+
+  drawBars(val, maxDp);
+}
+
+function appendRow(tbody, alias, expr, result, isAbs, delay) {
+  const tr = document.createElement('tr');
+  tr.style.animationDelay = `${delay * .05}s`;
+  tr.innerHTML = `
+    <td class="tc">${alias}</td>
+    <td class="${isAbs ? 'te-o' : 'te'}">${expr}</td>
+    <td class="tv">${result}</td>`;
+  tbody.appendChild(tr);
+}
+
+function drawBars(val, maxDp) {
+  const wrap = document.getElementById('round-bars');
+  wrap.innerHTML = '';
+
+  const vals   = [Math.abs(val)];
+  const labels = ['original'];
+  for (let dp = maxDp; dp >= 0; dp--) {
+    const m = Math.pow(10, dp);
+    vals.push(Math.abs(Math.round(val * m) / m));
+    labels.push(`dp=${dp}`);
+  }
+  const maxV = Math.max(...vals, .001);
+
+  vals.forEach((v, i) => {
+    const h   = (v / maxV) * 62 + 6;
+    const col = document.createElement('div');
+    col.className = 'bc';
+    col.innerHTML = `
+      <div class="bv">${parseFloat(v.toFixed(maxDp))}</div>
+      <div class="bi" style="height:${h}px;background:${COLORS[i % COLORS.length]};"></div>
+      <div class="bl">${labels[i]}</div>`;
+    wrap.appendChild(col);
+  });
+}
+
+// ── ABS ────────────────────────────────────────────────
+function runAbs() {
+  const val    = parseFloat(document.getElementById('abs-input').value);
+  if (isNaN(val)) return;
+  const absVal = Math.abs(val);
+
+  const tbody = document.getElementById('abs-tbody');
+  tbody.innerHTML = '';
+
+  appendRow(tbody, 'original_number',          String(val),           val,    true, 0);
+  appendRow(tbody, 'absolute_value_negative',  `ABS(${val})`,         absVal, true, 1);
+  appendRow(tbody, 'absolute_value_positive',  `ABS(${absVal})`,      absVal, true, 2);
+
+  document.getElementById('nl-in').textContent  = val;
+  document.getElementById('nl-out').textContent = absVal;
+
+  drawNL(val);
+}
+
+function drawNL(val) {
+  const canvas = document.getElementById('abs-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const absVal = Math.abs(val);
+  const range  = Math.max(absVal * 1.6, 14);
+  const cx = W / 2, cy = 52, pad = 44;
+  const toX = v => cx + (v / range) * (W / 2 - pad);
+
+  // Axis
+  ctx.strokeStyle = '#21262d'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(pad, cy); ctx.lineTo(W - pad, cy); ctx.stroke();
+
+  // Axis arrowheads
+  const ah = 5;
+  ctx.fillStyle = '#30363d';
+  [[W-pad, cy, 1], [pad, cy, -1]].forEach(([x, y, d]) => {
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - d*ah, y - ah);
+    ctx.lineTo(x - d*ah, y + ah);
+    ctx.closePath(); ctx.fill();
+  });
+
+  // Ticks
+  ctx.font = '11px JetBrains Mono, monospace';
+  ctx.textAlign = 'center';
+  const steps = [-1, -.5, 0, .5, 1];
+  steps.forEach(f => {
+    const x = toX(f * range);
+    ctx.strokeStyle = '#21262d'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, cy-4); ctx.lineTo(x, cy+4); ctx.stroke();
+    ctx.fillStyle = f === 0 ? '#8b949e' : '#484f58';
+    ctx.fillText(Math.round(f * range), x, cy + 17);
+  });
+
+  // ABS span (orange dashed)
+  const x0 = toX(0), x1 = toX(absVal);
+  ctx.setLineDash([5, 4]);
+  ctx.strokeStyle = '#f0883e'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(x0, cy); ctx.lineTo(x1, cy); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // ABS label
+  ctx.fillStyle = '#f0883e';
+  ctx.font = 'bold 12px JetBrains Mono, monospace';
+  ctx.fillText(`ABS = ${absVal}`, (x0 + x1) / 2, cy - 16);
+
+  // Input dot (cyan)
+  const vx = toX(val);
+  ctx.beginPath(); ctx.arc(vx, cy, 6, 0, Math.PI * 2);
+  ctx.fillStyle = '#39d0d8'; ctx.fill();
+  ctx.fillStyle = '#39d0d8';
+  ctx.font = '11px JetBrains Mono, monospace';
+  ctx.fillText(val, vx, cy - 12);
+
+  // ABS dot (orange)
+  ctx.beginPath(); ctx.arc(x1, cy, 6, 0, Math.PI * 2);
+  ctx.fillStyle = '#f0883e'; ctx.fill();
+}
+
+// Init
+runRound();
+runAbs();
+</script>
+</body>
+</html>

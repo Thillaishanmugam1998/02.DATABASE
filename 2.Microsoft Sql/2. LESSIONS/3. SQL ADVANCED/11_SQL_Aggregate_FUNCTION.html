@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL Aggregate Functions - Interactive Visualization</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #0a0d14;
+            color: #e1e8f0;
+            font-family: 'JetBrains Mono', monospace;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Grid background overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(0deg, transparent 24%, rgba(0, 255, 200, 0.03) 25%, rgba(0, 255, 200, 0.03) 26%, transparent 27%, transparent 74%, rgba(0, 255, 200, 0.03) 75%, rgba(0, 255, 200, 0.03) 76%, transparent 77%, transparent),
+                linear-gradient(90deg, transparent 24%, rgba(0, 255, 200, 0.03) 25%, rgba(0, 255, 200, 0.03) 26%, transparent 27%, transparent 74%, rgba(0, 255, 200, 0.03) 75%, rgba(0, 255, 200, 0.03) 76%, transparent 77%, transparent);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+            animation: slideDown 0.8s ease-out;
+        }
+
+        h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #00ffcc 0%, #00b4ff 50%, #ff006e 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            color: #7f8fa3;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .section {
+            margin-bottom: 60px;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid rgba(0, 255, 200, 0.1);
+        }
+
+        .section-badge {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 18px;
+            color: white;
+            background: linear-gradient(135deg, #00ffcc, #00b4ff);
+        }
+
+        .section-badge.alt {
+            background: linear-gradient(135deg, #ff006e, #ffb703);
+        }
+
+        .section-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .subsection {
+            background: rgba(20, 24, 36, 0.8);
+            border: 1px solid rgba(0, 255, 200, 0.1);
+            border-top: 3px solid;
+            border-top-image: linear-gradient(90deg, #00ffcc, #00b4ff, #ff006e) 1;
+            border-radius: 8px;
+            padding: 30px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+
+        .subsection-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .subsection-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            background: rgba(0, 255, 200, 0.2);
+            border-radius: 50%;
+            font-size: 12px;
+            font-weight: 600;
+            color: #00ffcc;
+        }
+
+        .query-block {
+            background: rgba(10, 13, 20, 0.8);
+            border: 1px solid rgba(0, 255, 200, 0.15);
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .query-title {
+            font-size: 13px;
+            color: #00ffcc;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .query-text {
+            background: rgba(0, 0, 0, 0.4);
+            border-left: 3px solid #00b4ff;
+            padding: 12px 15px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #00ffcc;
+            margin-bottom: 15px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .query-explanation {
+            font-size: 12px;
+            color: #a8b5c5;
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            margin-bottom: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        th {
+            background: rgba(0, 255, 200, 0.1);
+            color: #00ffcc;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid rgba(0, 255, 200, 0.2);
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid rgba(0, 255, 200, 0.05);
+            color: #c8d3e3;
+        }
+
+        tr:hover {
+            background-color: rgba(0, 255, 200, 0.05);
+        }
+
+        tr.processing {
+            animation: tableRowPulse 0.6s ease-in-out;
+        }
+
+        tr.completed {
+            background-color: rgba(0, 200, 100, 0.1);
+        }
+
+        .result-table {
+            background: rgba(0, 200, 100, 0.08);
+            border: 2px solid rgba(0, 200, 100, 0.3);
+        }
+
+        .result-table th {
+            background: rgba(0, 200, 100, 0.2);
+            color: #00ffcc;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: 1px solid rgba(0, 255, 200, 0.3);
+            border-radius: 4px;
+            background: rgba(0, 255, 200, 0.1);
+            color: #00ffcc;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button:hover {
+            background: rgba(0, 255, 200, 0.2);
+            border-color: rgba(0, 255, 200, 0.6);
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .flow-steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .flow-step {
+            background: rgba(10, 13, 20, 0.8);
+            border: 1px solid rgba(0, 255, 200, 0.1);
+            border-radius: 4px;
+            padding: 15px;
+            text-align: center;
+            font-size: 11px;
+            color: #7f8fa3;
+            transition: all 0.3s ease;
+        }
+
+        .flow-step.active {
+            animation: markerPulse 0.6s ease-in-out;
+            background: rgba(0, 255, 200, 0.2);
+            border-color: rgba(0, 255, 200, 0.5);
+            color: #00ffcc;
+        }
+
+        .flow-step.completed {
+            background: rgba(0, 200, 100, 0.2);
+            border-color: rgba(0, 200, 100, 0.5);
+            color: #00c864;
+        }
+
+        .result-cell {
+            background: rgba(0, 200, 100, 0.1);
+            border: 2px solid rgba(0, 200, 100, 0.3);
+            border-radius: 6px;
+            padding: 20px;
+            text-align: center;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .result-value {
+            font-size: 28px;
+            font-weight: 600;
+            color: #00c864;
+            font-family: 'Syne', sans-serif;
+        }
+
+        .result-label {
+            font-size: 12px;
+            color: #7f8fa3;
+            margin-top: 10px;
+        }
+
+        .comparison-box {
+            background: rgba(20, 24, 36, 0.8);
+            border: 1px solid rgba(255, 107, 107, 0.2);
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .comparison-item {
+            padding: 15px;
+            background: rgba(10, 13, 20, 0.8);
+            border-radius: 4px;
+        }
+
+        .comparison-item.wrong {
+            border-left: 4px solid #ff006e;
+        }
+
+        .comparison-item.correct {
+            border-left: 4px solid #00c864;
+        }
+
+        .comparison-label {
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .wrong .comparison-label {
+            color: #ff006e;
+        }
+
+        .correct .comparison-label {
+            color: #00c864;
+        }
+
+        .execution-summary {
+            background: rgba(0, 255, 200, 0.05);
+            border: 1px solid rgba(0, 255, 200, 0.2);
+            border-radius: 6px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .summary-title {
+            color: #00ffcc;
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(0, 255, 200, 0.1);
+            font-size: 12px;
+        }
+
+        .summary-item:last-child {
+            border-bottom: none;
+        }
+
+        .summary-value {
+            color: #00c864;
+            font-weight: 600;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes tableRowPulse {
+            0% {
+                background-color: rgba(255, 255, 100, 0.1);
+            }
+            50% {
+                background-color: rgba(255, 255, 100, 0.3);
+            }
+            100% {
+                background-color: rgba(0, 200, 100, 0.1);
+            }
+        }
+
+        @keyframes markerPulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 32px;
+            }
+
+            .comparison-box {
+                grid-template-columns: 1fr;
+            }
+
+            .flow-steps {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .table-wrapper {
+                font-size: 11px;
+            }
+
+            td, th {
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>SQL Aggregate Functions</h1>
+            <p class="subtitle">Interactive Visualization & Execution Engine</p>
+        </header>
+
+        <!-- SECTION 1: BASIC AGGREGATE FUNCTIONS -->
+        <section class="section">
+            <div class="section-header">
+                <div class="section-badge">1</div>
+                <h2 class="section-title">Basic Aggregate Functions</h2>
+            </div>
+
+            <!-- Sample Input Table -->
+            <div class="subsection" style="margin-bottom: 40px;">
+                <div class="subsection-title">
+                    <span class="subsection-badge">INPUT</span>
+                    Sales Table
+                </div>
+                <div class="table-wrapper">
+                    <table id="inputTable">
+                        <thead>
+                            <tr>
+                                <th>ProductID</th>
+                                <th>ProductName</th>
+                                <th>Category</th>
+                                <th>Quantity</th>
+                                <th>Price</th>
+                                <th>TotalSales</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>1</td><td>Laptop</td><td>Electronics</td><td>5</td><td>1200</td><td>6000</td></tr>
+                            <tr><td>2</td><td>Shirt</td><td>Clothing</td><td>20</td><td>50</td><td>1000</td></tr>
+                            <tr><td>3</td><td>Apple</td><td>Food</td><td>100</td><td>2</td><td>200</td></tr>
+                            <tr><td>4</td><td>Mouse</td><td>Electronics</td><td>15</td><td>30</td><td>450</td></tr>
+                            <tr><td>5</td><td>Pants</td><td>Clothing</td><td>10</td><td>80</td><td>800</td></tr>
+                            <tr><td>6</td><td>Orange</td><td>Food</td><td>50</td><td>3</td><td>150</td></tr>
+                            <tr><td>7</td><td>Monitor</td><td>Electronics</td><td>8</td><td>350</td><td>2800</td></tr>
+                            <tr><td>8</td><td>Jacket</td><td>Clothing</td><td>12</td><td>120</td><td>1440</td></tr>
+                            <tr><td>9</td><td>Banana</td><td>Food</td><td>75</td><td>1</td><td>75</td></tr>
+                            <tr><td>10</td><td>Keyboard</td><td>Electronics</td><td>12</td><td>100</td><td>1200</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- COUNT() -->
+            <div class="subsection">
+                <div class="subsection-title">
+                    <span class="subsection-badge">1.1</span>
+                    COUNT() - Counting Rows
+                </div>
+
+                <div class="query-block">
+                    <div class="query-title">Query 1: Count All Rows</div>
+                    <div class="query-text">SELECT COUNT(*) FROM Sales</div>
+                    <div class="query-explanation">📊 Counts the total number of rows in the table, regardless of column values.</div>
+                    <div class="controls">
+                        <button onclick="executeCountAll()">▶ Execute Query</button>
+                        <button onclick="resetCountAll()">↻ Reset</button>
+                    </div>
+                    <div id="flowSteps1" class="flow-steps">
+                        <div class="flow-step">1. Parse & Bind</div>
+                        <div class="flow-step">2. Table Scan</div>
+                        <div class="flow-step">3. Count Rows</div>
+                        <div class="flow-step">4. Return Result</div>
+                    </div>
+                    <div id="resultCountAll" class="result-cell hidden">
+                        <div>
+                            <div class="result-value" id="countAllValue">10</div>
+                            <div class="result-label">Total Rows</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="query-block">
+                    <div class="query-title">Query 2: Count Distinct Categories</div>
+                    <div class="query-text">SELECT COUNT(DISTINCT Category) FROM Sales</div>
+                    <div class="query-explanation">📊 Counts only unique/distinct values in a column, eliminating duplicates.</div>
+                    <div class="controls">
+                        <button onclick="executeCountDistinct()">▶ Execute Query</button>
+                        <button onclick="resetCountDistinct()">↻ Reset</button>
+                    </div>
+                    <div id="flowSteps2" class="flow-steps">
+                        <div class="flow-step">1. Parse & Bind</div>
+                        <div class="flow-step">2. Table Scan</div>
+                        <div class="flow-step">3. Find Distinct</div>
+                        <div class="flow-step">4. Return Result</div>
+                    </div>
+                    <div id="resultCountDistinct" class="result-cell hidden">
+                        <div>
+                            <div class="result-value" id="countDistinctValue">3</div>
+                            <div class="result-label">Unique Categories</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SUM() -->
+            <div class="subsection">
+                <div class="subsection-title">
+                    <span class="subsection-badge">1.2</span>
+                    SUM() - Adding Values
+                </div>
+
+                <div class="query-block">
+                    <div class="query-title">Query: Sum All TotalSales</div>
+                    <div class="query-text">SELECT SUM(TotalSales) FROM Sales</div>
+                    <div class="query-explanation">➕ Adds all numeric values in a column together to produce a total.</div>
+                    <div class="controls">
+                        <button onclick="executeSum()">▶ Execute Query</button>
+                        <button onclick="resetSum()">↻ Reset</button>
+                    </div>
+                    <div id="flowSteps3" class="flow-steps">
+                        <div class="flow-step">1. Parse & Bind</div>
+                        <div class="flow-step">2. Table Scan</div>
+                        <div class="flow-step">3. Sum Column</div>
+                        <div class="flow-step">4. Return Result</div>
+                    </div>
+                    <div id="resultSum" class="result-cell hidden">
+                        <div>
+                            <div class="result-value" id="sumValue">14115</div>
+                            <div class="result-label">Total Sales Revenue</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AVG() -->
+            <div class="subsection">
+                <div class="subsection-title">
+                    <span class="subsection-badge">1.3</span>
+                    AVG() - Calculating Average
+                </div>
+
+                <div class="query-block">
+                    <div class="query-title">Query: Average Quantity</div>
+                    <div class="query-text">SELECT AVG(Quantity) FROM Sales</div>
+                    <div class="query-explanation">📈 Calculates the average by summing all values and dividing by the count.</div>
+                    <div class="controls">
+                        <button onclick="executeAvg()">▶ Execute Query</button>
+                        <button onclick="resetAvg()">↻ Reset</button>
+                    </div>
+                    <div id="flowSteps4" class="flow-steps">
+                        <div class="flow-step">1. Parse & Bind</div>
+                        <div class="flow-step">2. Table Scan</div>
+                        <div class="flow-step">3. Calculate Avg</div>
+                        <div class="flow-step">4. Return Result</div>
+                    </div>
+                    <div id="resultAvg" class="result-cell hidden">
+                        <div>
+                            <div class="result-value" id="avgValue">30.7</div>
+                            <div class="result-label">Average Quantity per Product</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MAX() & MIN() -->
+            <div class="subsection">
+                <div class="subsection-title">
+                    <span class="subsection-badge">1.4</span>
+                    MAX() & MIN() - Extreme Values
+                </div>
+
+                <div class="query-block">
+                    <div class="query-title">Query 1: Maximum Price</div>
+                    <div class="query-text">SELECT MAX(Price) FROM Sales</div>
+                    <div class="query-explanation">🔼 Finds and returns the largest value in a column.</div>
+                    <div class="controls">
+                        <button onclick="executeMax()">▶ Execute Query</button>
+                        <button onclick="resetMax()">↻ Reset</button>
+                    </div>
+                    <div id="flowSteps5" class="flow-steps">
+                        <div class="flow-step">1. Parse & Bind</div>
+                        <div class="flow-step">2. Table Scan</div>
+                        <div class="flow-step">3. Find Max</div>
+                        <div class="flow-step">4. Return Result</div>
+                    </div>
+                    <div id="resultMax" class="result-cell hidden">
+                        <div>
+                            <div class="result-value" id="maxValue">1200</div>
+                            <div class="result-label">Maximum Price</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="query-block">
+                    <div class="query-title">Query 2: Minimum Price</div>
+                    <div class="query-text">SELECT MIN(Price) FROM Sales</div>
+                    <div class="query-explanation">🔽 Finds and returns the smallest value in a column.</div>
+                    <div class="controls">
+                        <button onclick="executeMin()">▶ Execute Query</button>
+                        <button onclick="resetMin()">↻ Reset</button>
+                    </div>
+                    <div id="flowSteps6" class="flow-steps">
+                        <div class="flow-step">1. Parse & Bind</div>
+                        <div class="flow-step">2. Table Scan</div>
+                        <div class="flow-step">3. Find Min</div>
+                        <div class="flow-step">4. Return Result</div>
+                    </div>
+                    <div id="resultMin" class="result-cell hidden">
+                        <div>
+                            <div class="result-value" id="minValue">1</div>
+                            <div class="result-label">Minimum Price</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Aggregate Comparison -->
+            <div class="subsection" style="background: rgba(20, 24, 36, 0.8); border-top-image: linear-gradient(90deg, #ff006e, #ffb703) 1;">
+                <div class="subsection-title">
+                    <span class="subsection-badge" style="background: linear-gradient(135deg, #ff006e, #ffb703);">★</span>
+                    All Aggregate Functions - Side-by-Side Results
+                </div>
+                <div id="aggregateComparison" class="table-wrapper hidden">
+                    <table class="result-table">
+                        <thead>
+                            <tr>
+                                <th>Function</th>
+                                <th>Query</th>
+                                <th>Result</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>COUNT(*)</strong></td>
+                                <td>Count all rows</td>
+                                <td style="color: #00c864; font-weight: 600;">10</td>
+                                <td>Total records in table</td>
+                            </tr>
+                            <tr>
+                                <td><strong>COUNT(DISTINCT)</strong></td>
+                                <td>Distinct categories</td>
+                                <td style="color: #00c864; font-weight: 600;">3</td>
+                                <td>Unique category values</td>
+                            </tr>
+                            <tr>
+                                <td><strong>SUM()</strong></td>
+                                <td>Sum TotalSales</td>
+                                <td style="color: #00c864; font-weight: 600;">14,115</td>
+                                <td>Total revenue from all sales</td>
+                            </tr>
+                            <tr>
+                                <td><strong>AVG()</strong></td>
+                                <td>Average Quantity</td>
+                                <td style="color: #00c864; font-weight: 600;">30.7</td>
+                                <td>Mean quantity across products</td>
+                            </tr>
+                            <tr>
+                                <td><strong>MAX()</strong></td>
+                                <td>Highest Price</td>
+                                <td style="color: #00c864; font-weight: 600;">1,200</td>
+                                <td>Most expensive product</td>
+                            </tr>
+                            <tr>
+                                <td><strong>MIN()</strong></td>
+                                <td>Lowest Price</td>
+                                <td style="color: #00c864; font-weight: 600;">1</td>
+                                <td>Least expensive product</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <button onclick="showAggregateComparison()" style="margin-top: 20px;">📊 Show All Results</button>
+            </div>
+        </section>
+
+        <!-- SECTION 2: GROUPED AGGREGATIONS -->
+        <section class="section">
+            <div class="section-header">
+                <div class="section-badge alt">2</div>
+                <h2 class="section-title">Grouped Aggregations with GROUP BY</h2>
+            </div>
+
+            <!-- GROUP BY Problem -->
+            <div class="subsection">
+                <div class="subsection-title">
+                    <span class="subsection-badge" style="background: #ff006e;">✗</span>
+                    The Problem: Without GROUP BY
+                </div>
+
+                <div class="query-block">
+                    <div class="query-title">Incorrect Query - Missing GROUP BY</div>
+                    <div class="query-text">SELECT Category, COUNT(*) FROM Sales</div>
+                    <div class="query-explanation">❌ This query is incomplete! Without GROUP BY, SQL doesn't know how to aggregate by category. Result: Error or unexpected output.</div>
+                    <div class="controls">
+                        <button onclick="executeProblemQuery()">▶ Execute Query</button>
+                        <button onclick="resetProblemQuery()">↻ Reset</button>
+                    </div>
+                    <div id="resultProblem" class="result-cell hidden" style="background: rgba(255, 107, 107, 0.1); border-color: rgba(255, 107, 107, 0.3);">
+                        <div>
+                            <div class="result-value" style="color: #ff006e;">ERROR</div>
+                            <div class="result-label">GROUP BY clause required when using aggregate functions</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GROUP BY Solution -->
+            <div class="subsection">
+                <div class="subsection-title">
+                    <span class="subsection-badge" style="background: #00c864;">✓</span>
+                    The Solution: With GROUP BY
+                </div>
+
+                <div class="query-block">
+                    <div class="query-title">Correct Query - With GROUP BY</div>
+                    <div class="query-text">SELECT Category, COUNT(*) AS TotalProducts, SUM(TotalSales) AS CategoryRevenue, AVG(Price) AS AvgPrice FROM Sales GROUP BY Category</div>
+                    <div class="query-explanation">✅ Properly groups data by Category and applies aggregate functions to each group independently.</div>
+                    <div class="controls">
+                        <button onclick="executeGroupByQuery()">▶ Execute Query</button>
+                        <button onclick="resetGroupByQuery()">↻ Reset</button>
+                    </div>
+                    <div id="flowSteps7" class="flow-steps">
+                        <div class="flow-step">1. Parse & Bind</div>
+                        <div class="flow-step">2. Table Scan</div>
+                        <div class="flow-step">3. Identify Groups</div>
+                        <div class="flow-step">4. Partition Rows</div>
+                        <div class="flow-step">5. Apply Functions</div>
+                        <div class="flow-step">6. Return Results</div>
+                    </div>
+                    <div id="resultGroupBy" class="table-wrapper hidden">
+                        <table class="result-table">
+                            <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>TotalProducts</th>
+                                    <th>CategoryRevenue</th>
+                                    <th>AvgPrice</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="completed">
+                                    <td><strong>Electronics</strong></td>
+                                    <td>4</td>
+                                    <td>10,450</td>
+                                    <td>420.00</td>
+                                </tr>
+                                <tr class="completed">
+                                    <td><strong>Clothing</strong></td>
+                                    <td>3</td>
+                                    <td>3,240</td>
+                                    <td>83.33</td>
+                                </tr>
+                                <tr class="completed">
+                                    <td><strong>Food</strong></td>
+                                    <td>3</td>
+                                    <td>425</td>
+                                    <td>2.00</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Comparison: Without vs With GROUP BY -->
+            <div class="subsection" style="background: rgba(20, 24, 36, 0.8); border-top-image: linear-gradient(90deg, #ff006e, #00c864) 1;">
+                <div class="subsection-title">
+                    <span class="subsection-badge" style="background: linear-gradient(135deg, #ff006e, #00c864);">⚖</span>
+                    Comparison: Impact of GROUP BY
+                </div>
+
+                <div class="comparison-box">
+                    <div class="comparison-item wrong">
+                        <div class="comparison-label">Without GROUP BY</div>
+                        <div style="font-size: 12px; color: #ff006e; margin-bottom: 10px;">
+                            ❌ Returns single aggregate line (only first category)<br>
+                            ❌ Loses category-specific data<br>
+                            ❌ Not useful for comparison analysis
+                        </div>
+                        <div style="background: rgba(255, 107, 107, 0.1); padding: 10px; border-radius: 4px; border-left: 3px solid #ff006e;">
+                            <div style="font-size: 11px; color: #ff006e;">Result: Ambiguous or Error</div>
+                        </div>
+                    </div>
+
+                    <div class="comparison-item correct">
+                        <div class="comparison-label">With GROUP BY</div>
+                        <div style="font-size: 12px; color: #00c864; margin-bottom: 10px;">
+                            ✅ Returns separate rows per category<br>
+                            ✅ Preserves all category-specific insights<br>
+                            ✅ Perfect for comparative analysis
+                        </div>
+                        <div style="background: rgba(0, 200, 100, 0.1); padding: 10px; border-radius: 4px; border-left: 3px solid #00c864;">
+                            <div style="font-size: 11px; color: #00c864;">Result: 3 meaningful rows</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Execution Summary -->
+            <div class="subsection">
+                <div class="subsection-title">
+                    <span class="subsection-badge" style="background: #00b4ff;">📊</span>
+                    Execution Summary
+                </div>
+                <div id="executionSummary" class="execution-summary hidden">
+                    <div class="summary-title">Query Execution Statistics</div>
+                    <div class="summary-item">
+                        <span>Rows Processed:</span>
+                        <span class="summary-value" id="summaryRowsProcessed">0</span>
+                    </div>
+                    <div class="summary-item">
+                        <span>Aggregation Groups:</span>
+                        <span class="summary-value" id="summaryGroups">0</span>
+                    </div>
+                    <div class="summary-item">
+                        <span>Total Calculations:</span>
+                        <span class="summary-value" id="summaryCalculations">0</span>
+                    </div>
+                    <div class="summary-item">
+                        <span>Result Rows Returned:</span>
+                        <span class="summary-value" id="summaryResultRows">0</span>
+                    </div>
+                    <div class="summary-item">
+                        <span>Status:</span>
+                        <span class="summary-value" id="summaryStatus">Ready</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const salesData = [
+            { id: 1, name: 'Laptop', category: 'Electronics', quantity: 5, price: 1200, total: 6000 },
+            { id: 2, name: 'Shirt', category: 'Clothing', quantity: 20, price: 50, total: 1000 },
+            { id: 3, name: 'Apple', category: 'Food', quantity: 100, price: 2, total: 200 },
+            { id: 4, name: 'Mouse', category: 'Electronics', quantity: 15, price: 30, total: 450 },
+            { id: 5, name: 'Pants', category: 'Clothing', quantity: 10, price: 80, total: 800 },
+            { id: 6, name: 'Orange', category: 'Food', quantity: 50, price: 3, total: 150 },
+            { id: 7, name: 'Monitor', category: 'Electronics', quantity: 8, price: 350, total: 2800 },
+            { id: 8, name: 'Jacket', category: 'Clothing', quantity: 12, price: 120, total: 1440 },
+            { id: 9, name: 'Banana', category: 'Food', quantity: 75, price: 1, total: 75 },
+            { id: 10, name: 'Keyboard', category: 'Electronics', quantity: 12, price: 100, total: 1200 }
+        ];
+
+        function animateFlowSteps(stepsId, delayStart = 0) {
+            const steps = document.querySelectorAll(`#${stepsId} .flow-step`);
+            steps.forEach((step, index) => {
+                step.classList.remove('active', 'completed');
+                setTimeout(() => {
+                    step.classList.add('active');
+                    setTimeout(() => {
+                        step.classList.remove('active');
+                        step.classList.add('completed');
+                    }, 400);
+                }, delayStart + (index * 300));
+            });
+        }
+
+        function animateTableRows(tableId, delayStart = 300) {
+            const table = document.getElementById(tableId);
+            const rows = table.querySelectorAll('tbody tr');
+            rows.forEach((row, index) => {
+                setTimeout(() => {
+                    row.classList.add('processing');
+                    setTimeout(() => {
+                        row.classList.remove('processing');
+                        row.classList.add('completed');
+                    }, 600);
+                }, delayStart + (index * 150));
+            });
+        }
+
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+
+        // COUNT(*) Query
+        function executeCountAll() {
+            animateFlowSteps('flowSteps1', 0);
+            animateTableRows('inputTable', 300);
+            setTimeout(() => {
+                const count = salesData.length;
+                document.getElementById('countAllValue').textContent = count;
+                document.getElementById('resultCountAll').classList.remove('hidden');
+                updateSummary(salesData.length, 0, 1, 1);
+            }, 1500);
+        }
+
+        function resetCountAll() {
+            document.querySelectorAll('#inputTable tbody tr').forEach(row => {
+                row.classList.remove('processing', 'completed');
+            });
+            document.getElementById('resultCountAll').classList.add('hidden');
+            document.querySelectorAll('#flowSteps1 .flow-step').forEach(step => {
+                step.classList.remove('active', 'completed');
+            });
+        }
+
+        // COUNT(DISTINCT) Query
+        function executeCountDistinct() {
+            animateFlowSteps('flowSteps2', 0);
+            setTimeout(() => {
+                const categories = new Set(salesData.map(item => item.category));
+                document.getElementById('countDistinctValue').textContent = categories.size;
+                document.getElementById('resultCountDistinct').classList.remove('hidden');
+                updateSummary(salesData.length, 0, 1, 1);
+            }, 1500);
+        }
+
+        function resetCountDistinct() {
+            document.getElementById('resultCountDistinct').classList.add('hidden');
+            document.querySelectorAll('#flowSteps2 .flow-step').forEach(step => {
+                step.classList.remove('active', 'completed');
+            });
+        }
+
+        // SUM() Query
+        function executeSum() {
+            animateFlowSteps('flowSteps3', 0);
+            animateTableRows('inputTable', 300);
+            setTimeout(() => {
+                const sum = salesData.reduce((total, item) => total + item.total, 0);
+                document.getElementById('sumValue').textContent = formatNumber(sum);
+                document.getElementById('resultSum').classList.remove('hidden');
+                updateSummary(salesData.length, 0, 1, 1);
+            }, 1500);
+        }
+
+        function resetSum() {
+            document.querySelectorAll('#inputTable tbody tr').forEach(row => {
+                row.classList.remove('processing', 'completed');
+            });
+            document.getElementById('resultSum').classList.add('hidden');
+            document.querySelectorAll('#flowSteps3 .flow-step').forEach(step => {
+                step.classList.remove('active', 'completed');
+            });
+        }
+
+        // AVG() Query
+        function executeAvg() {
+            animateFlowSteps('flowSteps4', 0);
+            animateTableRows('inputTable', 300);
+            setTimeout(() => {
+                const sum = salesData.reduce((total, item) => total + item.quantity, 0);
+                const avg = (sum / salesData.length).toFixed(1);
+                document.getElementById('avgValue').textContent = avg;
+                document.getElementById('resultAvg').classList.remove('hidden');
+                updateSummary(salesData.length, 0, 1, 1);
+            }, 1500);
+        }
+
+        function resetAvg() {
+            document.querySelectorAll('#inputTable tbody tr').forEach(row => {
+                row.classList.remove('processing', 'completed');
+            });
+            document.getElementById('resultAvg').classList.add('hidden');
+            document.querySelectorAll('#flowSteps4 .flow-step').forEach(step => {
+                step.classList.remove('active', 'completed');
+            });
+        }
+
+        // MAX() Query
+        function executeMax() {
+            animateFlowSteps('flowSteps5', 0);
+            animateTableRows('inputTable', 300);
+            setTimeout(() => {
+                const max = Math.max(...salesData.map(item => item.price));
+                document.getElementById('maxValue').textContent = formatNumber(max);
+                document.getElementById('resultMax').classList.remove('hidden');
+                updateSummary(salesData.length, 0, 1, 1);
+            }, 1500);
+        }
+
+        function resetMax() {
+            document.querySelectorAll('#inputTable tbody tr').forEach(row => {
+                row.classList.remove('processing', 'completed');
+            });
+            document.getElementById('resultMax').classList.add('hidden');
+            document.querySelectorAll('#flowSteps5 .flow-step').forEach(step => {
+                step.classList.remove('active', 'completed');
+            });
+        }
+
+        // MIN() Query
+        function executeMin() {
+            animateFlowSteps('flowSteps6', 0);
+            animateTableRows('inputTable', 300);
+            setTimeout(() => {
+                const min = Math.min(...salesData.map(item => item.price));
+                document.getElementById('minValue').textContent = formatNumber(min);
+                document.getElementById('resultMin').classList.remove('hidden');
+                updateSummary(salesData.length, 0, 1, 1);
+            }, 1500);
+        }
+
+        function resetMin() {
+            document.querySelectorAll('#inputTable tbody tr').forEach(row => {
+                row.classList.remove('processing', 'completed');
+            });
+            document.getElementById('resultMin').classList.add('hidden');
+            document.querySelectorAll('#flowSteps6 .flow-step').forEach(step => {
+                step.classList.remove('active', 'completed');
+            });
+        }
+
+        // Show Aggregate Comparison
+        function showAggregateComparison() {
+            document.getElementById('aggregateComparison').classList.remove('hidden');
+            setTimeout(() => {
+                const rows = document.querySelectorAll('#aggregateComparison tbody tr');
+                rows.forEach((row, index) => {
+                    setTimeout(() => {
+                        row.classList.add('completed');
+                    }, index * 200);
+                });
+            }, 100);
+        }
+
+        // GROUP BY - Problem Query
+        function executeProblemQuery() {
+            setTimeout(() => {
+                document.getElementById('resultProblem').classList.remove('hidden');
+                updateSummary(0, 0, 0, 0);
+            }, 1000);
+        }
+
+        function resetProblemQuery() {
+            document.getElementById('resultProblem').classList.add('hidden');
+        }
+
+        // GROUP BY - Solution Query
+        function executeGroupByQuery() {
+            animateFlowSteps('flowSteps7', 0);
+            animateTableRows('inputTable', 300);
+            setTimeout(() => {
+                document.getElementById('resultGroupBy').classList.remove('hidden');
+                const rows = document.querySelectorAll('#resultGroupBy tbody tr');
+                rows.forEach((row, index) => {
+                    setTimeout(() => {
+                        row.classList.add('completed');
+                    }, index * 200);
+                });
+                updateSummary(salesData.length, 3, 12, 3);
+            }, 2500);
+        }
+
+        function resetGroupByQuery() {
+            document.querySelectorAll('#inputTable tbody tr').forEach(row => {
+                row.classList.remove('processing', 'completed');
+            });
+            document.getElementById('resultGroupBy').classList.add('hidden');
+            document.querySelectorAll('#resultGroupBy tbody tr').forEach(row => {
+                row.classList.remove('completed');
+            });
+            document.querySelectorAll('#flowSteps7 .flow-step').forEach(step => {
+                step.classList.remove('active', 'completed');
+            });
+            document.getElementById('executionSummary').classList.add('hidden');
+        }
+
+        // Update Execution Summary
+        function updateSummary(rowsProcessed, groups, calculations, resultRows) {
+            document.getElementById('summaryRowsProcessed').textContent = rowsProcessed;
+            document.getElementById('summaryGroups').textContent = groups;
+            document.getElementById('summaryCalculations').textContent = calculations;
+            document.getElementById('summaryResultRows').textContent = resultRows;
+            document.getElementById('summaryStatus').textContent = resultRows > 0 ? 'Completed ✓' : 'Error ✗';
+            document.getElementById('executionSummary').classList.remove('hidden');
+        }
+
+        // Initialize
+        console.log('SQL Aggregate Functions Visualization loaded');
+    </script>
+</body>
+</html>

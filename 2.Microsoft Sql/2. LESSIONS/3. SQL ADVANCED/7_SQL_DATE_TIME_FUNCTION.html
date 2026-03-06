@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL Date & Time Functions — Lesson 06</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&family=Fraunces:ital,wght@0,300;0,700;0,900;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #06080f;
+  --surface: #0d1017;
+  --surface2: #131720;
+  --border: #1c2235;
+  --border2: #252d42;
+  --amber: #f59e0b;
+  --amber-dim: rgba(245,158,11,0.12);
+  --amber-glow: rgba(245,158,11,0.25);
+  --teal: #2dd4bf;
+  --teal-dim: rgba(45,212,191,0.1);
+  --rose: #fb7185;
+  --rose-dim: rgba(251,113,133,0.1);
+  --violet: #a78bfa;
+  --violet-dim: rgba(167,139,250,0.1);
+  --green: #4ade80;
+  --green-dim: rgba(74,222,128,0.1);
+  --sky: #38bdf8;
+  --sky-dim: rgba(56,189,248,0.1);
+  --text: #dde3f0;
+  --muted: #4a5270;
+  --muted2: #6b7494;
+  --kw: #f472b6;
+  --fn: #86efac;
+  --str: #fde68a;
+  --col: #67e8f9;
+  --num: #fbbf24;
+  --cm: #4a5680;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Radial glow bg */
+body::before {
+  content: '';
+  position: fixed;
+  top: -200px; left: 50%;
+  transform: translateX(-50%);
+  width: 900px; height: 500px;
+  background: radial-gradient(ellipse, rgba(245,158,11,0.04) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Dot grid */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 28px 28px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.wrap {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 56px 24px 80px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ─── HEADER ─── */
+.header {
+  margin-bottom: 60px;
+  animation: slideDown 0.8s cubic-bezier(0.16,1,0.3,1) both;
+}
+
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.lesson-pill {
+  background: var(--amber-dim);
+  border: 1px solid var(--amber-glow);
+  color: var(--amber);
+  font-size: 10px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  border-radius: 100px;
+  font-weight: 500;
+}
+
+.header-meta span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+h1 {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(38px, 6vw, 70px);
+  font-weight: 900;
+  line-height: 1.0;
+  color: #fff;
+  letter-spacing: -2px;
+}
+
+h1 em {
+  font-style: italic;
+  color: var(--amber);
+}
+
+.header-sub {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--muted2);
+  line-height: 1.8;
+  max-width: 560px;
+}
+
+/* ─── NAV TABS ─── */
+.nav-wrap {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 48px;
+  animation: fadeUp 0.5s 0.3s ease both;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(6,8,15,0.9);
+  backdrop-filter: blur(12px);
+  padding: 12px 0;
+  margin-left: -24px;
+  margin-right: -24px;
+  padding-left: 24px;
+  padding-right: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted2);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 7px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.tab:hover { border-color: var(--amber); color: var(--amber); background: var(--amber-dim); }
+.tab.active { border-color: var(--amber); color: var(--amber); background: var(--amber-dim); }
+
+/* ─── SECTION DIVIDER ─── */
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 52px 0 20px;
+  animation: fadeUp 0.4s ease both;
+}
+
+.section-num {
+  font-family: 'Fraunces', serif;
+  font-size: 11px;
+  color: var(--amber);
+  font-weight: 700;
+  opacity: 0.7;
+  width: 28px;
+}
+
+.section-title {
+  font-family: 'Fraunces', serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.5px;
+}
+
+.section-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ─── CARD ─── */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
+  gap: 18px;
+}
+
+@media (max-width: 560px) { .card-grid { grid-template-columns: 1fr; } }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s;
+  animation: fadeUp 0.5s ease both;
+}
+
+.card:hover {
+  border-color: var(--border2);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(245,158,11,0.08);
+}
+
+.card.hidden { display: none; }
+
+.card-top {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fn-tag {
+  font-family: 'Fraunces', serif;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.tag-getdate  { background: rgba(245,158,11,0.15); color: var(--amber); }
+.tag-extract  { background: rgba(45,212,191,0.12); color: var(--teal); }
+.tag-eomonth  { background: rgba(251,113,133,0.12); color: var(--rose); }
+.tag-format   { background: rgba(167,139,250,0.12); color: var(--violet); }
+.tag-convert  { background: rgba(74,222,128,0.12); color: var(--green); }
+.tag-cast     { background: rgba(56,189,248,0.12); color: var(--sky); }
+.tag-datemath { background: rgba(245,158,11,0.12); color: var(--amber); }
+.tag-isdate   { background: rgba(251,113,133,0.12); color: var(--rose); }
+
+.card-name {
+  font-family: 'Fraunces', serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.card-cat {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.card-body { padding: 18px 20px; }
+
+/* ─── EXPLAIN ─── */
+.explain {
+  border-left: 3px solid var(--border2);
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  font-size: 11.5px;
+  color: var(--muted2);
+  line-height: 1.75;
+  background: rgba(255,255,255,0.015);
+  border-radius: 0 6px 6px 0;
+}
+
+.explain strong { color: var(--text); font-weight: 600; }
+.explain code {
+  background: rgba(255,255,255,0.07);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 10.5px;
+  color: var(--str);
+}
+
+.syntax {
+  display: block;
+  margin-top: 7px;
+  font-size: 10.5px;
+  color: var(--fn);
+  opacity: 0.75;
+}
+
+/* ─── PLAYGROUND ─── */
+.play {
+  background: rgba(0,0,0,0.35);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+
+.play-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 9px;
+  flex-wrap: wrap;
+}
+.play-row:last-child { margin-bottom: 0; }
+
+.plabel {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  text-transform: uppercase;
+  width: 68px;
+  flex-shrink: 0;
+}
+
+.pinput {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--str);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  padding: 6px 11px;
+  border-radius: 4px;
+  flex: 1;
+  min-width: 90px;
+  transition: border-color 0.2s;
+}
+.pinput:focus { outline: none; border-color: var(--amber); }
+
+.pnumber {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--num);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  width: 80px;
+  transition: border-color 0.2s;
+}
+.pnumber:focus { outline: none; border-color: var(--amber); }
+
+.pselect {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--teal);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.pselect:focus { outline: none; border-color: var(--amber); }
+
+.pout {
+  background: var(--bg);
+  border: 1px solid rgba(245,158,11,0.2);
+  color: var(--green);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  padding: 6px 11px;
+  border-radius: 4px;
+  flex: 1;
+  min-width: 90px;
+  word-break: break-all;
+}
+
+.parrow { color: var(--muted); font-size: 13px; }
+
+/* ─── SQL BLOCK ─── */
+.sql {
+  background: rgba(0,0,0,0.5);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px 16px;
+  font-size: 11px;
+  line-height: 1.9;
+  overflow-x: auto;
+}
+.sql .kw { color: var(--kw); }
+.sql .fn { color: var(--fn); }
+.sql .str { color: var(--str); }
+.sql .col { color: var(--col); }
+.sql .num { color: var(--num); }
+.sql .cm { color: var(--cm); font-style: italic; }
+
+/* ─── DATE VIZ ─── */
+.date-ring {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.date-part-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  min-width: 60px;
+  transition: all 0.3s;
+}
+.date-part-box.lit {
+  background: var(--amber-dim);
+  border-color: var(--amber-glow);
+}
+.date-part-val {
+  font-size: 17px;
+  font-weight: 700;
+  font-family: 'Fraunces', serif;
+  color: var(--amber);
+}
+.date-part-lbl {
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+/* ─── TIMELINE VIZ ─── */
+.timeline {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-top: 12px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.tl-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 90px;
+}
+.tl-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--amber);
+  border: 2px solid var(--amber-glow);
+  box-shadow: 0 0 8px var(--amber-glow);
+  flex-shrink: 0;
+}
+.tl-line {
+  flex: 1;
+  height: 2px;
+  background: linear-gradient(90deg, var(--amber), var(--teal));
+  min-width: 30px;
+  align-self: center;
+}
+.tl-label {
+  font-size: 9px;
+  color: var(--muted2);
+  margin-top: 5px;
+  text-align: center;
+}
+.tl-val {
+  font-size: 11px;
+  color: var(--teal);
+  font-weight: 600;
+  margin-top: 2px;
+  text-align: center;
+}
+
+/* ─── FORMAT TABLE ─── */
+.fmt-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 6px;
+  margin-top: 10px;
+}
+.fmt-cell {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 7px 10px;
+}
+.fmt-code { font-size: 9px; color: var(--violet); letter-spacing: 1px; text-transform: uppercase; }
+.fmt-val { font-size: 13px; color: var(--text); margin-top: 3px; font-weight: 500; }
+
+/* ─── ISDATE VIZ ─── */
+.isdate-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.isdate-row:last-child { border-bottom: none; }
+.isdate-val { color: var(--str); min-width: 130px; }
+.isdate-badge {
+  padding: 2px 10px;
+  border-radius: 100px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+.badge-yes { background: rgba(74,222,128,0.15); color: var(--green); border: 1px solid rgba(74,222,128,0.3); }
+.badge-no  { background: rgba(251,113,133,0.15); color: var(--rose);  border: 1px solid rgba(251,113,133,0.3); }
+.isdate-result { color: var(--muted2); font-size: 11px; margin-left: auto; }
+
+/* ─── CONVERT/CAST TABLE ─── */
+.conv-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
+.conv-table th {
+  text-align: left;
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 400;
+}
+.conv-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted2);
+}
+.conv-table tr:last-child td { border-bottom: none; }
+.conv-table td:first-child { color: var(--str); }
+.conv-table td:last-child { color: var(--green); }
+
+/* ─── FOOTER ─── */
+.footer {
+  margin-top: 80px;
+  padding-top: 32px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+  animation: fadeUp 0.5s 0.6s ease both;
+}
+
+.footer-left { display: flex; flex-direction: column; gap: 8px; }
+
+.footer-lesson {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--amber-dim);
+  border: 1px solid var(--amber-glow);
+  border-radius: 4px;
+  padding: 6px 16px;
+  font-size: 10px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--amber);
+  font-family: 'Fraunces', serif;
+  font-weight: 700;
+}
+
+.footer-copy {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.footer-copy strong { color: var(--text); }
+
+.gh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 7px;
+  padding: 13px 22px;
+  text-decoration: none;
+  color: var(--text);
+  font-size: 12px;
+  font-family: 'IBM Plex Mono', monospace;
+  transition: all 0.22s;
+}
+
+.gh-btn:hover {
+  border-color: var(--amber);
+  color: var(--amber);
+  background: var(--amber-dim);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(245,158,11,0.15);
+}
+
+.gh-icon { width: 18px; height: 18px; fill: currentColor; flex-shrink: 0; }
+
+/* ─── ANIMS ─── */
+@keyframes slideDown {
+  from { opacity:0; transform: translateY(-28px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+@keyframes fadeUp {
+  from { opacity:0; transform: translateY(16px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+
+.card:nth-child(1)  { animation-delay:.04s }
+.card:nth-child(2)  { animation-delay:.08s }
+.card:nth-child(3)  { animation-delay:.12s }
+.card:nth-child(4)  { animation-delay:.16s }
+.card:nth-child(5)  { animation-delay:.20s }
+.card:nth-child(6)  { animation-delay:.24s }
+.card:nth-child(7)  { animation-delay:.28s }
+.card:nth-child(8)  { animation-delay:.32s }
+.card:nth-child(9)  { animation-delay:.36s }
+.card:nth-child(10) { animation-delay:.40s }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-meta">
+    <span class="lesson-pill">Lesson 06</span>
+    <span>SQL Date &amp; Time Functions</span>
+  </div>
+  <h1>Date &amp; <em>Time</em><br>Functions</h1>
+  <p class="header-sub">Interactive reference for every SQL date function — GETDATE through ISDATE. Click any input to experiment live.</p>
+</div>
+
+<!-- NAV -->
+<div class="nav-wrap">
+  <button class="tab active" onclick="filter('all',this)">All</button>
+  <button class="tab" onclick="filter('getdate',this)">GETDATE</button>
+  <button class="tab" onclick="filter('extract',this)">Date Parts</button>
+  <button class="tab" onclick="filter('eomonth',this)">EOMONTH</button>
+  <button class="tab" onclick="filter('format',this)">FORMAT</button>
+  <button class="tab" onclick="filter('convert',this)">CONVERT</button>
+  <button class="tab" onclick="filter('cast',this)">CAST</button>
+  <button class="tab" onclick="filter('datemath',this)">DATEADD / DATEDIFF</button>
+  <button class="tab" onclick="filter('isdate',this)">ISDATE</button>
+</div>
+
+<!-- ═══ SECTION 1 ═══ -->
+<div class="section-head" data-cat="getdate">
+  <span class="section-num">01</span>
+  <span class="section-title">GETDATE &amp; Date Values</span>
+  <div class="section-line"></div>
+</div>
+<div class="card-grid">
+
+  <!-- GETDATE -->
+  <div class="card" data-cat="getdate">
+    <div class="card-top">
+      <span class="fn-tag tag-getdate">GETDATE</span>
+      <span class="card-name">Current System Timestamp</span>
+      <span class="card-cat">Getdate</span>
+    </div>
+    <div class="card-body">
+      <div class="explain">
+        <strong>GETDATE()</strong> returns the current database server date and time as a <code>DATETIME</code> value. It takes no arguments. Use it for logging event timestamps, calculating ages, or comparing records against "right now." It refreshes each time the query runs.<br>
+        <code class="syntax">GETDATE()</code>
+      </div>
+      <div class="play">
+        <div class="play-row">
+          <span class="plabel">Now</span>
+          <div class="pout" id="gd-now" style="color:var(--amber)"></div>
+        </div>
+        <div class="play-row">
+          <span class="plabel">Hard-coded</span>
+          <input class="pinput" id="gd-hc" value="2025-08-20">
+        </div>
+        <div class="date-ring" id="gd-ring"></div>
+      </div>
+      <div class="sql">
+        <span class="kw">SELECT</span> <span class="col">OrderID</span>, <span class="col">CreationTime</span>,<br>
+        &nbsp;&nbsp;<span class="str">'2025-08-20'</span> <span class="kw">AS</span> HardCoded,<br>
+        &nbsp;&nbsp;<span class="fn">GETDATE</span>() <span class="kw">AS</span> Today<br>
+        <span class="kw">FROM</span> Sales.Orders;
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ SECTION 2 ═══ -->
+<div class="section-head" data-cat="extract">
+  <span class="section-num">02</span>
+  <span class="section-title">Date Part Extractions</span>
+  <div class="section-line"></div>
+</div>
+<div class="card-grid">
+
+  <!-- DATETRUNC -->
+  <div class="card" data-cat="extract">
+    <div class="card-top">
+      <span class="fn-tag tag-extract">DATETRUNC</span>
+      <span class="card-name">Truncate to Unit</span>
+      <span class="card-cat">Extract</span>
+    </div>
+    <div class="card-body">
+      <div class="explain">
+        <strong>DATETRUNC</strong> zeroes out every component smaller than the specified unit, returning a clean boundary date. For example, truncating <code>2025-08-20 14:35:22</code> to <code>year</code> gives <code>2025-01-01 00:00:00</code>. Ideal for GROUP BY aggregations.<br>
+        <code class="syntax">DATETRUNC( datepart, date )</code>
+      </div>
+      <div class="play">
+        <div class="play-row">
+          <span class="plabel">Date</span>
+          <input class="pinput" id="dtr-date" value="2025-08-20 14:35:22" oninput="updateDatetrunc()">
+        </div>
+        <div class="play-row">
+          <span class="plabel">Unit</span>
+          <select class="pselect" id="dtr-unit" onchange="updateDatetrunc()">
+            <option>year</option><option>quarter</option><option>month</option>
+            <option>week</option><option selected>day</option><option>hour</option><option>minute</option>
+          </select>
+          <span class="parrow">→</span>
+          <div class="pout" id="dtr-out"></div>
+        </div>
+      </div>
+      <div class="sql">
+        <span class="kw">SELECT</span><br>
+        &nbsp;&nbsp;<span class="fn">DATETRUNC</span>(<span class="num">year</span>, <span class="col">CreationTime</span>) <span class="kw">AS</span> Year_dt,<br>
+        &nbsp;&nbsp;<span class="fn">DATETRUNC</span>(<span class="num">day</span>, <span class="col">CreationTime</span>) <span class="kw">AS</span> Day_dt,<br>
+        &nbsp;&nbsp;<span class="fn">DATETRUNC</span>(<span class="num">minute</span>, <span class="col">CreationTime</span>) <span class="kw">AS</span> Minute_dt<br>
+        <span class="kw">FROM</span> Sales.Orders;
+      </div>
+    </div>
+  </div>
+
+  <!-- DATENAME -->
+  <div class="card" data-cat="extract">
+    <div class="card-top">
+      <span class="fn-tag tag-extract">DATENAME</span>
+      <span class="card-name">Named String Part</span>
+      <span class="card-cat">Extract</span>
+    </div>
+    <div class="card-body">
+      <div class="explain">
+        <strong>DATENAME</strong> returns the name of the specified date part as a <code>VARCHAR</code> string — perfect when you need "January" instead of 1, or "Wednesday" instead of 4. Great for human-readable reports.<br>
+        <code class="syntax">DATENAME( datepart, date )</code>
+      </div>
+      <div class="play">
+        <div class="play-row">
+          <span class="plabel">Date</span>
+          <input class="pinput" id="dn-date" value="2025-08-20 14:35:22" oninput="updateDatename()">
+        </div>
+        <div class="play-row">
+          <span class="plabel">Part</span>
+          <select class="pselect" id="dn-part" onchange="updateDatename()">
+            <option>month</option><option>weekday</option><option>day</option>
+            <option>year</option><option>quarter</option>
+          </select>
+          <span class="parrow">→</span>
+          <div class="pout" id="dn-out"></div>
+        </div>
+      </div>
+      <div class="sql">
+        <span class="kw">SELECT</span><br>
+        &nbsp;&nbsp;<span class="fn">DATENAME</span>(<span class="num">month</span>, <span class="col">CreationTime</span>) <span class="kw">AS</span> Month_dn,<br>
+        &nbsp;&nbsp;<span class="fn">DATENAME</span>(<span class="num">weekday</span>, <span class="col">CreationTime</span>) <span class="kw">AS</span> Weekday_dn<br>
+        <span class="kw">FROM</span> Sales.Orders;
+      </div>
+    </div>
+  </div>
+
+  <!-- DATEPART -->
+  <div class="card" data-cat="extract">
+    <div class="card-top">
+      <span class="fn-tag tag-extract">DATEPART</span>
+      <span class="card-name">Numeric Part Extraction</span>
+      <span class="card-cat">Extract</span>
+    </div>
+    <div class="card-body">
+      <div class="explain">
+        <strong>DATEPART</strong> returns the specified component of a date as an <code>INTEGER</code>. Unlike DATENAME it gives numbers, making it suitable for arithmetic and filtering (e.g., <code>WHERE DATEPART(month,...) = 2</code>).<br>
+        <code class="syntax">DATEPART( datepart, date )</code>
+      </div>
+      <div class="play">
+        <div class="play-row">
+          <span class="plabel">Date</span>
+          <input class="pinput" id="dp-date" value="2025-08-20 14:35:22" oninput="updateDatepart()">
+        </div>
+        <div class="date-ring" id="dp-ring"></div>
+      </div>
+      <div class="sql">
+        <span class="kw">SELECT</span><br>
+        &nbsp;&nbsp;<span class="fn">DATEPART</span>(<span class="num">year</span>, <span class="col">CreationTime</span>) <span class="kw">AS</span> Year_dp,<br>
+        &nbsp;&nbsp;<span class="fn">DATEPART</span>(<span class="num">month</span>, <span class="col">CreationTime</span>) <span class="kw">AS</span> Month_dp,<br>
+        &nbsp;&nbsp;<span class="fn">DATEPART</span>(<span class="num">quarter</span>, <span class="col">CreationTime</span>) <span class="kw">AS</span> Quarter_dp<br>
+        <span class="kw">FROM</span> Sales.Orders;
+      </div>
+    </div>
+  </div>
+
+  <!-- YEAR / MONTH / DAY -->
+  <div class="card" data-cat="extract">
+    <div class="card-top">
+      <span class="fn-tag tag-extract">YEAR / MONTH / DAY</span>
+      <span class="card-name">Shorthand Extractors</span>
+      <span class="card-cat">Extract</span>
+    </div>
+    <div class="card-body">
+      <div class="explain">
+        <strong>YEAR</strong>, <strong>MONTH</strong>, and <strong>DAY</strong> are convenient shorthand functions equivalent to <code>DATEPART(year,…)</code>, <code>DATEPART(month,…)</code>, and <code>DATEPART(day,…)</code>. They always return integers and are the most readable way to extract the big three parts.<br>
+        <code class="syntax">YEAR(date) | MONTH(date) | DAY(date)</code>
+      </div>
+      <div class="play">
+        <div class="play-row">
+          <span class="plabel">Date</span>
+          <input class="pinput" id="ymd-date" value="2025-08-20" oninput="updateYMD()">
+        </div>
+        <div class="play-row">
+          <span class="plabel">YEAR</span>
+          <div class="pout" id="ymd-y"></div>
+          <span class="plabel">MONTH</span>
+          <div class="pout" id="ymd-m"></div>
+          <span class="plabel">DAY</span>
+          <div class="pout" id="ymd-d"></div>
+        </div>
+      </div>
+      <div class="sql">
+        <span class="kw">SELECT</span><br>
+        &nbsp;&nbsp;<span class="fn">YEAR</span>(<span class="col">OrderDate</span>) <span class="kw">AS</span> OrderYear,<br>
+        &nbsp;&nbsp;<span class="fn">MONTH</span>(<span class="col">OrderDate</span>) <span class="kw">AS</span> OrderMonth,<br>
+        &nbsp;&nbsp;<span class="fn">DAY</span>(<span class="col">OrderDate</span>) <span class="kw">AS</span> OrderDay<br>
+        <span class="kw">FROM</span> Sales.Orders;
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ SECTION 3 ═══ -->
+<div class="section-head" data-cat="eomonth">
+  <span class="section-num">03</span>
+  <span class="section-title">EOMONTH</span>
+  <div class="section-line"></div>
+</div>
+<div class="card-grid">
+
+  <div class="card" data-cat="eomonth">
+    <div class="card-top">
+      <span class="fn-tag tag-eomonth">EOMONTH</span>
+      <span class="card-name">End of Month Date</span>
+      <span class="card-cat">Eomonth</span>
+    </div>
+    <div class="card-body">
+      <div class="explain">
+        <strong>EOMONTH</strong> returns the last day of the month for any given date as a <code>DATE</code> value. An optional second argument offsets by N months. Useful for billing cycles, SLA deadlines, and monthly reporting boundaries.<br>
+        <code class="syntax">EOMONTH( date [, month_offset ] )</code>
+      </div>
+      <div class="play">
+        <div class="play-row">
+          <span class="plabel">Date</span>
+          <input class="pinput" id="eom-date" value="2025-08-20" oninput="updateEOM()">
+          <span class="plabel">Offset</span>
+          <input class="pnumber" id="eom-offset" type="number" value="0" oninput="updateEOM()">
+        </div>
+        <div class="play-row">
+          <span class="plabel">Result</span>
+          <div class="pout" id="eom-out"></div>
+        </div>
+        <div class="timeline" id="eom-timeline"></div>
+      </div>
+      <div class="sql">
+        <span class="kw">SELECT</span><br>
+        &nbsp;&nbsp;<span class="col">OrderID</span>, <span class="col">CreationTime</span>,<br>
+        &nbsp;&nbsp;<span class="fn">EOMONTH</span>(<span class="col">CreationTime</span>) <span class="kw">AS</span> EndOfMonth<br>
+        <span class="kw">FROM</span> Sales.Orders;
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ SECTION 4 ═══ -->
+<div class="section-head" data-cat="format">
+  <span class="section-num">04</span>
+  <span class="section-title">FORMAT</span>
+  <div class="section-line"></div>
+</div>
+<div class="card-grid">
+
+  <div class="card" data-cat="format">
+    <div class="card-top">
+      <span class="fn-tag tag-format">FORMAT</span>
+      <span class="card-name">Date String Formatting</span>
+      <span class="card-cat">Format</span>
+    </div>
+    <div class="card-body">
+      <div class="explain">
+        <strong>FORMAT</strong> converts a date/number into a formatted string using .NET format specifiers. It gives you the most flexibility for display but is slower than CONVERT for large datasets. Use for reports and front-end display queries.<br>
+        <code class="syntax">FORMAT( value, format_string )</code>
+      </div>
+      <div class="play">
+        <div class="play-row">
+          <span class="plabel">Date</span>
+          <input class="pinput" id="fmt-date" value="2025-08-20 14:35:22" oninput="updateFormat()">
+        </div>
+        <div class="fmt-grid" id="fmt-grid"></div>
+      </div>
+      <div class="sql">
+        <span class="kw">SELECT</span><br>
+        &nbsp;&nbsp;<span class="fn">FORMAT</span>(<span class="col">CreationTime</span>, <span class="str">'MM-dd-yyyy'</span>) <span class="kw">AS</span> USA_Format,<br>
+        &nbsp;&nbsp;<span class="fn">FORMAT</span>(<span class="col">CreationTime</span>, <span class="str">'dd-MM-yyyy'</span>) <span class="kw">AS</span> EURO_Format,<br>
+        &nbsp;&nbsp;<span class="fn">FORMAT</span>(<span class="col">CreationTime</span>, <span class="str">'dddd'</span>) <span class="kw">AS</span> DayName,<br>
+        &nbsp;&nbsp;<span class="fn">FORMAT</span>(<span class="col">CreationTime</span>, <span class="str">'MMMM'</span>) <span class="kw">AS</span> MonthName<br>
+        <span class="kw">FROM</span> Sales.Orders;
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ SECTION 5 ═══ -->
+<div class="section-head" data-cat="convert">
+  <span class="section-num">05</span>
+  <span class="section-title">CONVERT</span>
+  <div class="section-line"></div>
+</div>
+<div class="card-grid">
+
+  <div class="card" data-cat="convert">
+    <div class="card-top">
+      <span class="fn-tag tag-convert">CONVERT</span>
+      <span class="card-name">Type &amp; Style Conversion</span>
+      <span class="card-cat">Convert</span>
+    </div>
+    <div class="card-body">
+      <div class="explain">
+        <strong>CONVERT</strong> changes a value from one data type to another. A third optional argument (style code) controls date formatting — e.g., style <code>32</code> gives US format, <code>34</code> gives European. Preferred over FORMAT for high-volume queries due to better performance.<br>
+        <code class="syntax">CONVERT( target_type, value [, style] )</code>
+      </div>
+      <div class="play">
+        <div class="play-row">
+          <span class="plabel">DateTime</span>
+          <input class="pinput" id="cv-date" value="2025-08-20 14:35:22" oninput="updateConvert()">
+        </div>
+      </div>
+      <table class="conv-table" id="cv-table">
+        <thead><tr><th>Expression</th><th>Result</th></tr></thead>
+        <tbody id="cv-body"></tbody>
+      </table>
+      <div class="sql" style="margin-top:14px">
+        <span class="kw">SELECT</span><br>
+        &nbsp;&nbsp;<span class="fn">CONVERT</span>(<span class="kw">INT</span>, <span class="str">'123'</span>),<br>
+        &nbsp;&nbsp;<span class="fn">CONVERT</span>(<span class="kw">DATE</span>, <span class="col">CreationTime</span>),<br>
+        &nbsp;&nbsp;<span class="fn">CONVERT</span>(<span class="kw">VARCHAR</span>, <span class="col">CreationTime</span>, <span class="num">32</span>) <span class="kw">AS</span> USA,<br>
+        &nbsp;&nbsp;<span class="fn">CONVERT</span>(<span class="kw">VARCHAR</span>, <span class="col">CreationTime</span>, <span class="num">34</span>) <span class="kw">AS</span> EURO<br>
+        <span class="kw">FROM</span> Sales.Orders;
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ SECTION 6 ═══ -->
+<div class="section-head" data-cat="cast">
+  <span class="section-num">06</span>
+  <span class="section-title">CAST</span>
+  <div class="section-line"></div>
+</div>
+<div class="card-grid">
+
+  <div class="card" data-cat="cast">
+    <div class="card-top">
+      <span class="fn-tag tag-cast">CAST</span>
+      <span class="card-name">Standard Type Casting</span>
+      <span class="card-cat">Cast</span>
+    </div>
+    <div class="card-body">
+      <div class="explain">
+        <strong>CAST</strong> is the ANSI SQL standard for type conversion. Unlike CONVERT, it does not support a style code — just source and target type. Use CAST when you want portable code that works across SQL dialects. Prefer it over CONVERT when no date-style formatting is needed.<br>
+        <code class="syntax">CAST( value AS target_type )</code>
+      </div>
+      <div class="play">
+        <div class="play-row">
+          <span class="plabel">DateTime</span>
+          <input class="pinput" id="ca-date" value="2025-08-20 14:35:22" oninput="updateCast()">
+        </div>
+      </div>
+      <table class="conv-table">
+        <thead><tr><th>Expression</th><th>Result</th></tr></thead>
+        <tbody id="ca-body"></tbody>
+      </table>
+      <div class="sql" style="margin-top:14px">
+        <span class="kw">SELECT</span><br>
+        &nbsp;&nbsp;<span class="kw">CAST</span>(<span class="str">'123'</span> <span class="kw">AS</span> <span class="kw">INT</span>),<br>
+        &nbsp;&nbsp;<span class="kw">CAST</span>(<span class="num">123</span> <span class="kw">AS</span> <span class="kw">VARCHAR</span>),<br>
+        &nbsp;&nbsp;<span class="kw">CAST</span>(<span class="col">CreationTime</span> <span class="kw">AS</span> <span class="kw">DATE</span>)<br>
+        <span class="kw">FROM</span> Sales.Orders;
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ SECTION 7 ═══ -->
+<div class="section-head" data-cat="datemath">
+  <span class="section-num">07</span>
+  <span class="section-title">DATEADD &amp; DATEDIFF</span>
+  <div class="section-line"></div>
+</div>
+<div class="card-grid">
+
+  <!-- DATEADD -->
+  <div class="card" data-cat="datemath">
+    <div class="card-top">
+      <span class="fn-tag tag-datemath">DATEADD</span>
+      <span class="card-name">Add / Subtract Time</span>
+      <span class="card-cat">Date Math</span>
+    </div>
+    <div class="card-body">
+      <div class="explain">
+        <strong>DATEADD</strong> adds (or subtracts with negative values) a number of date units to a date, returning a new <code>DATETIME</code>. Use it to calculate due dates, expiry windows, or offset delivery schedules by days, months, or years.<br>
+        <code class="syntax">DATEADD( datepart, number, date )</code>
+      </div>
+      <div class="play">
+        <div class="play-row">
+          <span class="plabel">Date</span>
+          <input class="pinput" id="da-date" value="2025-08-20" oninput="updateDateadd()">
+        </div>
+        <div class="play-row">
+          <span class="plabel">Unit</span>
+          <select class="pselect" id="da-unit" onchange="updateDateadd()">
+            <option>day</option><option>month</option><option>year</option><option>hour</option><option>week</option>
+          </select>
+          <span class="plabel">N</span>
+          <input class="pnumber" id="da-n" type="number" value="10" oninput="updateDateadd()">
+        </div>
+        <div class="play-row">
+          <span class="plabel">Result</span>
+          <div class="pout" id="da-out"></div>
+        </div>
+        <div class="timeline" id="da-timeline"></div>
+      </div>
+      <div class="sql">
+        <span class="kw">SELECT</span><br>
+        &nbsp;&nbsp;<span class="fn">DATEADD</span>(<span class="num">day</span>, <span class="num">-10</span>, <span class="col">OrderDate</span>) <span class="kw">AS</span> TenDaysBefore,<br>
+        &nbsp;&nbsp;<span class="fn">DATEADD</span>(<span class="num">month</span>, <span class="num">3</span>, <span class="col">OrderDate</span>) <span class="kw">AS</span> ThreeMonthsLater<br>
+        <span class="kw">FROM</span> Sales.Orders;
+      </div>
+    </div>
+  </div>
+
+  <!-- DATEDIFF -->
+  <div class="card" data-cat="datemath">
+    <div class="card-top">
+      <span class="fn-tag tag-datemath">DATEDIFF</span>
+      <span class="card-name">Difference Between Dates</span>
+      <span class="card-cat">Date Math</span>
+    </div>
+    <div class="card-body">
+      <div class="explain">
+        <strong>DATEDIFF</strong> calculates the number of specified date units between two dates (end minus start). It counts boundary crossings, so from Dec 31 to Jan 1 = 1 year regardless of hours. Widely used for age calculation, shipping duration, and time-gap analysis.<br>
+        <code class="syntax">DATEDIFF( datepart, start_date, end_date )</code>
+      </div>
+      <div class="play">
+        <div class="play-row">
+          <span class="plabel">Start</span>
+          <input class="pinput" id="dd-start" value="1990-05-15" oninput="updateDatediff()">
+        </div>
+        <div class="play-row">
+          <span class="plabel">End</span>
+          <input class="pinput" id="dd-end" oninput="updateDatediff()">
+        </div>
+        <div class="play-row">
+          <span class="plabel">Unit</span>
+          <select class="pselect" id="dd-unit" onchange="updateDatediff()">
+            <option>year</option><option>month</option><option>day</option><option>hour</option><option>week</option>
+          </select>
+          <span class="parrow">→</span>
+          <div class="pout" id="dd-out"></div>
+        </div>
+      </div>
+      <div class="sql">
+        <span class="kw">SELECT</span><br>
+        &nbsp;&nbsp;<span class="fn">DATEDIFF</span>(<span class="num">year</span>, <span class="col">BirthDate</span>, <span class="fn">GETDATE</span>()) <span class="kw">AS</span> Age<br>
+        <span class="kw">FROM</span> Sales.Employees;<br><br>
+        <span class="fn">AVG</span>(<span class="fn">DATEDIFF</span>(<span class="num">day</span>, <span class="col">OrderDate</span>, <span class="col">ShipDate</span>)) <span class="kw">AS</span> AvgShip
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ SECTION 8 ═══ -->
+<div class="section-head" data-cat="isdate">
+  <span class="section-num">08</span>
+  <span class="section-title">ISDATE</span>
+  <div class="section-line"></div>
+</div>
+<div class="card-grid">
+
+  <div class="card" data-cat="isdate">
+    <div class="card-top">
+      <span class="fn-tag tag-isdate">ISDATE</span>
+      <span class="card-name">Date Validation</span>
+      <span class="card-cat">Isdate</span>
+    </div>
+    <div class="card-body">
+      <div class="explain">
+        <strong>ISDATE</strong> checks whether a string or expression is a valid date/time value. Returns <code>1</code> if valid, <code>0</code> if not. Combine with a <code>CASE</code> expression to substitute a fallback date for invalid rows — critical for safely importing messy external data.<br>
+        <code class="syntax">ISDATE( expression )  →  1 | 0</code>
+      </div>
+      <div class="play">
+        <div class="play-row">
+          <span class="plabel">Add value</span>
+          <input class="pinput" id="isd-add" placeholder="e.g. 2025-13-01" style="flex:1">
+          <button onclick="addIsdate()" style="background:var(--amber-dim);border:1px solid var(--amber-glow);color:var(--amber);font-family:inherit;font-size:11px;padding:6px 14px;border-radius:4px;cursor:pointer;">+ Add</button>
+        </div>
+        <div id="isd-rows"></div>
+      </div>
+      <div class="sql">
+        <span class="kw">SELECT</span> <span class="col">OrderDate</span>,<br>
+        &nbsp;&nbsp;<span class="fn">ISDATE</span>(<span class="col">OrderDate</span>) <span class="kw">AS</span> IsValidDate,<br>
+        &nbsp;&nbsp;<span class="kw">CASE</span> <span class="kw">WHEN</span> <span class="fn">ISDATE</span>(<span class="col">OrderDate</span>) = <span class="num">1</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">THEN</span> <span class="kw">CAST</span>(<span class="col">OrderDate</span> <span class="kw">AS</span> <span class="kw">DATE</span>)<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">ELSE</span> <span class="str">'9999-01-01'</span><br>
+        &nbsp;&nbsp;<span class="kw">END</span> <span class="kw">AS</span> NewOrderDate<br>
+        <span class="kw">FROM</span> (...) <span class="kw">AS</span> t;
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<div class="footer">
+  <div class="footer-left">
+    <span class="footer-lesson">&#x25CF;&ensp;Lesson 06 &mdash; SQL Date &amp; Time Functions</span>
+    <span class="footer-copy">&copy; 2024 <strong>Thillai Shanmugam</strong> &mdash; All rights reserved.</span>
+  </div>
+  <a class="gh-btn" href="https://github.com/Thillaishanmugam1998" target="_blank" rel="noopener">
+    <svg class="gh-icon" viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+    github.com/Thillaishanmugam1998
+  </a>
+</div>
+
+</div><!-- /wrap -->
+
+<script>
+// ─── UTILS ─────────────────────────────────────────────────────────
+function parseDate(str) {
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function padZ(n) { return String(n).padStart(2,'0'); }
+
+function fmtDatetime(d) {
+  return `${d.getFullYear()}-${padZ(d.getMonth()+1)}-${padZ(d.getDate())} ${padZ(d.getHours())}:${padZ(d.getMinutes())}:${padZ(d.getSeconds())}`;
+}
+
+function fmtDate(d) {
+  return `${d.getFullYear()}-${padZ(d.getMonth()+1)}-${padZ(d.getDate())}`;
+}
+
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MONTHS3 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const DAYS3 = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+// ─── GETDATE ────────────────────────────────────────────────────────
+function tickGetdate() {
+  const now = new Date();
+  document.getElementById('gd-now').textContent = fmtDatetime(now);
+  const ring = document.getElementById('gd-ring');
+  const parts = [
+    { val: now.getFullYear(), lbl: 'Year' },
+    { val: padZ(now.getMonth()+1), lbl: 'Month' },
+    { val: padZ(now.getDate()), lbl: 'Day' },
+    { val: padZ(now.getHours()), lbl: 'Hour' },
+    { val: padZ(now.getMinutes()), lbl: 'Min' },
+    { val: padZ(now.getSeconds()), lbl: 'Sec' },
+  ];
+  ring.innerHTML = parts.map(p=>`<div class="date-part-box lit"><span class="date-part-val">${p.val}</span><span class="date-part-lbl">${p.lbl}</span></div>`).join('');
+}
+setInterval(tickGetdate, 1000);
+tickGetdate();
+
+// ─── DATETRUNC ──────────────────────────────────────────────────────
+function updateDatetrunc() {
+  const d = parseDate(document.getElementById('dtr-date').value);
+  const unit = document.getElementById('dtr-unit').value;
+  if (!d) { document.getElementById('dtr-out').textContent = 'Invalid date'; return; }
+  let t = new Date(d);
+  if (unit === 'year')    { t.setMonth(0); t.setDate(1); t.setHours(0,0,0,0); }
+  else if (unit==='quarter') { t.setMonth(Math.floor(t.getMonth()/3)*3); t.setDate(1); t.setHours(0,0,0,0); }
+  else if (unit==='month')   { t.setDate(1); t.setHours(0,0,0,0); }
+  else if (unit==='week')    { t.setDate(t.getDate()-t.getDay()); t.setHours(0,0,0,0); }
+  else if (unit==='day')     { t.setHours(0,0,0,0); }
+  else if (unit==='hour')    { t.setMinutes(0,0,0); }
+  else if (unit==='minute')  { t.setSeconds(0,0); }
+  document.getElementById('dtr-out').textContent = fmtDatetime(t);
+}
+updateDatetrunc();
+
+// ─── DATENAME ───────────────────────────────────────────────────────
+function updateDatename() {
+  const d = parseDate(document.getElementById('dn-date').value);
+  const part = document.getElementById('dn-part').value;
+  if (!d) { document.getElementById('dn-out').textContent = 'Invalid'; return; }
+  let result = '';
+  if (part==='month')   result = MONTHS[d.getMonth()];
+  else if (part==='weekday') result = DAYS[d.getDay()];
+  else if (part==='day')    result = String(d.getDate());
+  else if (part==='year')   result = String(d.getFullYear());
+  else if (part==='quarter') result = 'Q'+Math.ceil((d.getMonth()+1)/3);
+  document.getElementById('dn-out').textContent = result;
+}
+updateDatename();
+
+// ─── DATEPART ───────────────────────────────────────────────────────
+function updateDatepart() {
+  const d = parseDate(document.getElementById('dp-date').value);
+  const ring = document.getElementById('dp-ring');
+  if (!d) { ring.innerHTML = '<span style="color:var(--rose);font-size:12px">Invalid date</span>'; return; }
+  const parts = [
+    { val: d.getFullYear(), lbl: 'year' },
+    { val: d.getMonth()+1, lbl: 'month' },
+    { val: d.getDate(), lbl: 'day' },
+    { val: Math.ceil((d.getMonth()+1)/3), lbl: 'quarter' },
+    { val: d.getHours(), lbl: 'hour' },
+    { val: d.getMinutes(), lbl: 'minute' },
+    { val: d.getSeconds(), lbl: 'second' },
+  ];
+  ring.innerHTML = parts.map(p=>`<div class="date-part-box"><span class="date-part-val">${p.val}</span><span class="date-part-lbl">${p.lbl}</span></div>`).join('');
+}
+updateDatepart();
+
+// ─── YEAR/MONTH/DAY ─────────────────────────────────────────────────
+function updateYMD() {
+  const d = parseDate(document.getElementById('ymd-date').value);
+  if (!d) { ['y','m','d'].forEach(x=>document.getElementById('ymd-'+x).textContent='?'); return; }
+  document.getElementById('ymd-y').textContent = d.getFullYear();
+  document.getElementById('ymd-m').textContent = d.getMonth()+1;
+  document.getElementById('ymd-d').textContent = d.getDate();
+}
+updateYMD();
+
+// ─── EOMONTH ────────────────────────────────────────────────────────
+function updateEOM() {
+  const d = parseDate(document.getElementById('eom-date').value);
+  const offset = parseInt(document.getElementById('eom-offset').value)||0;
+  if (!d) { document.getElementById('eom-out').textContent='Invalid'; return; }
+  const t = new Date(d.getFullYear(), d.getMonth()+offset+1, 0);
+  document.getElementById('eom-out').textContent = fmtDate(t);
+  // timeline
+  const tl = document.getElementById('eom-timeline');
+  const start = new Date(t.getFullYear(), t.getMonth(), 1);
+  const mid = d;
+  const end = t;
+  tl.innerHTML = `
+    <div class="tl-node"><div class="tl-dot"></div><div class="tl-label">Start</div><div class="tl-val">${fmtDate(start)}</div></div>
+    <div class="tl-line"></div>
+    <div class="tl-node"><div class="tl-dot" style="background:var(--teal);border-color:rgba(45,212,191,0.4)"></div><div class="tl-label">Input</div><div class="tl-val">${fmtDate(mid)}</div></div>
+    <div class="tl-line"></div>
+    <div class="tl-node"><div class="tl-dot" style="background:var(--rose);border-color:rgba(251,113,133,0.4)"></div><div class="tl-label">EOMONTH</div><div class="tl-val">${fmtDate(end)}</div></div>
+  `;
+}
+updateEOM();
+
+// ─── FORMAT ─────────────────────────────────────────────────────────
+function updateFormat() {
+  const d = parseDate(document.getElementById('fmt-date').value);
+  const grid = document.getElementById('fmt-grid');
+  if (!d) { grid.innerHTML = '<span style="color:var(--rose);font-size:12px">Invalid date</span>'; return; }
+  const y4 = d.getFullYear();
+  const y2 = String(y4).slice(-2);
+  const MM = padZ(d.getMonth()+1);
+  const dd = padZ(d.getDate());
+  const ddd = DAYS3[d.getDay()];
+  const dddd = DAYS[d.getDay()];
+  const MMM = MONTHS3[d.getMonth()];
+  const MMMM = MONTHS[d.getMonth()];
+  const hh = padZ(d.getHours()%12||12);
+  const mm = padZ(d.getMinutes());
+  const ss = padZ(d.getSeconds());
+  const tt = d.getHours()<12?'AM':'PM';
+  const entries = [
+    { code:'MM-dd-yyyy', val:`${MM}-${dd}-${y4}` },
+    { code:'dd-MM-yyyy', val:`${dd}-${MM}-${y4}` },
+    { code:'dd',         val:dd },
+    { code:'ddd',        val:ddd },
+    { code:'dddd',       val:dddd },
+    { code:'MM',         val:MM },
+    { code:'MMM',        val:MMM },
+    { code:'MMMM',       val:MMMM },
+    { code:'yyyy',       val:y4 },
+    { code:'yy',         val:y2 },
+    { code:'hh:mm:ss tt',val:`${hh}:${mm}:${ss} ${tt}` },
+    { code:'MMM yy',     val:`${MMM} ${y2}` },
+  ];
+  grid.innerHTML = entries.map(e=>`<div class="fmt-cell"><div class="fmt-code">${e.code}</div><div class="fmt-val">${e.val}</div></div>`).join('');
+}
+updateFormat();
+
+// ─── CONVERT ────────────────────────────────────────────────────────
+function updateConvert() {
+  const dStr = document.getElementById('cv-date').value;
+  const d = parseDate(dStr);
+  const body = document.getElementById('cv-body');
+  const rows = [
+    { expr:"CONVERT(INT,'123')", val: '123' },
+    { expr:"CONVERT(DATE,'2025-08-20')", val: '2025-08-20' },
+    { expr:"CONVERT(DATE, CreationTime)", val: d ? fmtDate(d) : '?' },
+    { expr:"CONVERT(VARCHAR, ..., 32) USA", val: d ? `${padZ(d.getMonth()+1)}/${padZ(d.getDate())}/${d.getFullYear()}` : '?' },
+    { expr:"CONVERT(VARCHAR, ..., 34) EURO", val: d ? `${padZ(d.getDate())}/${padZ(d.getMonth()+1)}/${d.getFullYear()}` : '?' },
+  ];
+  body.innerHTML = rows.map(r=>`<tr><td>${r.expr}</td><td>${r.val}</td></tr>`).join('');
+}
+updateConvert();
+
+// ─── CAST ───────────────────────────────────────────────────────────
+function updateCast() {
+  const dStr = document.getElementById('ca-date').value;
+  const d = parseDate(dStr);
+  const body = document.getElementById('ca-body');
+  const rows = [
+    { expr:"CAST('123' AS INT)", val:'123' },
+    { expr:"CAST(123 AS VARCHAR)", val:'123' },
+    { expr:"CAST('2025-08-20' AS DATE)", val:'2025-08-20' },
+    { expr:"CAST('2025-08-20' AS DATETIME2)", val:'2025-08-20 00:00:00.000' },
+    { expr:"CAST(CreationTime AS DATE)", val: d ? fmtDate(d) : '?' },
+  ];
+  body.innerHTML = rows.map(r=>`<tr><td>${r.expr}</td><td>${r.val}</td></tr>`).join('');
+}
+updateCast();
+document.getElementById('ca-date').addEventListener('input', updateCast);
+
+// ─── DATEADD ────────────────────────────────────────────────────────
+function updateDateadd() {
+  const d = parseDate(document.getElementById('da-date').value);
+  const unit = document.getElementById('da-unit').value;
+  const n = parseInt(document.getElementById('da-n').value)||0;
+  if (!d) { document.getElementById('da-out').textContent='Invalid'; return; }
+  let t = new Date(d);
+  if (unit==='day')   t.setDate(t.getDate()+n);
+  else if (unit==='month') t.setMonth(t.getMonth()+n);
+  else if (unit==='year')  t.setFullYear(t.getFullYear()+n);
+  else if (unit==='hour')  t.setHours(t.getHours()+n);
+  else if (unit==='week')  t.setDate(t.getDate()+n*7);
+  document.getElementById('da-out').textContent = fmtDate(t);
+  const tl = document.getElementById('da-timeline');
+  const earlier = n < 0;
+  const fromD = earlier ? t : d;
+  const toD   = earlier ? d : t;
+  tl.innerHTML = `
+    <div class="tl-node"><div class="tl-dot"></div><div class="tl-label">Start</div><div class="tl-val">${fmtDate(fromD)}</div></div>
+    <div class="tl-line"></div>
+    <div class="tl-node"><div class="tl-dot" style="background:var(--rose);border-color:rgba(251,113,133,0.4)"></div><div class="tl-label">+${Math.abs(n)} ${unit}s</div><div class="tl-val">${fmtDate(toD)}</div></div>
+  `;
+}
+updateDateadd();
+
+// ─── DATEDIFF ───────────────────────────────────────────────────────
+function updateDatediff() {
+  const now = new Date();
+  const endEl = document.getElementById('dd-end');
+  if (!endEl.value) endEl.value = `${now.getFullYear()}-${padZ(now.getMonth()+1)}-${padZ(now.getDate())}`;
+  const s = parseDate(document.getElementById('dd-start').value);
+  const e = parseDate(endEl.value);
+  const unit = document.getElementById('dd-unit').value;
+  if (!s||!e) { document.getElementById('dd-out').textContent='Invalid'; return; }
+  let diff = 0;
+  if (unit==='year')  diff = e.getFullYear()-s.getFullYear();
+  else if (unit==='month') diff = (e.getFullYear()-s.getFullYear())*12+(e.getMonth()-s.getMonth());
+  else if (unit==='day')   diff = Math.floor((e-s)/86400000);
+  else if (unit==='hour')  diff = Math.floor((e-s)/3600000);
+  else if (unit==='week')  diff = Math.floor((e-s)/604800000);
+  document.getElementById('dd-out').textContent = `${diff} ${unit}(s)`;
+}
+updateDatediff();
+
+// ─── ISDATE ─────────────────────────────────────────────────────────
+const isdateData = ['2025-08-20','2025-08-21','2025-08-23','2025-08'];
+function isValidDate(str) {
+  if (!str || str.length < 8) return false;
+  const d = new Date(str);
+  return !isNaN(d.getTime()) && str.includes('-') && str.split('-').length === 3;
+}
+function renderIsdate() {
+  const cont = document.getElementById('isd-rows');
+  cont.innerHTML = isdateData.map(v => {
+    const valid = isValidDate(v);
+    const result = valid ? `→ ${v}` : `→ 9999-01-01`;
+    return `<div class="isdate-row">
+      <span class="isdate-val">"${v}"</span>
+      <span class="isdate-badge ${valid?'badge-yes':'badge-no'}">${valid?'VALID':'INVALID'}</span>
+      <span class="isdate-result">${result}</span>
+    </div>`;
+  }).join('');
+}
+function addIsdate() {
+  const val = document.getElementById('isd-add').value.trim();
+  if (!val) return;
+  isdateData.push(val);
+  renderIsdate();
+  document.getElementById('isd-add').value = '';
+}
+renderIsdate();
+
+// ─── FILTER ─────────────────────────────────────────────────────────
+function filter(cat, btn) {
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.card').forEach(c => {
+    c.classList.toggle('hidden', cat !== 'all' && c.dataset.cat !== cat);
+  });
+  document.querySelectorAll('.section-head').forEach(h => {
+    h.style.display = (cat === 'all' || h.dataset.cat === cat) ? 'flex' : 'none';
+  });
+}
+</script>
+</body>
+</html>

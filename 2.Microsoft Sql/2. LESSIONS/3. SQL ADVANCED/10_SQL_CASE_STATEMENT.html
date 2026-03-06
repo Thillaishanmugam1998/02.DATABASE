@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL CASE Statement — Lesson 07</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,400;1,700&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --cream: #f5f0e8;
+  --paper: #faf7f2;
+  --ink: #1a1610;
+  --ink2: #2e2a22;
+  --ink3: #4a4438;
+  --muted: #8a8070;
+  --rule: #ddd5c5;
+  --rule2: #c8bfaf;
+  --orange: #d4580a;
+  --orange-dim: rgba(212,88,10,0.1);
+  --orange-glow: rgba(212,88,10,0.2);
+  --blue: #1a4f8a;
+  --blue-dim: rgba(26,79,138,0.08);
+  --green: #1a6b3c;
+  --green-dim: rgba(26,107,60,0.08);
+  --red: #9b1f1f;
+  --red-dim: rgba(155,31,31,0.08);
+  --violet: #5a2d82;
+  --violet-dim: rgba(90,45,130,0.08);
+  --kw: #9b1f1f;
+  --fn: #1a4f8a;
+  --str: #1a6b3c;
+  --col: #5a2d82;
+  --num: #d4580a;
+  --cm: #a09080;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+
+body {
+  background: var(--cream);
+  color: var(--ink);
+  font-family: 'DM Mono', monospace;
+  min-height: 100vh;
+}
+
+/* subtle paper texture via repeating gradient */
+body::before {
+  content:'';
+  position:fixed;
+  inset:0;
+  background-image:
+    repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(180,160,130,0.06) 28px),
+    repeating-linear-gradient(90deg, transparent, transparent 27px, rgba(180,160,130,0.04) 28px);
+  pointer-events:none;
+  z-index:0;
+}
+
+.wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 60px 32px 100px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ─── HEADER ─── */
+.header {
+  border-bottom: 3px solid var(--ink);
+  padding-bottom: 28px;
+  margin-bottom: 48px;
+  animation: fadeIn 0.7s ease both;
+}
+
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.lesson-tag {
+  background: var(--ink);
+  color: var(--cream);
+  font-size: 10px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  font-weight: 500;
+}
+
+.header-meta .divider {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.header-meta .topic {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(40px, 7vw, 82px);
+  font-weight: 900;
+  line-height: 1.0;
+  color: var(--ink);
+  letter-spacing: -2px;
+}
+
+h1 em {
+  font-style: italic;
+  color: var(--orange);
+}
+
+.header-sub {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.8;
+  max-width: 520px;
+}
+
+/* ─── STICKY NAV ─── */
+.nav-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(245,240,232,0.96);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--rule2);
+  margin: 0 -32px 48px;
+  padding: 10px 32px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  animation: fadeIn 0.5s 0.2s ease both;
+}
+
+.tab {
+  background: transparent;
+  border: 1px solid var(--rule2);
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 7px 16px;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+
+.tab:hover, .tab.active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--cream);
+}
+
+/* ─── SECTION ─── */
+.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin: 56px 0 22px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--rule);
+  animation: fadeIn 0.4s ease both;
+}
+
+.section-num {
+  font-family: 'Playfair Display', serif;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--orange);
+  width: 36px;
+  flex-shrink: 0;
+}
+
+.section-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.5px;
+}
+
+.section-note {
+  font-size: 11px;
+  color: var(--muted);
+  margin-left: auto;
+  letter-spacing: 0.5px;
+}
+
+/* ─── CARD ─── */
+.card {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  margin-bottom: 18px;
+  overflow: hidden;
+  transition: box-shadow 0.2s, transform 0.2s;
+  animation: fadeUp 0.5s ease both;
+}
+
+.card:hover {
+  box-shadow: 4px 4px 0 var(--rule2);
+  transform: translate(-1px,-1px);
+}
+
+.card.hidden { display:none; }
+
+.card-top {
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--cream);
+}
+
+.fn-tag {
+  font-family: 'Playfair Display', serif;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 12px;
+  letter-spacing: 0.3px;
+}
+
+.tag-categorize { background: var(--orange-dim); color: var(--orange); border: 1px solid var(--orange-glow); }
+.tag-mapping    { background: var(--blue-dim);   color: var(--blue);   border: 1px solid rgba(26,79,138,0.2); }
+.tag-quick      { background: var(--green-dim);  color: var(--green);  border: 1px solid rgba(26,107,60,0.2); }
+.tag-nulls      { background: var(--red-dim);    color: var(--red);    border: 1px solid rgba(155,31,31,0.2); }
+.tag-condagg    { background: var(--violet-dim); color: var(--violet); border: 1px solid rgba(90,45,130,0.2); }
+
+.card-name {
+  font-family: 'Playfair Display', serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.card-cat {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.card-body { padding: 20px 22px; }
+
+/* ─── EXPLAIN ─── */
+.explain {
+  border-left: 3px solid var(--rule2);
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  font-size: 12px;
+  color: var(--ink3);
+  line-height: 1.8;
+  background: rgba(255,255,255,0.5);
+}
+
+.explain strong { color: var(--ink); font-weight: 600; }
+.explain code {
+  background: rgba(0,0,0,0.06);
+  padding: 1px 5px;
+  font-size: 11px;
+  color: var(--orange);
+}
+
+.syntax {
+  display: block;
+  margin-top: 7px;
+  font-size: 11px;
+  color: var(--fn);
+  opacity: 0.8;
+}
+
+/* ─── TWO-COL LAYOUT ─── */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media(max-width:700px) { .two-col { grid-template-columns: 1fr; } }
+
+/* ─── PLAYGROUND ─── */
+.play {
+  background: #fff;
+  border: 1px solid var(--rule);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.play-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.play-row:last-child { margin-bottom:0; }
+
+.plabel {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  text-transform: uppercase;
+  width: 68px;
+  flex-shrink: 0;
+}
+
+.pinput, .pselect, .pnumber {
+  background: var(--cream);
+  border: 1px solid var(--rule2);
+  color: var(--ink);
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  padding: 6px 10px;
+  transition: border-color 0.2s;
+}
+.pinput { flex:1; min-width:80px; }
+.pnumber { width:70px; }
+.pselect { cursor:pointer; }
+.pinput:focus, .pselect:focus, .pnumber:focus { outline:none; border-color: var(--orange); }
+
+.pout {
+  background: var(--cream);
+  border: 1px solid var(--orange-glow);
+  color: var(--green);
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  padding: 6px 10px;
+  flex:1;
+  min-width:80px;
+  word-break: break-all;
+}
+
+.parrow { color: var(--muted); font-size:13px; }
+
+/* ─── SQL BLOCK ─── */
+.sql {
+  background: var(--ink2);
+  color: #c8c0b0;
+  padding: 16px 18px;
+  font-size: 11px;
+  line-height: 1.9;
+  overflow-x: auto;
+}
+.sql .kw  { color: #f28b82; }
+.sql .fn  { color: #8ab4f8; }
+.sql .str { color: #81c995; }
+.sql .col { color: #c58af9; }
+.sql .num { color: #ffb86c; }
+.sql .cm  { color: #6e7a8a; font-style:italic; }
+
+/* ─── CATEGORIZE VIZ ─── */
+.sales-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 12px;
+}
+.sales-row:last-child { border-bottom:none; }
+
+.sales-amount {
+  font-size: 15px;
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+  color: var(--ink);
+  width: 52px;
+  flex-shrink: 0;
+}
+
+.sales-bar-wrap {
+  flex: 1;
+  height: 14px;
+  background: var(--cream);
+  border: 1px solid var(--rule);
+  overflow: hidden;
+}
+
+.sales-bar {
+  height: 100%;
+  transition: width 0.4s ease;
+}
+
+.cat-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  width: 68px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.cat-high   { background: var(--orange-dim); color: var(--orange); border: 1px solid var(--orange-glow); }
+.cat-medium { background: var(--blue-dim);   color: var(--blue);   border: 1px solid rgba(26,79,138,0.2); }
+.cat-low    { background: var(--green-dim);  color: var(--green);  border: 1px solid rgba(26,107,60,0.2); }
+
+/* ─── MAPPING VIZ ─── */
+.map-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.map-card {
+  background: var(--cream);
+  border: 1px solid var(--rule);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: all 0.2s;
+}
+
+.map-card.match {
+  border-color: var(--orange-glow);
+  background: var(--orange-dim);
+}
+
+.map-country { font-size: 13px; font-weight: 600; color: var(--ink); }
+.map-arrow   { font-size: 10px; color: var(--muted); }
+.map-abbr    { font-size: 18px; font-family:'Playfair Display',serif; font-weight:700; color: var(--orange); }
+
+/* ─── NULL VIZ ─── */
+.null-table { width:100%; border-collapse:collapse; font-size:11.5px; }
+.null-table th {
+  text-align:left;
+  color: var(--muted);
+  font-size:9px;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  padding:6px 10px;
+  border-bottom:2px solid var(--rule2);
+  font-weight:400;
+}
+.null-table td {
+  padding:8px 10px;
+  border-bottom:1px solid var(--rule);
+}
+.null-table tr:last-child td { border-bottom:none; }
+.null-val  { color: var(--red); font-style:italic; }
+.clean-val { color: var(--green); font-weight:600; }
+.avg-val   { color: var(--blue); font-weight:600; }
+
+/* ─── COND AGG VIZ ─── */
+.agg-bars { display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+.agg-row {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-size:11px;
+}
+.agg-id { color:var(--muted); width:30px; flex-shrink:0; }
+.agg-wrap { flex:1; display:flex; flex-direction:column; gap:2px; }
+.agg-bar-row { display:flex; align-items:center; gap:6px; }
+.agg-bar-bg {
+  flex:1;
+  height:10px;
+  background: var(--cream);
+  border:1px solid var(--rule);
+  overflow:hidden;
+}
+.agg-bar-fill { height:100%; transition: width 0.4s ease; }
+.agg-bar-fill.high  { background: var(--orange); }
+.agg-bar-fill.total { background: var(--ink3); opacity:0.3; }
+.agg-bar-lbl { font-size:9px; color:var(--muted); width:100px; flex-shrink:0; }
+
+/* ─── FOOTER ─── */
+.footer {
+  margin-top: 80px;
+  padding-top: 28px;
+  border-top: 3px solid var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+  animation: fadeIn 0.5s 0.5s ease both;
+}
+
+.footer-left { display:flex; flex-direction:column; gap:8px; }
+
+.footer-lesson {
+  font-family: 'Playfair Display', serif;
+  font-size: 14px;
+  font-style: italic;
+  color: var(--ink);
+}
+
+.footer-lesson strong {
+  font-style:normal;
+  font-weight:900;
+  color: var(--orange);
+}
+
+.footer-copy {
+  font-size:11px;
+  color: var(--muted);
+}
+
+.footer-copy strong { color: var(--ink); }
+
+.gh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--ink);
+  color: var(--cream);
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  padding: 13px 22px;
+  text-decoration: none;
+  border: 2px solid var(--ink);
+  transition: all 0.2s;
+}
+
+.gh-btn:hover {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #fff;
+  transform: translate(-2px,-2px);
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+.gh-icon { width:18px; height:18px; fill:currentColor; flex-shrink:0; }
+
+/* ─── QUICK-FORM DIFF ─── */
+.diff-wrap {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media(max-width:640px) { .diff-wrap { grid-template-columns:1fr; } }
+
+.diff-box {
+  background: var(--ink2);
+  color: #c8c0b0;
+  padding: 14px 16px;
+  font-size: 11px;
+  line-height: 1.9;
+}
+
+.diff-label {
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+  display: block;
+}
+
+/* ─── ANIMS ─── */
+@keyframes fadeIn {
+  from { opacity:0; transform:translateY(-10px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(18px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+.card:nth-child(1) { animation-delay:.04s }
+.card:nth-child(2) { animation-delay:.08s }
+.card:nth-child(3) { animation-delay:.12s }
+.card:nth-child(4) { animation-delay:.16s }
+.card:nth-child(5) { animation-delay:.20s }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-meta">
+    <span class="lesson-tag">Lesson 07</span>
+    <span class="divider">/</span>
+    <span class="topic">SQL Reference</span>
+  </div>
+  <h1>SQL <em>CASE</em><br>Statement</h1>
+  <p class="header-sub">Conditional logic inside SQL queries — categorize, map, handle nulls, and aggregate data interactively.</p>
+</div>
+
+<!-- NAV -->
+<div class="nav-wrap">
+  <button class="tab active" onclick="filter('all',this)">All</button>
+  <button class="tab" onclick="filter('categorize',this)">Categorize</button>
+  <button class="tab" onclick="filter('mapping',this)">Mapping</button>
+  <button class="tab" onclick="filter('quick',this)">Quick Form</button>
+  <button class="tab" onclick="filter('nulls',this)">Handling Nulls</button>
+  <button class="tab" onclick="filter('condagg',this)">Conditional Aggregation</button>
+</div>
+
+<!-- ═══ SECTION 1: CATEGORIZE ═══ -->
+<div class="section-head" data-cat="categorize">
+  <span class="section-num">01</span>
+  <span class="section-title">Categorize Data</span>
+  <span class="section-note">CASE + GROUP BY</span>
+</div>
+
+<div class="card" data-cat="categorize">
+  <div class="card-top">
+    <span class="fn-tag tag-categorize">CASE — Buckets</span>
+    <span class="card-name">Sales Tier Classification</span>
+    <span class="card-cat">Categorize</span>
+  </div>
+  <div class="card-body">
+    <div class="explain">
+      <strong>CASE</strong> evaluates conditions top-to-bottom and returns the value for the first <code>WHEN</code> that is true. Wrapping it in a subquery lets you <code>GROUP BY</code> the computed label — turning raw numbers into named buckets. Change the thresholds below to see buckets shift live.<br>
+      <code class="syntax">CASE WHEN &lt;cond&gt; THEN &lt;val&gt; ... ELSE &lt;val&gt; END</code>
+    </div>
+    <div class="two-col">
+      <div>
+        <div class="play">
+          <div class="play-row">
+            <span class="plabel">High &gt;</span>
+            <input class="pnumber" id="cat-high" type="number" value="50" oninput="updateCategorize()">
+            <span class="plabel">Med &gt;</span>
+            <input class="pnumber" id="cat-med" type="number" value="20" oninput="updateCategorize()">
+          </div>
+          <div class="play-row">
+            <span class="plabel">Add sale</span>
+            <input class="pnumber" id="cat-add" type="number" placeholder="e.g. 35">
+            <button onclick="addSale()" style="background:var(--ink);color:var(--cream);border:none;font-family:inherit;font-size:11px;padding:6px 14px;cursor:pointer;letter-spacing:1px;">+ Add</button>
+          </div>
+        </div>
+        <div id="cat-rows"></div>
+      </div>
+      <div>
+        <div class="sql">
+          <span class="kw">SELECT</span> Category, <span class="fn">SUM</span>(Sales) <span class="kw">AS</span> TotalSales<br>
+          <span class="kw">FROM</span> (<br>
+          &nbsp;<span class="kw">SELECT</span> OrderID, Sales,<br>
+          &nbsp;&nbsp;<span class="kw">CASE</span><br>
+          &nbsp;&nbsp;&nbsp;<span class="kw">WHEN</span> Sales &gt; <span class="num">50</span> <span class="kw">THEN</span> <span class="str">'High'</span><br>
+          &nbsp;&nbsp;&nbsp;<span class="kw">WHEN</span> Sales &gt; <span class="num">20</span> <span class="kw">THEN</span> <span class="str">'Medium'</span><br>
+          &nbsp;&nbsp;&nbsp;<span class="kw">ELSE</span> <span class="str">'Low'</span><br>
+          &nbsp;&nbsp;<span class="kw">END</span> <span class="kw">AS</span> Category<br>
+          &nbsp;<span class="kw">FROM</span> Sales.Orders<br>
+          ) <span class="kw">AS</span> t<br>
+          <span class="kw">GROUP BY</span> Category<br>
+          <span class="kw">ORDER BY</span> TotalSales <span class="kw">DESC</span>;
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SECTION 2: MAPPING ═══ -->
+<div class="section-head" data-cat="mapping">
+  <span class="section-num">02</span>
+  <span class="section-title">Mapping</span>
+  <span class="section-note">Value → Label translation</span>
+</div>
+
+<div class="card" data-cat="mapping">
+  <div class="card-top">
+    <span class="fn-tag tag-mapping">CASE — Mapping</span>
+    <span class="card-name">Country Code Lookup</span>
+    <span class="card-cat">Mapping</span>
+  </div>
+  <div class="card-body">
+    <div class="explain">
+      <strong>CASE as a mapping table</strong> lets you translate one set of values into another inline — no JOIN required. Each <code>WHEN Country = … THEN …</code> branch acts like a dictionary entry. The <code>ELSE</code> handles unmapped values gracefully.<br>
+      <code class="syntax">CASE WHEN col = 'A' THEN 'x' WHEN col = 'B' THEN 'y' ELSE 'n/a' END</code>
+    </div>
+    <div class="two-col">
+      <div>
+        <div class="play">
+          <div class="play-row">
+            <span class="plabel">Country</span>
+            <input class="pinput" id="map-input" value="Germany" oninput="updateMapping()" placeholder="Type a country…">
+          </div>
+          <div class="play-row">
+            <span class="plabel">Result</span>
+            <div class="pout" id="map-out"></div>
+          </div>
+        </div>
+        <div class="map-grid" id="map-grid"></div>
+      </div>
+      <div>
+        <div class="sql">
+          <span class="kw">SELECT</span><br>
+          &nbsp;&nbsp;<span class="col">CustomerID</span>, <span class="col">FirstName</span>,<br>
+          &nbsp;&nbsp;<span class="col">Country</span>,<br>
+          &nbsp;&nbsp;<span class="kw">CASE</span><br>
+          &nbsp;&nbsp;&nbsp;<span class="kw">WHEN</span> Country = <span class="str">'Germany'</span> <span class="kw">THEN</span> <span class="str">'DE'</span><br>
+          &nbsp;&nbsp;&nbsp;<span class="kw">WHEN</span> Country = <span class="str">'USA'</span>     <span class="kw">THEN</span> <span class="str">'US'</span><br>
+          &nbsp;&nbsp;&nbsp;<span class="kw">ELSE</span> <span class="str">'n/a'</span><br>
+          &nbsp;&nbsp;<span class="kw">END</span> <span class="kw">AS</span> CountryAbbr<br>
+          <span class="kw">FROM</span> Sales.Customers;
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SECTION 3: QUICK FORM ═══ -->
+<div class="section-head" data-cat="quick">
+  <span class="section-num">03</span>
+  <span class="section-title">Quick Form Syntax</span>
+  <span class="section-note">Simple CASE vs Searched CASE</span>
+</div>
+
+<div class="card" data-cat="quick">
+  <div class="card-top">
+    <span class="fn-tag tag-quick">CASE — Quick Form</span>
+    <span class="card-name">Simple vs Searched Syntax</span>
+    <span class="card-cat">Quick Form</span>
+  </div>
+  <div class="card-body">
+    <div class="explain">
+      SQL has two CASE syntaxes. The <strong>Searched CASE</strong> evaluates full boolean expressions in each WHEN — it is the most flexible form. The <strong>Simple CASE</strong> (Quick Form) places the column once after CASE and each WHEN just provides a match value. Both produce identical results for equality checks — the simple form is more concise.<br>
+      <code class="syntax">CASE col WHEN 'val' THEN … END &nbsp;vs&nbsp; CASE WHEN col = 'val' THEN … END</code>
+    </div>
+    <div class="play">
+      <div class="play-row">
+        <span class="plabel">Country</span>
+        <input class="pinput" id="qf-input" value="USA" oninput="updateQuick()">
+        <span class="parrow">→</span>
+        <div class="pout" id="qf-searched" style="max-width:90px"></div>
+        <span style="font-size:10px;color:var(--muted)">Searched</span>
+        <div class="pout" id="qf-simple" style="max-width:90px"></div>
+        <span style="font-size:10px;color:var(--muted)">Simple</span>
+      </div>
+      <div style="font-size:11px;color:var(--green);margin-top:8px;padding:6px 10px;background:var(--green-dim);border:1px solid rgba(26,107,60,0.2)" id="qf-match"></div>
+    </div>
+    <div class="diff-wrap">
+      <div class="diff-box">
+        <span class="diff-label">Searched CASE (flexible)</span>
+        <span class="kw">CASE</span><br>
+        &nbsp;<span class="kw">WHEN</span> Country = <span class="str">'Germany'</span><br>
+        &nbsp;&nbsp;<span class="kw">THEN</span> <span class="str">'DE'</span><br>
+        &nbsp;<span class="kw">WHEN</span> Country = <span class="str">'USA'</span><br>
+        &nbsp;&nbsp;<span class="kw">THEN</span> <span class="str">'US'</span><br>
+        &nbsp;<span class="kw">ELSE</span> <span class="str">'n/a'</span><br>
+        <span class="kw">END</span> <span class="kw">AS</span> CountryAbbr
+      </div>
+      <div class="diff-box">
+        <span class="diff-label">Simple CASE (concise)</span>
+        <span class="kw">CASE</span> Country<br>
+        &nbsp;<span class="kw">WHEN</span> <span class="str">'Germany'</span><br>
+        &nbsp;&nbsp;<span class="kw">THEN</span> <span class="str">'DE'</span><br>
+        &nbsp;<span class="kw">WHEN</span> <span class="str">'USA'</span><br>
+        &nbsp;&nbsp;<span class="kw">THEN</span> <span class="str">'US'</span><br>
+        &nbsp;<span class="kw">ELSE</span> <span class="str">'n/a'</span><br>
+        <span class="kw">END</span> <span class="kw">AS</span> CountryAbbr2
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SECTION 4: NULLS ═══ -->
+<div class="section-head" data-cat="nulls">
+  <span class="section-num">04</span>
+  <span class="section-title">Handling Nulls</span>
+  <span class="section-note">NULL-safe calculations</span>
+</div>
+
+<div class="card" data-cat="nulls">
+  <div class="card-top">
+    <span class="fn-tag tag-nulls">CASE — Nulls</span>
+    <span class="card-name">NULL to Zero Substitution</span>
+    <span class="card-cat">Handling Nulls</span>
+  </div>
+  <div class="card-body">
+    <div class="explain">
+      <strong>NULL values poison aggregations</strong> — <code>AVG()</code> ignores NULLs, producing a misleadingly high average. Using CASE to replace NULL with <code>0</code> before aggregating gives a true average across <em>all</em> customers. This pattern is useful anywhere you want to count non-events as zero rather than absent.<br>
+      <code class="syntax">CASE WHEN col IS NULL THEN 0 ELSE col END</code>
+    </div>
+    <div class="two-col">
+      <div>
+        <div class="play">
+          <div style="font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px">Edit scores (leave blank = NULL)</div>
+          <div id="null-inputs"></div>
+          <div style="margin-top:10px;padding:10px;background:var(--cream);border:1px solid var(--rule);font-size:11px;display:flex;gap:16px;flex-wrap:wrap">
+            <span>AVG <span style="color:var(--muted)">(nulls ignored):</span> <strong id="null-avg-raw" style="color:var(--red)"></strong></span>
+            <span>AVG <span style="color:var(--muted)">(nulls=0):</span> <strong id="null-avg-clean" style="color:var(--green)"></strong></span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="sql">
+          <span class="kw">SELECT</span><br>
+          &nbsp;&nbsp;<span class="col">CustomerID</span>, <span class="col">Score</span>,<br>
+          &nbsp;&nbsp;<span class="kw">CASE</span><br>
+          &nbsp;&nbsp;&nbsp;<span class="kw">WHEN</span> Score <span class="kw">IS NULL</span> <span class="kw">THEN</span> <span class="num">0</span><br>
+          &nbsp;&nbsp;&nbsp;<span class="kw">ELSE</span> Score<br>
+          &nbsp;&nbsp;<span class="kw">END</span> <span class="kw">AS</span> ScoreClean,<br>
+          &nbsp;&nbsp;<span class="fn">AVG</span>(<span class="kw">CASE</span> <span class="kw">WHEN</span> Score <span class="kw">IS NULL</span><br>
+          &nbsp;&nbsp;&nbsp;<span class="kw">THEN</span> <span class="num">0</span> <span class="kw">ELSE</span> Score <span class="kw">END</span>)<br>
+          &nbsp;&nbsp;<span class="kw">OVER</span>() <span class="kw">AS</span> AvgClean,<br>
+          &nbsp;&nbsp;<span class="fn">AVG</span>(Score) <span class="kw">OVER</span>() <span class="kw">AS</span> AvgRaw<br>
+          <span class="kw">FROM</span> Sales.Customers;
+        </div>
+      </div>
+    </div>
+    <div style="overflow-x:auto;margin-top:16px">
+      <table class="null-table" id="null-table">
+        <thead><tr><th>CustomerID</th><th>Score (raw)</th><th>ScoreClean</th><th>AvgRaw</th><th>AvgClean</th></tr></thead>
+        <tbody id="null-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SECTION 5: CONDITIONAL AGG ═══ -->
+<div class="section-head" data-cat="condagg">
+  <span class="section-num">05</span>
+  <span class="section-title">Conditional Aggregation</span>
+  <span class="section-note">SUM(CASE…) pattern</span>
+</div>
+
+<div class="card" data-cat="condagg">
+  <div class="card-top">
+    <span class="fn-tag tag-condagg">CASE — SUM</span>
+    <span class="card-name">Count Filtered Orders per Customer</span>
+    <span class="card-cat">Cond. Aggregation</span>
+  </div>
+  <div class="card-body">
+    <div class="explain">
+      <strong>Conditional aggregation</strong> uses <code>SUM(CASE WHEN … THEN 1 ELSE 0 END)</code> to count only rows that meet a condition — without a WHERE clause that would remove all other rows. This lets you count multiple different subsets in a single query pass, unlike using multiple sub-selects.<br>
+      <code class="syntax">SUM(CASE WHEN condition THEN 1 ELSE 0 END) AS ConditionalCount</code>
+    </div>
+    <div class="two-col">
+      <div>
+        <div class="play">
+          <div class="play-row">
+            <span class="plabel">High &gt;</span>
+            <input class="pnumber" id="agg-threshold" type="number" value="30" oninput="updateCondAgg()">
+          </div>
+        </div>
+        <div class="agg-bars" id="agg-bars"></div>
+      </div>
+      <div>
+        <div class="sql">
+          <span class="kw">SELECT</span><br>
+          &nbsp;&nbsp;<span class="col">CustomerID</span>,<br>
+          &nbsp;&nbsp;<span class="fn">SUM</span>(<br>
+          &nbsp;&nbsp;&nbsp;<span class="kw">CASE</span><br>
+          &nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">WHEN</span> Sales &gt; <span class="num">30</span> <span class="kw">THEN</span> <span class="num">1</span><br>
+          &nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">ELSE</span> <span class="num">0</span><br>
+          &nbsp;&nbsp;&nbsp;<span class="kw">END</span><br>
+          &nbsp;&nbsp;) <span class="kw">AS</span> TotalHighSales,<br>
+          &nbsp;&nbsp;<span class="fn">COUNT</span>(*) <span class="kw">AS</span> TotalOrders<br>
+          <span class="kw">FROM</span> Sales.Orders<br>
+          <span class="kw">GROUP BY</span> CustomerID;
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div class="footer-left">
+    <div class="footer-lesson">
+      <strong>Lesson 07</strong> — SQL CASE Statement
+    </div>
+    <div class="footer-copy">&copy; 2024 <strong>Thillai Shanmugam</strong> — All rights reserved.</div>
+  </div>
+  <a class="gh-btn" href="https://github.com/Thillaishanmugam1998" target="_blank" rel="noopener">
+    <svg class="gh-icon" viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+    github.com/Thillaishanmugam1998
+  </a>
+</div>
+
+</div><!-- /wrap -->
+
+<script>
+// ─── SAMPLE DATA ──────────────────────────────────────────────────────────────
+let salesData = [12, 34, 58, 23, 7, 91, 45, 18, 62, 28];
+
+const countryMap = { Germany:'DE', USA:'US', France:'FR', UK:'GB', Japan:'JP', Canada:'CA' };
+
+let nullScores = [88, null, 72, null, 95, 61, null, 84];
+
+const aggOrders = [
+  { id:'C01', orders:[45,12,67,8,33] },
+  { id:'C02', orders:[22,55,14,38,60] },
+  { id:'C03', orders:[5,9,71,42,18] },
+  { id:'C04', orders:[88,31,6,50,27] },
+  { id:'C05', orders:[15,40,35,11,29] },
+];
+
+// ─── CATEGORIZE ──────────────────────────────────────────────────────────────
+function categorize(val, high, med) {
+  if (val > high) return 'High';
+  if (val > med)  return 'Medium';
+  return 'Low';
+}
+
+function addSale() {
+  const v = parseFloat(document.getElementById('cat-add').value);
+  if (!isNaN(v)) { salesData.push(v); document.getElementById('cat-add').value=''; }
+  updateCategorize();
+}
+
+function updateCategorize() {
+  const high = parseFloat(document.getElementById('cat-high').value)||50;
+  const med  = parseFloat(document.getElementById('cat-med').value)||20;
+  const max  = Math.max(...salesData, 1);
+  const cont = document.getElementById('cat-rows');
+  const sorted = [...salesData].sort((a,b)=>b-a);
+  cont.innerHTML = sorted.map(v => {
+    const cat = categorize(v, high, med);
+    const cls = cat==='High'?'cat-high':cat==='Medium'?'cat-medium':'cat-low';
+    const pct = Math.max(4, (v/max)*100);
+    const barColor = cat==='High'?'#d4580a':cat==='Medium'?'#1a4f8a':'#1a6b3c';
+    return `<div class="sales-row">
+      <span class="sales-amount">${v}</span>
+      <div class="sales-bar-wrap"><div class="sales-bar" style="width:${pct}%;background:${barColor};opacity:0.7"></div></div>
+      <span class="cat-badge ${cls}">${cat}</span>
+    </div>`;
+  }).join('');
+}
+updateCategorize();
+
+// ─── MAPPING ──────────────────────────────────────────────────────────────────
+function mapCountry(c) {
+  return countryMap[c] || 'n/a';
+}
+
+function updateMapping() {
+  const v = document.getElementById('map-input').value.trim();
+  document.getElementById('map-out').textContent = mapCountry(v);
+  const grid = document.getElementById('map-grid');
+  grid.innerHTML = Object.entries(countryMap).map(([country, abbr]) => {
+    const active = country.toLowerCase() === v.toLowerCase();
+    return `<div class="map-card ${active?'match':''}">
+      <span class="map-country">${country}</span>
+      <span class="map-arrow">→</span>
+      <span class="map-abbr">${abbr}</span>
+    </div>`;
+  }).join('') + `<div class="map-card ${!Object.keys(countryMap).map(k=>k.toLowerCase()).includes(v.toLowerCase())&&v?'match':''}">
+    <span class="map-country">Other</span>
+    <span class="map-arrow">→</span>
+    <span class="map-abbr" style="font-size:14px;color:var(--muted)">n/a</span>
+  </div>`;
+}
+updateMapping();
+
+// ─── QUICK FORM ───────────────────────────────────────────────────────────────
+function updateQuick() {
+  const v = document.getElementById('qf-input').value.trim();
+  const result = mapCountry(v);
+  document.getElementById('qf-searched').textContent = result;
+  document.getElementById('qf-simple').textContent = result;
+  const match = document.getElementById('qf-match');
+  if (result !== 'n/a') {
+    match.textContent = `✓ Both forms return "${result}" — they produce identical results for equality checks.`;
+    match.style.color = 'var(--green)';
+    match.style.background = 'var(--green-dim)';
+    match.style.borderColor = 'rgba(26,107,60,0.2)';
+  } else {
+    match.textContent = `No match for "${v}" — ELSE 'n/a' catches all unmapped values.`;
+    match.style.color = 'var(--red)';
+    match.style.background = 'var(--red-dim)';
+    match.style.borderColor = 'rgba(155,31,31,0.2)';
+  }
+}
+updateQuick();
+
+// ─── NULLS ─────────────────────────────────────────────────────────────────
+function buildNullInputs() {
+  const cont = document.getElementById('null-inputs');
+  cont.innerHTML = nullScores.map((s,i)=>`
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+      <span style="font-size:10px;color:var(--muted);width:48px">C0${i+1}</span>
+      <input class="pnumber" type="number" id="ns-${i}" value="${s===null?'':s}" placeholder="NULL" oninput="updateNulls()" style="width:80px">
+      <span style="font-size:10px;color:var(--muted)">${s===null?'→ NULL (will use 0)':''}</span>
+    </div>
+  `).join('');
+}
+
+function updateNulls() {
+  const vals = nullScores.map((_,i)=>{
+    const el = document.getElementById('ns-'+i);
+    const v = el ? el.value.trim() : '';
+    return v===''?null:parseFloat(v);
+  });
+  const nonNull = vals.filter(v=>v!==null);
+  const avgRaw   = nonNull.length ? (nonNull.reduce((a,b)=>a+b,0)/nonNull.length).toFixed(2) : 'n/a';
+  const cleaned  = vals.map(v=>v===null?0:v);
+  const avgClean = (cleaned.reduce((a,b)=>a+b,0)/cleaned.length).toFixed(2);
+
+  document.getElementById('null-avg-raw').textContent   = avgRaw;
+  document.getElementById('null-avg-clean').textContent = avgClean;
+
+  const tbody = document.getElementById('null-tbody');
+  tbody.innerHTML = vals.map((v,i)=>{
+    const clean = v===null?0:v;
+    return `<tr>
+      <td>C0${i+1}</td>
+      <td class="${v===null?'null-val':''}">${v===null?'NULL':v}</td>
+      <td class="clean-val">${clean}</td>
+      <td class="avg-val">${avgRaw}</td>
+      <td class="avg-val">${avgClean}</td>
+    </tr>`;
+  }).join('');
+}
+
+buildNullInputs();
+updateNulls();
+
+// ─── CONDITIONAL AGG ─────────────────────────────────────────────────────────
+function updateCondAgg() {
+  const thresh = parseFloat(document.getElementById('agg-threshold').value)||30;
+  const cont = document.getElementById('agg-bars');
+  const maxOrders = Math.max(...aggOrders.map(c=>c.orders.length));
+  cont.innerHTML = aggOrders.map(c => {
+    const total = c.orders.length;
+    const high  = c.orders.filter(v=>v>thresh).length;
+    const pctH  = (high/total)*100;
+    return `<div class="agg-row">
+      <span class="agg-id">${c.id}</span>
+      <div class="agg-wrap">
+        <div class="agg-bar-row">
+          <div class="agg-bar-bg"><div class="agg-bar-fill total" style="width:100%"></div></div>
+          <span class="agg-bar-lbl">Total: ${total}</span>
+        </div>
+        <div class="agg-bar-row">
+          <div class="agg-bar-bg"><div class="agg-bar-fill high" style="width:${pctH}%"></div></div>
+          <span class="agg-bar-lbl">Sales &gt; ${thresh}: <strong>${high}</strong></span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+updateCondAgg();
+
+// ─── FILTER ──────────────────────────────────────────────────────────────────
+function filter(cat, btn) {
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.card').forEach(c=>{
+    c.classList.toggle('hidden', cat!=='all' && c.dataset.cat!==cat);
+  });
+  document.querySelectorAll('.section-head').forEach(h=>{
+    h.style.display = (cat==='all'||h.dataset.cat===cat)?'flex':'none';
+  });
+}
+</script>
+</body>
+</html>

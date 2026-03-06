@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL String Functions</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c10;
+    --surface: #111318;
+    --border: #1e2330;
+    --accent: #00e5ff;
+    --accent2: #ff6b6b;
+    --accent3: #a8ff78;
+    --accent4: #ffd060;
+    --text: #e8eaf0;
+    --muted: #5a6080;
+    --keyword: #ff79c6;
+    --function: #50fa7b;
+    --string: #f1fa8c;
+    --comment: #6272a4;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: 
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 48px 24px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  .header {
+    margin-bottom: 56px;
+    animation: fadeDown 0.7s ease forwards;
+  }
+
+  .header-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    opacity: 0.8;
+  }
+
+  .header h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(32px, 5vw, 56px);
+    font-weight: 800;
+    color: #fff;
+    line-height: 1.1;
+    letter-spacing: -1px;
+  }
+
+  .header h1 span {
+    color: var(--accent);
+  }
+
+  .header p {
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--muted);
+    max-width: 500px;
+    line-height: 1.7;
+  }
+
+  /* Category nav */
+  .nav {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+    animation: fadeUp 0.6s 0.2s ease both;
+  }
+
+  .nav-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    padding: 8px 18px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+
+  .nav-btn:hover, .nav-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,229,255,0.05);
+  }
+
+  /* Function cards grid */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+    gap: 20px;
+  }
+
+  @media (max-width: 540px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.3s;
+    animation: fadeUp 0.5s ease both;
+  }
+
+  .card:hover {
+    border-color: rgba(0,229,255,0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(0,229,255,0.1);
+  }
+
+  .card.hidden { display: none; }
+
+  .card-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .fn-badge {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+  }
+
+  .cat-manipulation .fn-badge { background: rgba(0,229,255,0.12); color: var(--accent); }
+  .cat-calculation .fn-badge { background: rgba(255,208,96,0.12); color: var(--accent4); }
+  .cat-extraction .fn-badge { background: rgba(168,255,120,0.12); color: var(--accent3); }
+  .cat-nesting .fn-badge { background: rgba(255,107,107,0.12); color: var(--accent2); }
+
+  .card-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .card-desc {
+    font-size: 11px;
+    color: var(--muted);
+    margin-left: auto;
+  }
+
+  .card-body {
+    padding: 20px;
+  }
+
+  /* Interactive playground */
+  .playground {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .playground-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+
+  .playground-row:last-child { margin-bottom: 0; }
+
+  .play-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    width: 60px;
+    flex-shrink: 0;
+  }
+
+  .play-input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--string);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    flex: 1;
+    min-width: 100px;
+    transition: border-color 0.2s;
+  }
+
+  .play-input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .play-output {
+    background: var(--bg);
+    border: 1px solid rgba(0,229,255,0.2);
+    color: var(--accent3);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    flex: 1;
+    min-width: 100px;
+    word-break: break-all;
+  }
+
+  .arrow {
+    color: var(--muted);
+    font-size: 16px;
+  }
+
+  /* Extra inputs for multi-param functions */
+  .play-param {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--accent4);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    width: 80px;
+    transition: border-color 0.2s;
+  }
+
+  .play-param:focus {
+    outline: none;
+    border-color: var(--accent4);
+  }
+
+  /* SQL code block */
+  .sql-block {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    font-size: 12px;
+    line-height: 1.8;
+    overflow-x: auto;
+    position: relative;
+  }
+
+  .sql-block .kw { color: var(--keyword); }
+  .sql-block .fn { color: var(--function); }
+  .sql-block .str { color: var(--string); }
+  .sql-block .cm { color: var(--comment); font-style: italic; }
+  .sql-block .col { color: var(--accent); }
+  .sql-block .num { color: var(--accent4); }
+
+  /* Visualizer bar for LEN */
+  .len-viz {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    margin-top: 8px;
+  }
+
+  .len-char {
+    background: var(--accent);
+    color: var(--bg);
+    font-size: 11px;
+    width: 22px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    transition: all 0.3s;
+    font-weight: 700;
+  }
+
+  .len-char.space-char {
+    background: var(--accent2);
+    opacity: 0.6;
+  }
+
+  /* Substring highlight viz */
+  .substr-viz {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+
+  .substr-char {
+    width: 24px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: 700;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    transition: all 0.3s;
+    position: relative;
+  }
+
+  .substr-char.highlight {
+    background: rgba(168,255,120,0.15);
+    border-color: var(--accent3);
+    color: var(--accent3);
+  }
+
+  .substr-char.left-hl {
+    background: rgba(0,229,255,0.15);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .substr-char.right-hl {
+    background: rgba(255,107,107,0.15);
+    border-color: var(--accent2);
+    color: var(--accent2);
+  }
+
+  /* Concat viz */
+  .concat-viz {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+
+  .concat-part {
+    padding: 5px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .concat-part.p1 { background: rgba(0,229,255,0.15); color: var(--accent); border: 1px solid rgba(0,229,255,0.3); }
+  .concat-part.sep { background: rgba(255,208,96,0.15); color: var(--accent4); border: 1px solid rgba(255,208,96,0.3); }
+  .concat-part.p2 { background: rgba(168,255,120,0.15); color: var(--accent3); border: 1px solid rgba(168,255,120,0.3); }
+  .concat-part.result { background: rgba(255,255,255,0.05); color: var(--text); border: 1px solid var(--border); }
+
+  .plus-sign { color: var(--muted); font-size: 14px; }
+  .eq-sign { color: var(--muted); font-size: 14px; }
+
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .card:nth-child(1) { animation-delay: 0.05s; }
+  .card:nth-child(2) { animation-delay: 0.10s; }
+  .card:nth-child(3) { animation-delay: 0.15s; }
+  .card:nth-child(4) { animation-delay: 0.20s; }
+  .card:nth-child(5) { animation-delay: 0.25s; }
+  .card:nth-child(6) { animation-delay: 0.30s; }
+  .card:nth-child(7) { animation-delay: 0.35s; }
+  .card:nth-child(8) { animation-delay: 0.40s; }
+
+  .section-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 40px 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    animation: fadeUp 0.5s ease both;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Explanation block */
+  .fn-explain {
+    border-left: 3px solid var(--border);
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.7;
+    background: rgba(255,255,255,0.02);
+    border-radius: 0 6px 6px 0;
+  }
+
+  .cat-manipulation .fn-explain { border-left-color: var(--accent); }
+  .cat-calculation .fn-explain { border-left-color: var(--accent4); }
+  .cat-extraction .fn-explain { border-left-color: var(--accent3); }
+  .cat-nesting .fn-explain { border-left-color: var(--accent2); }
+
+  .fn-explain strong {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .fn-explain code {
+    background: rgba(255,255,255,0.06);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11px;
+    color: var(--accent4);
+  }
+
+  /* Syntax signature */
+  .fn-syntax {
+    font-size: 11px;
+    color: var(--function);
+    margin-top: 6px;
+    opacity: 0.8;
+  }
+
+  /* Footer */
+  .footer {
+    margin-top: 64px;
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    animation: fadeUp 0.5s 0.5s ease both;
+  }
+
+  .footer-left {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .lesson-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0,229,255,0.08);
+    border: 1px solid rgba(0,229,255,0.2);
+    border-radius: 4px;
+    padding: 6px 14px;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+  }
+
+  .copyright {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+  }
+
+  .copyright span {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .github-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 20px;
+    text-decoration: none;
+    color: var(--text);
+    font-size: 13px;
+    font-family: 'JetBrains Mono', monospace;
+    transition: all 0.2s;
+  }
+
+  .github-link:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,229,255,0.05);
+  }
+
+  .github-icon {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div class="header-tag">// Lesson 05 &nbsp;&middot;&nbsp; SQL Reference</div>
+    <h1>String <span>Functions</span></h1>
+    <p>Interactive playground for SQL string manipulation, calculation, and extraction. Edit any input to see live results.</p>
+  </div>
+
+  <div class="nav">
+    <button class="nav-btn active" onclick="filterCards('all', this)">All</button>
+    <button class="nav-btn" onclick="filterCards('manipulation', this)">Manipulation</button>
+    <button class="nav-btn" onclick="filterCards('calculation', this)">Calculation</button>
+    <button class="nav-btn" onclick="filterCards('extraction', this)">Extraction</button>
+    <button class="nav-btn" onclick="filterCards('nesting', this)">Nesting</button>
+  </div>
+
+  <div class="grid" id="grid">
+
+    <!-- CONCAT -->
+    <div class="card cat-manipulation" data-cat="manipulation">
+      <div class="card-header">
+        <span class="fn-badge">CONCAT</span>
+        <span class="card-title">String Concatenation</span>
+        <span class="card-desc">Manipulation</span>
+      </div>
+      <div class="card-body">
+        <div class="fn-explain">
+          <strong>CONCAT</strong> joins two or more strings together into a single string. You can pass any number of arguments — including a separator character — and SQL will merge them left to right.<br>
+          <span class="fn-syntax">CONCAT( string1, separator, string2, ... )</span>
+        </div>
+        <div class="playground">
+          <div class="playground-row">
+            <span class="play-label">Part 1</span>
+            <input class="play-input" id="concat-a" value="John" oninput="updateConcat()">
+            <span class="play-label">Sep</span>
+            <input class="play-input" id="concat-sep" value="-" style="max-width:60px" oninput="updateConcat()">
+            <span class="play-label">Part 2</span>
+            <input class="play-input" id="concat-b" value="USA" oninput="updateConcat()">
+          </div>
+          <div class="playground-row">
+            <span class="play-label">Result</span>
+            <div class="play-output" id="concat-out"></div>
+          </div>
+          <div class="concat-viz" id="concat-viz"></div>
+        </div>
+        <div class="sql-block">
+          <span class="kw">SELECT</span><br>
+          &nbsp;&nbsp;<span class="fn">CONCAT</span>(<span class="col">first_name</span>, <span class="str">'-'</span>, <span class="col">country</span>) <span class="kw">AS</span> full_info<br>
+          <span class="kw">FROM</span> customers
+        </div>
+      </div>
+    </div>
+
+    <!-- LOWER / UPPER -->
+    <div class="card cat-manipulation" data-cat="manipulation">
+      <div class="card-header">
+        <span class="fn-badge">LOWER / UPPER</span>
+        <span class="card-title">Case Transformation</span>
+        <span class="card-desc">Manipulation</span>
+      </div>
+      <div class="card-body">
+        <div class="fn-explain">
+          <strong>LOWER</strong> converts every character in a string to lowercase. <strong>UPPER</strong> converts every character to uppercase. Useful for standardizing text before comparisons or storage so that <code>'John'</code>, <code>'john'</code>, and <code>'JOHN'</code> all match.<br>
+          <span class="fn-syntax">LOWER( string ) &nbsp;|&nbsp; UPPER( string )</span>
+        </div>
+        <div class="playground">
+          <div class="playground-row">
+            <span class="play-label">Input</span>
+            <input class="play-input" id="case-input" value="Hello World" oninput="updateCase()">
+          </div>
+          <div class="playground-row">
+            <span class="play-label">LOWER</span>
+            <div class="play-output" id="lower-out"></div>
+            <span class="arrow">↑</span>
+            <div class="play-output" id="upper-out"></div>
+            <span class="play-label" style="width:auto">UPPER</span>
+          </div>
+        </div>
+        <div class="sql-block">
+          <span class="kw">SELECT</span><br>
+          &nbsp;&nbsp;<span class="fn">LOWER</span>(<span class="col">first_name</span>) <span class="kw">AS</span> lower_name,<br>
+          &nbsp;&nbsp;<span class="fn">UPPER</span>(<span class="col">first_name</span>) <span class="kw">AS</span> upper_name<br>
+          <span class="kw">FROM</span> customers
+        </div>
+      </div>
+    </div>
+
+    <!-- TRIM -->
+    <div class="card cat-manipulation" data-cat="manipulation">
+      <div class="card-header">
+        <span class="fn-badge">TRIM</span>
+        <span class="card-title">Remove Whitespace</span>
+        <span class="card-desc">Manipulation</span>
+      </div>
+      <div class="card-body">
+        <div class="fn-explain">
+          <strong>TRIM</strong> removes leading and trailing spaces from a string, leaving internal spaces untouched. Essential for cleaning messy imported data where names or values have accidental padding. Shown as <code>·</code> in the visualizer below.<br>
+          <span class="fn-syntax">TRIM( string )</span>
+        </div>
+        <div class="playground">
+          <div class="playground-row">
+            <span class="play-label">Input</span>
+            <input class="play-input" id="trim-input" value="  Alice  " oninput="updateTrim()">
+          </div>
+          <div class="playground-row">
+            <span class="play-label">TRIM</span>
+            <div class="play-output" id="trim-out"></div>
+            <span class="arrow">→</span>
+            <div class="play-output" id="trim-len" style="max-width:100px"></div>
+            <span class="play-label" style="width:auto">LEN diff</span>
+          </div>
+          <div class="len-viz" id="trim-viz"></div>
+        </div>
+        <div class="sql-block">
+          <span class="kw">SELECT</span> first_name,<br>
+          &nbsp;&nbsp;<span class="fn">LEN</span>(<span class="col">first_name</span>) - <span class="fn">LEN</span>(<span class="fn">TRIM</span>(<span class="col">first_name</span>)) <span class="kw">AS</span> spaces_removed<br>
+          <span class="kw">FROM</span> customers<br>
+          <span class="kw">WHERE</span> <span class="fn">LEN</span>(<span class="col">first_name</span>) != <span class="fn">LEN</span>(<span class="fn">TRIM</span>(<span class="col">first_name</span>))
+        </div>
+      </div>
+    </div>
+
+    <!-- REPLACE -->
+    <div class="card cat-manipulation" data-cat="manipulation">
+      <div class="card-header">
+        <span class="fn-badge">REPLACE</span>
+        <span class="card-title">Replace / Remove</span>
+        <span class="card-desc">Manipulation</span>
+      </div>
+      <div class="card-body">
+        <div class="fn-explain">
+          <strong>REPLACE</strong> scans a string and substitutes every occurrence of a target substring with a new value. Setting the replacement to <code>''</code> effectively deletes the target — handy for stripping dashes from phone numbers or swapping file extensions.<br>
+          <span class="fn-syntax">REPLACE( string, old_value, new_value )</span>
+        </div>
+        <div class="playground">
+          <div class="playground-row">
+            <span class="play-label">String</span>
+            <input class="play-input" id="rep-str" value="123-456-7890" oninput="updateReplace()">
+          </div>
+          <div class="playground-row">
+            <span class="play-label">Old</span>
+            <input class="play-input" id="rep-old" value="-" style="max-width:80px" oninput="updateReplace()">
+            <span class="play-label">New</span>
+            <input class="play-input" id="rep-new" value="/" style="max-width:80px" oninput="updateReplace()">
+          </div>
+          <div class="playground-row">
+            <span class="play-label">Result</span>
+            <div class="play-output" id="rep-out"></div>
+          </div>
+        </div>
+        <div class="sql-block">
+          <span class="kw">SELECT</span><br>
+          &nbsp;&nbsp;<span class="fn">REPLACE</span>(<span class="str">'123-456-7890'</span>, <span class="str">'-'</span>, <span class="str">'/'</span>) <span class="kw">AS</span> clean_phone
+        </div>
+      </div>
+    </div>
+
+    <!-- LEN -->
+    <div class="card cat-calculation" data-cat="calculation">
+      <div class="card-header">
+        <span class="fn-badge">LEN</span>
+        <span class="card-title">String Length</span>
+        <span class="card-desc">Calculation</span>
+      </div>
+      <div class="card-body">
+        <div class="fn-explain">
+          <strong>LEN</strong> returns the total number of characters in a string as an integer. Trailing spaces are not counted (unlike <code>DATALENGTH</code>). Commonly combined with TRIM to detect hidden whitespace or validate field lengths.<br>
+          <span class="fn-syntax">LEN( string )</span>
+        </div>
+        <div class="playground">
+          <div class="playground-row">
+            <span class="play-label">Input</span>
+            <input class="play-input" id="len-input" value="Alexandria" oninput="updateLen()">
+          </div>
+          <div class="playground-row">
+            <span class="play-label">LEN</span>
+            <div class="play-output" id="len-out" style="max-width:80px"></div>
+            <span class="arrow">chars</span>
+          </div>
+          <div class="len-viz" id="len-viz"></div>
+        </div>
+        <div class="sql-block">
+          <span class="kw">SELECT</span><br>
+          &nbsp;&nbsp;<span class="col">first_name</span>,<br>
+          &nbsp;&nbsp;<span class="fn">LEN</span>(<span class="col">first_name</span>) <span class="kw">AS</span> name_length<br>
+          <span class="kw">FROM</span> customers
+        </div>
+      </div>
+    </div>
+
+    <!-- LEFT / RIGHT -->
+    <div class="card cat-extraction" data-cat="extraction">
+      <div class="card-header">
+        <span class="fn-badge">LEFT / RIGHT</span>
+        <span class="card-title">Substring Extraction</span>
+        <span class="card-desc">Extraction</span>
+      </div>
+      <div class="card-body">
+        <div class="fn-explain">
+          <strong>LEFT</strong> extracts N characters from the beginning of a string. <strong>RIGHT</strong> extracts N characters from the end. Perfect for pulling area codes, country prefixes, file extensions, or initials without knowing the full string length.<br>
+          <span class="fn-syntax">LEFT( string, n ) &nbsp;|&nbsp; RIGHT( string, n )</span>
+        </div>
+        <div class="playground">
+          <div class="playground-row">
+            <span class="play-label">Input</span>
+            <input class="play-input" id="lr-input" value="Alexandria" oninput="updateLeftRight()">
+            <span class="play-label">N</span>
+            <input class="play-param" id="lr-n" type="number" value="3" min="0" oninput="updateLeftRight()">
+          </div>
+          <div class="playground-row">
+            <span class="play-label">LEFT</span>
+            <div class="play-output" id="left-out"></div>
+            <span class="play-label">RIGHT</span>
+            <div class="play-output" id="right-out"></div>
+          </div>
+          <div class="substr-viz" id="lr-viz"></div>
+        </div>
+        <div class="sql-block">
+          <span class="kw">SELECT</span><br>
+          &nbsp;&nbsp;<span class="fn">LEFT</span>(<span class="fn">TRIM</span>(<span class="col">first_name</span>), <span class="num">2</span>) <span class="kw">AS</span> first_2,<br>
+          &nbsp;&nbsp;<span class="fn">RIGHT</span>(<span class="col">first_name</span>, <span class="num">2</span>) <span class="kw">AS</span> last_2<br>
+          <span class="kw">FROM</span> customers
+        </div>
+      </div>
+    </div>
+
+    <!-- SUBSTRING -->
+    <div class="card cat-extraction" data-cat="extraction">
+      <div class="card-header">
+        <span class="fn-badge">SUBSTRING</span>
+        <span class="card-title">Extract Substring</span>
+        <span class="card-desc">Extraction</span>
+      </div>
+      <div class="card-body">
+        <div class="fn-explain">
+          <strong>SUBSTRING</strong> extracts a portion of a string starting at a given position (1-indexed) for a specified number of characters. More flexible than LEFT/RIGHT as you can target any slice in the middle of a string.<br>
+          <span class="fn-syntax">SUBSTRING( string, start_position, length )</span>
+        </div>
+        <div class="playground">
+          <div class="playground-row">
+            <span class="play-label">Input</span>
+            <input class="play-input" id="sub-input" value="Alexandria" oninput="updateSubstring()">
+          </div>
+          <div class="playground-row">
+            <span class="play-label">Start</span>
+            <input class="play-param" id="sub-start" type="number" value="2" min="1" oninput="updateSubstring()">
+            <span class="play-label">Length</span>
+            <input class="play-param" id="sub-len" type="number" value="5" min="1" oninput="updateSubstring()">
+          </div>
+          <div class="playground-row">
+            <span class="play-label">Result</span>
+            <div class="play-output" id="sub-out"></div>
+          </div>
+          <div class="substr-viz" id="sub-viz"></div>
+        </div>
+        <div class="sql-block">
+          <span class="kw">SELECT</span><br>
+          &nbsp;&nbsp;<span class="fn">SUBSTRING</span>(<span class="fn">TRIM</span>(<span class="col">first_name</span>), <span class="num">2</span>, <span class="fn">LEN</span>(<span class="col">first_name</span>))<br>
+          &nbsp;&nbsp;<span class="kw">AS</span> without_first_char<br>
+          <span class="kw">FROM</span> customers
+        </div>
+      </div>
+    </div>
+
+    <!-- NESTING -->
+    <div class="card cat-nesting" data-cat="nesting">
+      <div class="card-header">
+        <span class="fn-badge">NESTING</span>
+        <span class="card-title">Combining Functions</span>
+        <span class="card-desc">Advanced</span>
+      </div>
+      <div class="card-body">
+        <div class="fn-explain">
+          <strong>Nesting</strong> means wrapping one function inside another. SQL evaluates from the innermost function outward. In <code>UPPER(LOWER(x))</code>, LOWER runs first to normalize the string, then UPPER transforms the result — a common pattern for data standardization pipelines.<br>
+          <span class="fn-syntax">OUTER_FN( INNER_FN( string ) )</span>
+        </div>
+        <div class="playground">
+          <div class="playground-row">
+            <span class="play-label">Input</span>
+            <input class="play-input" id="nest-input" value="hElLo WoRlD" oninput="updateNesting()">
+          </div>
+          <div class="playground-row">
+            <span class="play-label">Step 1</span>
+            <div class="play-output" id="nest-step1" style="font-size:11px;color:var(--accent4)"></div>
+            <span class="arrow">LOWER</span>
+          </div>
+          <div class="playground-row">
+            <span class="play-label">Step 2</span>
+            <div class="play-output" id="nest-step2" style="font-size:11px;color:var(--accent3)"></div>
+            <span class="arrow">UPPER</span>
+          </div>
+        </div>
+        <div class="sql-block">
+          <span class="kw">SELECT</span><br>
+          &nbsp;&nbsp;<span class="col">first_name</span>,<br>
+          &nbsp;&nbsp;<span class="fn">UPPER</span>(<span class="fn">LOWER</span>(<span class="col">first_name</span>)) <span class="kw">AS</span> nesting<br>
+          <span class="kw">FROM</span> customers<br>
+          <span class="cm">-- LOWER runs first → then UPPER wraps it</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="footer-left">
+      <span class="lesson-badge">&#x2022; Lesson 05 &mdash; SQL String Functions</span>
+      <span class="copyright">&copy; 2024 <span>Thillai Shanmugam</span> &mdash; All rights reserved.</span>
+    </div>
+    <a class="github-link" href="https://github.com/Thillaishanmugam1998" target="_blank" rel="noopener">
+      <svg class="github-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+      </svg>
+      github.com/Thillaishanmugam1998
+    </a>
+  </div>
+
+</div>
+
+<script>
+  function updateConcat() {
+    const a = document.getElementById('concat-a').value;
+    const sep = document.getElementById('concat-sep').value;
+    const b = document.getElementById('concat-b').value;
+    const result = a + sep + b;
+    document.getElementById('concat-out').textContent = result;
+    const viz = document.getElementById('concat-viz');
+    viz.innerHTML = `
+      <span class="concat-part p1">${escHtml(a)}</span>
+      <span class="plus-sign">+</span>
+      <span class="concat-part sep">"${escHtml(sep)}"</span>
+      <span class="plus-sign">+</span>
+      <span class="concat-part p2">${escHtml(b)}</span>
+      <span class="eq-sign">=</span>
+      <span class="concat-part result">${escHtml(result)}</span>
+    `;
+  }
+
+  function updateCase() {
+    const v = document.getElementById('case-input').value;
+    document.getElementById('lower-out').textContent = v.toLowerCase();
+    document.getElementById('upper-out').textContent = v.toUpperCase();
+  }
+
+  function updateTrim() {
+    const v = document.getElementById('trim-input').value;
+    const t = v.trim();
+    document.getElementById('trim-out').textContent = `"${t}"`;
+    document.getElementById('trim-len').textContent = `${v.length} → ${t.length}`;
+    const viz = document.getElementById('trim-viz');
+    viz.innerHTML = v.split('').map(c => {
+      const isSpace = c === ' ';
+      return `<span class="len-char ${isSpace ? 'space-char' : ''}">${isSpace ? '·' : escHtml(c)}</span>`;
+    }).join('');
+  }
+
+  function updateReplace() {
+    const str = document.getElementById('rep-str').value;
+    const old = document.getElementById('rep-old').value;
+    const nw = document.getElementById('rep-new').value;
+    const result = old ? str.split(old).join(nw) : str;
+    document.getElementById('rep-out').textContent = result;
+  }
+
+  function updateLen() {
+    const v = document.getElementById('len-input').value;
+    document.getElementById('len-out').textContent = v.length;
+    const viz = document.getElementById('len-viz');
+    viz.innerHTML = v.split('').map((c, i) => `<span class="len-char" style="opacity:${0.5 + (i / v.length) * 0.5}">${escHtml(c)}</span>`).join('');
+  }
+
+  function updateLeftRight() {
+    const v = document.getElementById('lr-input').value.trim();
+    const n = Math.max(0, parseInt(document.getElementById('lr-n').value) || 0);
+    const leftR = v.substring(0, n);
+    const rightR = v.substring(Math.max(0, v.length - n));
+    document.getElementById('left-out').textContent = leftR;
+    document.getElementById('right-out').textContent = rightR;
+
+    const viz = document.getElementById('lr-viz');
+    viz.innerHTML = v.split('').map((c, i) => {
+      let cls = '';
+      if (i < n) cls = 'left-hl';
+      else if (i >= v.length - n) cls = 'right-hl';
+      return `<span class="substr-char ${cls}">${escHtml(c)}</span>`;
+    }).join('');
+  }
+
+  function updateSubstring() {
+    const v = document.getElementById('sub-input').value.trim();
+    const start = Math.max(1, parseInt(document.getElementById('sub-start').value) || 1);
+    const length = Math.max(0, parseInt(document.getElementById('sub-len').value) || 0);
+    // SQL SUBSTRING is 1-indexed
+    const result = v.substring(start - 1, start - 1 + length);
+    document.getElementById('sub-out').textContent = result;
+
+    const viz = document.getElementById('sub-viz');
+    viz.innerHTML = v.split('').map((c, i) => {
+      const inRange = i >= (start - 1) && i < (start - 1 + length);
+      return `<span class="substr-char ${inRange ? 'highlight' : ''}">${escHtml(c)}</span>`;
+    }).join('');
+  }
+
+  function updateNesting() {
+    const v = document.getElementById('nest-input').value;
+    const step1 = v.toLowerCase();
+    const step2 = step1.toUpperCase();
+    document.getElementById('nest-step1').textContent = step1;
+    document.getElementById('nest-step2').textContent = step2;
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function filterCards(cat, btn) {
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.card').forEach(c => {
+      if (cat === 'all' || c.dataset.cat === cat) c.classList.remove('hidden');
+      else c.classList.add('hidden');
+    });
+  }
+
+  // Init all
+  updateConcat();
+  updateCase();
+  updateTrim();
+  updateReplace();
+  updateLen();
+  updateLeftRight();
+  updateSubstring();
+  updateNesting();
+</script>
+</body>
+</html>

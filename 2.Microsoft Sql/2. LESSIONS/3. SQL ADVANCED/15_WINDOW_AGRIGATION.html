@@ -1,0 +1,1088 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL: Aggregate vs GROUP BY vs Window Functions</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0d14;
+    --bg2: #0f1320;
+    --bg3: #141825;
+    --card: #111520;
+    --border: #1e2535;
+    --cyan: #00d4ff;
+    --purple: #a855f7;
+    --orange: #f97316;
+    --green: #22d3a0;
+    --pink: #f43f5e;
+    --yellow: #fbbf24;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+  /* Header */
+  header {
+    padding: 48px 0 32px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 48px;
+  }
+  .badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--cyan);
+    background: rgba(0,212,255,0.08);
+    border: 1px solid rgba(0,212,255,0.2);
+    padding: 4px 12px;
+    border-radius: 20px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  h1 {
+    font-family: var(--sans);
+    font-size: clamp(28px, 5vw, 52px);
+    font-weight: 800;
+    line-height: 1.1;
+    background: linear-gradient(135deg, #fff 0%, var(--cyan) 50%, var(--purple) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 12px;
+  }
+  .subtitle {
+    color: var(--muted);
+    font-size: 15px;
+    font-weight: 400;
+    letter-spacing: 0.5px;
+  }
+
+  /* Golden Rule Banner */
+  .golden-rule {
+    background: linear-gradient(135deg, rgba(168,85,247,0.1), rgba(0,212,255,0.1));
+    border: 1px solid rgba(168,85,247,0.3);
+    border-radius: 12px;
+    padding: 20px 28px;
+    margin-bottom: 48px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    animation: fadeIn 0.8s ease;
+  }
+  .golden-rule .icon { font-size: 28px; }
+  .golden-rule .text { font-family: var(--mono); font-size: 14px; color: var(--text); }
+  .golden-rule .text span { color: var(--cyan); font-weight: 700; }
+
+  /* Section cards */
+  .section {
+    margin-bottom: 56px;
+    animation: slideDown 0.6s ease both;
+  }
+  .section:nth-child(2) { animation-delay: 0.1s; }
+  .section:nth-child(3) { animation-delay: 0.2s; }
+  .section:nth-child(4) { animation-delay: 0.3s; }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .section-num {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--bg);
+    padding: 4px 10px;
+    border-radius: 6px;
+    letter-spacing: 1px;
+  }
+  .s1 .section-num { background: var(--cyan); }
+  .s2 .section-num { background: var(--purple); }
+  .s3 .section-num { background: var(--orange); }
+
+  .section-title {
+    font-family: var(--sans);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .s1 .section-title { color: var(--cyan); }
+  .s2 .section-title { color: var(--purple); }
+  .s3 .section-title { color: var(--orange); }
+
+  /* Card */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    position: relative;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+  .s1 .card::before { background: linear-gradient(90deg, var(--cyan), var(--purple)); }
+  .s2 .card::before { background: linear-gradient(90deg, var(--purple), var(--pink)); }
+  .s3 .card::before { background: linear-gradient(90deg, var(--orange), var(--yellow)); }
+
+  .card-inner { padding: 28px; }
+
+  /* Two col layout */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
+
+  /* Tables */
+  .table-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .table-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--cyan);
+    background: rgba(0,212,255,0.05);
+    padding: 10px 14px;
+    text-align: left;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 9px 14px;
+    border-bottom: 1px solid rgba(30,37,53,0.5);
+    transition: background 0.2s;
+    color: var(--text);
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(0,212,255,0.04); }
+  td.null { color: var(--pink); font-style: italic; }
+  td.green { color: var(--green); font-weight: 700; }
+  td.yellow-v { color: var(--yellow); }
+  td.cyan-v { color: var(--cyan); }
+  td.purple-v { color: var(--purple); }
+  td.orange-v { color: var(--orange); }
+
+  /* Query box */
+  .query-box {
+    background: #080b12;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 20px 0;
+  }
+  .query-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,0.02);
+  }
+  .query-lang {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .dots { display: flex; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot-r { background: #f43f5e; }
+  .dot-y { background: #fbbf24; }
+  .dot-g { background: #22d3a0; }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.7;
+    padding: 18px 20px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+  }
+  .kw { color: var(--purple); font-weight: 700; }
+  .fn { color: var(--cyan); }
+  .cm { color: var(--muted); font-style: italic; }
+  .str { color: var(--green); }
+  .num { color: var(--orange); }
+
+  /* Buttons */
+  .btn-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 16px 0; }
+  .btn {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn-exec {
+    background: linear-gradient(135deg, var(--cyan), var(--purple));
+    color: var(--bg);
+  }
+  .btn-exec:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,212,255,0.3); }
+  .btn-reset {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .btn-reset:hover { border-color: var(--muted); color: var(--text); }
+
+  /* Flow steps */
+  .flow-steps {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin: 16px 0;
+    flex-wrap: wrap;
+  }
+  .flow-step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    transition: all 0.4s;
+  }
+  .flow-step .num {
+    width: 20px; height: 20px;
+    background: var(--border);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    transition: all 0.4s;
+    flex-shrink: 0;
+  }
+  .flow-step.active {
+    border-color: var(--yellow);
+    color: var(--yellow);
+    background: rgba(251,191,36,0.08);
+  }
+  .flow-step.active .num { background: var(--yellow); color: var(--bg); }
+  .flow-step.done {
+    border-color: var(--green);
+    color: var(--green);
+    background: rgba(34,211,160,0.08);
+  }
+  .flow-step.done .num { background: var(--green); color: var(--bg); }
+  .flow-arrow { color: var(--border); font-size: 14px; }
+
+  /* Output area */
+  .output-area {
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: all 0.5s ease;
+  }
+  .output-area.visible {
+    opacity: 1;
+    max-height: 600px;
+  }
+
+  /* Comparison */
+  .comparison {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 16px 0;
+  }
+  @media (max-width: 600px) { .comparison { grid-template-columns: 1fr; } }
+  .comp-box {
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .comp-wrong { background: rgba(244,63,94,0.08); border: 1px solid rgba(244,63,94,0.3); color: var(--pink); }
+  .comp-right { background: rgba(34,211,160,0.08); border: 1px solid rgba(34,211,160,0.3); color: var(--green); }
+  .comp-title { font-weight: 700; margin-bottom: 6px; font-size: 11px; letter-spacing: 1px; }
+
+  /* Row pulse animation */
+  @keyframes rowPulse {
+    0% { background: transparent; }
+    50% { background: rgba(251,191,36,0.15); }
+    100% { background: transparent; }
+  }
+  tr.scanning td { animation: rowPulse 0.6s ease; }
+
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* Impact badge */
+  .impact {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 8px 16px;
+    border-radius: 20px;
+    margin-top: 12px;
+    font-weight: 700;
+  }
+  .impact-cyan { background: rgba(0,212,255,0.1); border: 1px solid rgba(0,212,255,0.3); color: var(--cyan); }
+  .impact-purple { background: rgba(168,85,247,0.1); border: 1px solid rgba(168,85,247,0.3); color: var(--purple); }
+  .impact-orange { background: rgba(249,115,22,0.1); border: 1px solid rgba(249,115,22,0.3); color: var(--orange); }
+
+  /* Divider */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+
+  /* Explanation */
+  .explain {
+    background: rgba(0,212,255,0.04);
+    border-left: 3px solid var(--cyan);
+    padding: 12px 16px;
+    border-radius: 0 8px 8px 0;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-top: 14px;
+  }
+  .explain strong { color: var(--text); }
+
+  /* Summary table */
+  .summary-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 48px;
+    position: relative;
+  }
+  .summary-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--cyan), var(--purple), var(--orange));
+  }
+  .summary-card .card-inner { padding: 28px; }
+  .summary-title {
+    font-family: var(--sans);
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  /* Processing status */
+  .status-bar {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--yellow);
+    padding: 8px 0;
+    animation: pulse 1s infinite;
+  }
+  .status-bar.show { display: flex; }
+
+  /* Tabs for section 3 */
+  .tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .tab {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 7px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+  .tab.active-cyan { border-color: var(--cyan); color: var(--cyan); background: rgba(0,212,255,0.08); }
+  .tab.active-purple { border-color: var(--purple); color: var(--purple); background: rgba(168,85,247,0.08); }
+  .tab.active-orange { border-color: var(--orange); color: var(--orange); background: rgba(249,115,22,0.08); }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  footer {
+    text-align: center;
+    padding: 32px;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    border-top: 1px solid var(--border);
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Header -->
+  <header>
+    <div class="badge">SQL Internals</div>
+    <h1>Aggregate vs GROUP BY<br>vs Window Functions</h1>
+    <p class="subtitle">Interactive visualization — same data, same question, three different answers</p>
+  </header>
+
+  <!-- Golden Rule -->
+  <div class="golden-rule">
+    <div class="icon">⚡</div>
+    <div class="text">
+      <span>GOLDEN RULE</span> — GROUP BY <span>reduces rows</span> · WINDOW FUNCTIONS <span>do not</span> · NORMAL AGGREGATE returns <span>one row</span>
+    </div>
+  </div>
+
+  <!-- BASE DATA -->
+  <div class="section s1">
+    <div class="section-header">
+      <span class="section-num">BASE DATA</span>
+      <span class="section-title">Employees Table</span>
+    </div>
+    <div class="card">
+      <div class="card-inner">
+        <p style="font-size:13px; color:var(--muted); margin-bottom:18px; font-family:var(--mono);">7 employees across IT, HR, and Sales — this same dataset is used in all three sections below.</p>
+        <div class="table-wrap">
+          <div class="table-label">📋 Employees — 7 rows</div>
+          <table id="baseTable">
+            <thead><tr><th>EmployeeID</th><th>EmployeeName</th><th>Department</th><th>Salary</th></tr></thead>
+            <tbody>
+              <tr><td class="cyan-v">1</td><td>Alice</td><td class="cyan-v">IT</td><td class="green">60,000</td></tr>
+              <tr><td class="cyan-v">2</td><td>Bob</td><td class="cyan-v">IT</td><td class="green">55,000</td></tr>
+              <tr><td class="cyan-v">3</td><td>Charlie</td><td class="purple-v">HR</td><td class="green">45,000</td></tr>
+              <tr><td class="cyan-v">4</td><td>David</td><td class="purple-v">HR</td><td class="green">40,000</td></tr>
+              <tr><td class="cyan-v">5</td><td>Eva</td><td class="orange-v">Sales</td><td class="green">70,000</td></tr>
+              <tr><td class="cyan-v">6</td><td>Frank</td><td class="orange-v">Sales</td><td class="green">65,000</td></tr>
+              <tr><td class="cyan-v">7</td><td>Grace</td><td class="cyan-v">IT</td><td class="green">60,000</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 1: NORMAL AGGREGATE -->
+  <div class="section s1">
+    <div class="section-header">
+      <span class="section-num">SECTION 01</span>
+      <span class="section-title">Normal Aggregate Function</span>
+    </div>
+    <div class="card">
+      <div class="card-inner">
+
+        <div class="explain" style="margin-bottom:20px; border-color:var(--cyan);">
+          <strong>Question:</strong> What is the average salary of <strong>ALL</strong> employees?
+          — A normal aggregate collapses all rows into <strong>one single value</strong>.
+        </div>
+
+        <div class="query-box">
+          <div class="query-header">
+            <span class="query-lang">SQL — Normal Aggregate</span>
+            <div class="dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+          </div>
+          <pre><span class="kw">SELECT</span>
+    <span class="fn">AVG</span>(Salary) <span class="kw">AS</span> CompanyAverageSalary
+<span class="kw">FROM</span> Employees;
+
+<span class="cm">-- Returns: ONE row — entire table collapsed to a single number</span></pre>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-exec" onclick="runSection1()">▶ Execute Query</button>
+          <button class="btn btn-reset" onclick="resetSection1()">↻ Reset</button>
+          <div class="status-bar" id="s1Status">⟳ Scanning all 7 rows...</div>
+        </div>
+
+        <div class="flow-steps" id="s1Flow">
+          <div class="flow-step" id="s1f1"><span class="num">1</span>Scan all rows</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step" id="s1f2"><span class="num">2</span>Sum salaries</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step" id="s1f3"><span class="num">3</span>Count rows = 7</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step" id="s1f4"><span class="num">4</span>395000 ÷ 7</div>
+        </div>
+
+        <div class="output-area" id="s1Output">
+          <hr class="divider">
+          <div class="table-wrap" style="max-width:280px;">
+            <div class="table-label">OUTPUT — 1 row returned</div>
+            <table>
+              <thead><tr><th>CompanyAverageSalary</th></tr></thead>
+              <tbody>
+                <tr><td class="green" style="font-size:16px; padding:14px;">56,428</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="comparison" style="margin-top:16px;">
+            <div class="comp-box comp-wrong">
+              <div class="comp-title">✗ What you LOSE</div>
+              Employee names, departments, individual salaries — all gone. 7 rows → 1 row.
+            </div>
+            <div class="comp-box comp-right">
+              <div class="comp-title">✓ What you GET</div>
+              One clean overall number. Perfect for a company-wide KPI dashboard tile.
+            </div>
+          </div>
+          <div class="impact impact-cyan">📊 Output: 1 row · 7 rows collapsed · No detail retained</div>
+          <div class="explain" style="margin-top:14px;">
+            <strong>Key Point:</strong> Normal aggregate always returns <strong>exactly one row</strong>. All individual employee data is permanently lost in the result.
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 2: GROUP BY -->
+  <div class="section s2">
+    <div class="section-header">
+      <span class="section-num">SECTION 02</span>
+      <span class="section-title">GROUP BY Aggregate</span>
+    </div>
+    <div class="card">
+      <div class="card-inner">
+
+        <div class="explain" style="margin-bottom:20px; border-color:var(--purple);">
+          <strong>Question:</strong> What is the average salary <strong>per department</strong>?
+          — GROUP BY reduces rows to <strong>one row per group</strong>.
+        </div>
+
+        <div class="query-box">
+          <div class="query-header">
+            <span class="query-lang">SQL — GROUP BY Aggregate</span>
+            <div class="dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+          </div>
+          <pre><span class="kw">SELECT</span>
+    Department,
+    <span class="fn">AVG</span>(Salary) <span class="kw">AS</span> DepartmentAverageSalary
+<span class="kw">FROM</span> Employees
+<span class="kw">GROUP BY</span> Department;
+
+<span class="cm">-- Returns: ONE row per department — employee-level data LOST</span></pre>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-exec" onclick="runSection2()">▶ Execute Query</button>
+          <button class="btn btn-reset" onclick="resetSection2()">↻ Reset</button>
+          <div class="status-bar" id="s2Status">⟳ Grouping rows by Department...</div>
+        </div>
+
+        <div class="flow-steps" id="s2Flow">
+          <div class="flow-step" id="s2f1"><span class="num">1</span>Scan all rows</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step" id="s2f2"><span class="num">2</span>Group by Dept</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step" id="s2f3"><span class="num">3</span>AVG per group</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step" id="s2f4"><span class="num">4</span>Emit 1 row/group</div>
+        </div>
+
+        <div class="output-area" id="s2Output">
+          <hr class="divider">
+          <div class="two-col">
+            <div>
+              <div class="table-wrap">
+                <div class="table-label">INPUT — 7 rows, 3 departments</div>
+                <table>
+                  <thead><tr><th>EmployeeName</th><th>Department</th><th>Salary</th></tr></thead>
+                  <tbody>
+                    <tr><td>Alice</td><td class="cyan-v">IT</td><td>60,000</td></tr>
+                    <tr><td>Bob</td><td class="cyan-v">IT</td><td>55,000</td></tr>
+                    <tr><td>Grace</td><td class="cyan-v">IT</td><td>60,000</td></tr>
+                    <tr style="opacity:0.4"><td colspan="3" style="font-family:var(--mono);font-size:10px;color:var(--muted);">── grouped away ──</td></tr>
+                    <tr><td>Charlie</td><td class="purple-v">HR</td><td>45,000</td></tr>
+                    <tr><td>David</td><td class="purple-v">HR</td><td>40,000</td></tr>
+                    <tr style="opacity:0.4"><td colspan="3" style="font-family:var(--mono);font-size:10px;color:var(--muted);">── grouped away ──</td></tr>
+                    <tr><td>Eva</td><td class="orange-v">Sales</td><td>70,000</td></tr>
+                    <tr><td>Frank</td><td class="orange-v">Sales</td><td>65,000</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div>
+              <div class="table-wrap">
+                <div class="table-label">OUTPUT — 3 rows returned</div>
+                <table>
+                  <thead><tr><th>Department</th><th>DeptAvgSalary</th></tr></thead>
+                  <tbody>
+                    <tr><td class="cyan-v">IT</td><td class="green">58,333</td></tr>
+                    <tr><td class="purple-v">HR</td><td class="green">42,500</td></tr>
+                    <tr><td class="orange-v">Sales</td><td class="green">67,500</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="impact impact-purple" style="margin-top:12px; display:flex;">📦 7 rows → 3 rows · Names lost</div>
+            </div>
+          </div>
+          <div class="comparison" style="margin-top:16px;">
+            <div class="comp-box comp-wrong">
+              <div class="comp-title">✗ What you LOSE</div>
+              EmployeeName, individual Salary — Alice, Bob, Grace all vanish into "IT". Can't see who earned what.
+            </div>
+            <div class="comp-box comp-right">
+              <div class="comp-title">✓ What you GET</div>
+              Clean per-department summary. Ideal for department-level reporting, charts, and leaderboards.
+            </div>
+          </div>
+          <div class="explain" style="margin-top:14px;">
+            <strong>Key Point:</strong> GROUP BY always <strong>reduces rows</strong>. You get one row per unique group value. Individual row data is discarded — you cannot retrieve Alice's name from the GROUP BY result.
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 3: WINDOW FUNCTION -->
+  <div class="section s3">
+    <div class="section-header">
+      <span class="section-num">SECTION 03</span>
+      <span class="section-title">Window Aggregate Function</span>
+    </div>
+    <div class="card">
+      <div class="card-inner">
+
+        <div class="explain" style="margin-bottom:20px; border-color:var(--orange);">
+          <strong>Question:</strong> Show <strong>each employee</strong> with their department average salary alongside —
+          Window functions keep <strong>all rows</strong> and add analytics per row.
+        </div>
+
+        <!-- Tabs for different window examples -->
+        <div class="tabs">
+          <button class="tab active-orange" id="wt1" onclick="switchWindowTab(1)">AVG — Avg Salary</button>
+          <button class="tab" id="wt2" onclick="switchWindowTab(2)">SUM — Total Salary</button>
+          <button class="tab" id="wt3" onclick="switchWindowTab(3)">COUNT — Team Size</button>
+        </div>
+
+        <!-- Tab 1: AVG -->
+        <div class="tab-content active" id="wtab1">
+          <div class="query-box">
+            <div class="query-header">
+              <span class="query-lang">SQL — Window AVG</span>
+              <div class="dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+            </div>
+            <pre><span class="kw">SELECT</span>
+    EmployeeName,
+    Department,
+    Salary,
+    <span class="fn">AVG</span>(Salary) <span class="kw">OVER</span> (<span class="kw">PARTITION BY</span> Department)
+        <span class="kw">AS</span> DepartmentAverageSalary
+<span class="kw">FROM</span> Employees;
+
+<span class="cm">-- Returns: ALL 7 rows — each gets the dept average attached</span></pre>
+          </div>
+        </div>
+
+        <!-- Tab 2: SUM -->
+        <div class="tab-content" id="wtab2">
+          <div class="query-box">
+            <div class="query-header">
+              <span class="query-lang">SQL — Window SUM</span>
+              <div class="dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+            </div>
+            <pre><span class="kw">SELECT</span>
+    EmployeeName,
+    Department,
+    Salary,
+    <span class="fn">SUM</span>(Salary) <span class="kw">OVER</span> (<span class="kw">PARTITION BY</span> Department)
+        <span class="kw">AS</span> TotalSalaryPerDept
+<span class="kw">FROM</span> Employees;
+
+<span class="cm">-- Returns: ALL 7 rows — each gets the dept total attached</span></pre>
+          </div>
+        </div>
+
+        <!-- Tab 3: COUNT -->
+        <div class="tab-content" id="wtab3">
+          <div class="query-box">
+            <div class="query-header">
+              <span class="query-lang">SQL — Window COUNT</span>
+              <div class="dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+            </div>
+            <pre><span class="kw">SELECT</span>
+    EmployeeName,
+    Department,
+    <span class="fn">COUNT</span>(*) <span class="kw">OVER</span> (<span class="kw">PARTITION BY</span> Department)
+        <span class="kw">AS</span> EmployeesInDept
+<span class="kw">FROM</span> Employees;
+
+<span class="cm">-- Returns: ALL 7 rows — each knows the dept headcount</span></pre>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-exec" onclick="runSection3()">▶ Execute Query</button>
+          <button class="btn btn-reset" onclick="resetSection3()">↻ Reset</button>
+          <div class="status-bar" id="s3Status">⟳ Computing window partitions...</div>
+        </div>
+
+        <div class="flow-steps" id="s3Flow">
+          <div class="flow-step" id="s3f1"><span class="num">1</span>Scan all rows</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step" id="s3f2"><span class="num">2</span>Partition by Dept</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step" id="s3f3"><span class="num">3</span>Calc per window</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step" id="s3f4"><span class="num">4</span>Attach to each row</div>
+        </div>
+
+        <div class="output-area" id="s3Output">
+          <hr class="divider">
+
+          <!-- AVG Output -->
+          <div id="s3OutAvg">
+            <div class="table-wrap">
+              <div class="table-label">OUTPUT — ALL 7 rows returned (AVG)</div>
+              <table>
+                <thead><tr><th>EmployeeName</th><th>Department</th><th>Salary</th><th>DeptAvgSalary</th></tr></thead>
+                <tbody>
+                  <tr><td>Alice</td><td class="cyan-v">IT</td><td>60,000</td><td class="green">58,333</td></tr>
+                  <tr><td>Bob</td><td class="cyan-v">IT</td><td>55,000</td><td class="green">58,333</td></tr>
+                  <tr><td>Grace</td><td class="cyan-v">IT</td><td>60,000</td><td class="green">58,333</td></tr>
+                  <tr><td>Charlie</td><td class="purple-v">HR</td><td>45,000</td><td class="green">42,500</td></tr>
+                  <tr><td>David</td><td class="purple-v">HR</td><td>40,000</td><td class="green">42,500</td></tr>
+                  <tr><td>Eva</td><td class="orange-v">Sales</td><td>70,000</td><td class="green">67,500</td></tr>
+                  <tr><td>Frank</td><td class="orange-v">Sales</td><td>65,000</td><td class="green">67,500</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- SUM Output -->
+          <div id="s3OutSum" style="display:none">
+            <div class="table-wrap">
+              <div class="table-label">OUTPUT — ALL 7 rows returned (SUM)</div>
+              <table>
+                <thead><tr><th>EmployeeName</th><th>Department</th><th>Salary</th><th>TotalSalaryPerDept</th></tr></thead>
+                <tbody>
+                  <tr><td>Alice</td><td class="cyan-v">IT</td><td>60,000</td><td class="green">175,000</td></tr>
+                  <tr><td>Bob</td><td class="cyan-v">IT</td><td>55,000</td><td class="green">175,000</td></tr>
+                  <tr><td>Grace</td><td class="cyan-v">IT</td><td>60,000</td><td class="green">175,000</td></tr>
+                  <tr><td>Charlie</td><td class="purple-v">HR</td><td>45,000</td><td class="green">85,000</td></tr>
+                  <tr><td>David</td><td class="purple-v">HR</td><td>40,000</td><td class="green">85,000</td></tr>
+                  <tr><td>Eva</td><td class="orange-v">Sales</td><td>70,000</td><td class="green">135,000</td></tr>
+                  <tr><td>Frank</td><td class="orange-v">Sales</td><td>65,000</td><td class="green">135,000</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- COUNT Output -->
+          <div id="s3OutCount" style="display:none">
+            <div class="table-wrap">
+              <div class="table-label">OUTPUT — ALL 7 rows returned (COUNT)</div>
+              <table>
+                <thead><tr><th>EmployeeName</th><th>Department</th><th>EmployeesInDept</th></tr></thead>
+                <tbody>
+                  <tr><td>Alice</td><td class="cyan-v">IT</td><td class="green">3</td></tr>
+                  <tr><td>Bob</td><td class="cyan-v">IT</td><td class="green">3</td></tr>
+                  <tr><td>Grace</td><td class="cyan-v">IT</td><td class="green">3</td></tr>
+                  <tr><td>Charlie</td><td class="purple-v">HR</td><td class="green">2</td></tr>
+                  <tr><td>David</td><td class="purple-v">HR</td><td class="green">2</td></tr>
+                  <tr><td>Eva</td><td class="orange-v">Sales</td><td class="green">2</td></tr>
+                  <tr><td>Frank</td><td class="orange-v">Sales</td><td class="green">2</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="comparison" style="margin-top:16px;">
+            <div class="comp-box comp-wrong">
+              <div class="comp-title">vs GROUP BY</div>
+              GROUP BY would collapse these 7 rows into 3 rows. Alice, Bob, Grace disappear — only "IT" remains.
+            </div>
+            <div class="comp-box comp-right">
+              <div class="comp-title">✓ Window Function WIN</div>
+              All 7 employees visible. Each row knows its department aggregate. Perfect for comparison analysis.
+            </div>
+          </div>
+          <div class="impact impact-orange">🪟 Output: 7 rows · All data kept · Analytics per row added</div>
+          <div class="explain" style="margin-top:14px;">
+            <strong>Key Point:</strong> <code>OVER (PARTITION BY Department)</code> creates an invisible window over each department group, computes the aggregate, and <strong>attaches the result back to every original row</strong> without removing any row.
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- SUMMARY COMPARISON TABLE -->
+  <div class="summary-card">
+    <div class="card-inner">
+      <div class="summary-title">
+        <span>📊</span> Side-by-Side Comparison
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:20%">Feature</th>
+              <th style="color:var(--cyan)">Normal Aggregate</th>
+              <th style="color:var(--purple)">GROUP BY</th>
+              <th style="color:var(--orange)">Window Function</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="color:var(--muted); font-size:11px; letter-spacing:0.5px;">ROWS RETURNED</td>
+              <td class="cyan-v">Always 1</td>
+              <td class="purple-v">1 per group</td>
+              <td class="orange-v">All original rows</td>
+            </tr>
+            <tr>
+              <td style="color:var(--muted); font-size:11px;">DETAIL KEPT</td>
+              <td class="pink">❌ None</td>
+              <td class="pink">❌ Lost</td>
+              <td class="green">✅ Fully preserved</td>
+            </tr>
+            <tr>
+              <td style="color:var(--muted); font-size:11px;">USE CASE</td>
+              <td>Company-wide KPI</td>
+              <td>Dept reports, charts</td>
+              <td>Row-level comparison</td>
+            </tr>
+            <tr>
+              <td style="color:var(--muted); font-size:11px;">SYNTAX HINT</td>
+              <td class="cyan-v">AVG(col)</td>
+              <td class="purple-v">GROUP BY col</td>
+              <td class="orange-v">OVER (PARTITION BY)</td>
+            </tr>
+            <tr>
+              <td style="color:var(--muted); font-size:11px;">EXAMPLE RESULT</td>
+              <td>56,428</td>
+              <td>IT: 58,333<br>HR: 42,500</td>
+              <td>Alice | IT | 60k | 58,333</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer>SQL INTERNALS · AGGREGATE vs GROUP BY vs WINDOW FUNCTIONS · Zero to Hero</footer>
+
+<script>
+  // ---- SECTION 1: NORMAL AGGREGATE ----
+  function runSection1() {
+    const status = document.getElementById('s1Status');
+    const output = document.getElementById('s1Output');
+    const steps = ['s1f1','s1f2','s1f3','s1f4'];
+    const rows = document.querySelectorAll('#baseTable tbody tr');
+
+    status.classList.add('show');
+    steps.forEach(id => {
+      document.getElementById(id).className = 'flow-step';
+    });
+    output.classList.remove('visible');
+
+    // Pulse base table rows
+    rows.forEach((r, i) => {
+      setTimeout(() => {
+        r.classList.add('scanning');
+        setTimeout(() => r.classList.remove('scanning'), 600);
+      }, i * 120);
+    });
+
+    // Animate steps
+    steps.forEach((id, i) => {
+      setTimeout(() => {
+        if (i > 0) document.getElementById(steps[i-1]).className = 'flow-step done';
+        document.getElementById(id).className = 'flow-step active';
+      }, 400 + i * 500);
+    });
+
+    setTimeout(() => {
+      document.getElementById(steps[3]).className = 'flow-step done';
+      status.classList.remove('show');
+      output.classList.add('visible');
+    }, 400 + 4 * 500);
+  }
+
+  function resetSection1() {
+    document.getElementById('s1Output').classList.remove('visible');
+    document.getElementById('s1Status').classList.remove('show');
+    ['s1f1','s1f2','s1f3','s1f4'].forEach(id => {
+      document.getElementById(id).className = 'flow-step';
+    });
+  }
+
+  // ---- SECTION 2: GROUP BY ----
+  function runSection2() {
+    const status = document.getElementById('s2Status');
+    const output = document.getElementById('s2Output');
+    const steps = ['s2f1','s2f2','s2f3','s2f4'];
+    const rows = document.querySelectorAll('#baseTable tbody tr');
+
+    status.classList.add('show');
+    steps.forEach(id => document.getElementById(id).className = 'flow-step');
+    output.classList.remove('visible');
+
+    rows.forEach((r, i) => {
+      setTimeout(() => {
+        r.classList.add('scanning');
+        setTimeout(() => r.classList.remove('scanning'), 600);
+      }, i * 100);
+    });
+
+    steps.forEach((id, i) => {
+      setTimeout(() => {
+        if (i > 0) document.getElementById(steps[i-1]).className = 'flow-step done';
+        document.getElementById(id).className = 'flow-step active';
+      }, 300 + i * 500);
+    });
+
+    setTimeout(() => {
+      document.getElementById(steps[3]).className = 'flow-step done';
+      status.classList.remove('show');
+      output.classList.add('visible');
+    }, 300 + 4 * 500);
+  }
+
+  function resetSection2() {
+    document.getElementById('s2Output').classList.remove('visible');
+    document.getElementById('s2Status').classList.remove('show');
+    ['s2f1','s2f2','s2f3','s2f4'].forEach(id => {
+      document.getElementById(id).className = 'flow-step';
+    });
+  }
+
+  // ---- SECTION 3: WINDOW FUNCTION ----
+  let activeTab = 1;
+
+  function switchWindowTab(n) {
+    activeTab = n;
+    [1,2,3].forEach(i => {
+      document.getElementById('wtab'+i).className = 'tab-content' + (i===n ? ' active' : '');
+      const btn = document.getElementById('wt'+i);
+      btn.className = 'tab' + (i===n ? ' active-orange' : '');
+    });
+    // Update visible output if already shown
+    const out = document.getElementById('s3Output');
+    if (out.classList.contains('visible')) {
+      document.getElementById('s3OutAvg').style.display = activeTab===1 ? '' : 'none';
+      document.getElementById('s3OutSum').style.display = activeTab===2 ? '' : 'none';
+      document.getElementById('s3OutCount').style.display = activeTab===3 ? '' : 'none';
+    }
+  }
+
+  function runSection3() {
+    const status = document.getElementById('s3Status');
+    const output = document.getElementById('s3Output');
+    const steps = ['s3f1','s3f2','s3f3','s3f4'];
+    const rows = document.querySelectorAll('#baseTable tbody tr');
+
+    status.classList.add('show');
+    steps.forEach(id => document.getElementById(id).className = 'flow-step');
+    output.classList.remove('visible');
+
+    // Animate in groups
+    const groups = [[0,1,6],[2,3],[4,5]];
+    groups.forEach((g, gi) => {
+      g.forEach(ri => {
+        setTimeout(() => {
+          if (rows[ri]) {
+            rows[ri].classList.add('scanning');
+            setTimeout(() => rows[ri].classList.remove('scanning'), 700);
+          }
+        }, gi * 300);
+      });
+    });
+
+    steps.forEach((id, i) => {
+      setTimeout(() => {
+        if (i > 0) document.getElementById(steps[i-1]).className = 'flow-step done';
+        document.getElementById(id).className = 'flow-step active';
+      }, 200 + i * 550);
+    });
+
+    setTimeout(() => {
+      document.getElementById(steps[3]).className = 'flow-step done';
+      status.classList.remove('show');
+      // Show correct output tab
+      document.getElementById('s3OutAvg').style.display = activeTab===1 ? '' : 'none';
+      document.getElementById('s3OutSum').style.display = activeTab===2 ? '' : 'none';
+      document.getElementById('s3OutCount').style.display = activeTab===3 ? '' : 'none';
+      output.classList.add('visible');
+    }, 200 + 4 * 550);
+  }
+
+  function resetSection3() {
+    document.getElementById('s3Output').classList.remove('visible');
+    document.getElementById('s3Status').classList.remove('show');
+    ['s3f1','s3f2','s3f3','s3f4'].forEach(id => {
+      document.getElementById(id).className = 'flow-step';
+    });
+  }
+</script>
+</body>
+</html>

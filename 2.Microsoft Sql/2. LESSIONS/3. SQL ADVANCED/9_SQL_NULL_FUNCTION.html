@@ -1,0 +1,1344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL NULL Functions – Interactive Visualization</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0d14;
+            --surface: #111520;
+            --surface2: #161c2e;
+            --border: #1e2740;
+            --accent: #00d4ff;
+            --accent2: #ff6b35;
+            --accent3: #7c3aed;
+            --green: #00e676;
+            --yellow: #ffd600;
+            --red: #ff4444;
+            --text: #e2e8f0;
+            --muted: #64748b;
+            --page-bg: #1a2035;
+            --page-border: #2a3a5c;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Syne', sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 24px 80px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+            animation: slideDown 0.8s ease-out;
+        }
+
+        .badge {
+            display: inline-block;
+            background: rgba(0,212,255,0.1);
+            border: 1px solid rgba(0,212,255,0.3);
+            color: var(--accent);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            padding: 6px 16px;
+            border-radius: 2px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-size: clamp(28px, 5vw, 52px);
+            font-weight: 800;
+            line-height: 1.1;
+            background: linear-gradient(135deg, #fff 0%, var(--accent) 50%, var(--accent3) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 16px;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            font-size: 16px;
+            font-weight: 400;
+        }
+
+        .section-label {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 28px;
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        .section-num {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .num-agg { background: rgba(0,212,255,0.15); color: var(--accent); border: 1px solid rgba(0,212,255,0.3); }
+        .num-math { background: rgba(124,58,237,0.15); color: var(--accent3); border: 1px solid rgba(124,58,237,0.3); }
+        .num-sort { background: rgba(255,107,53,0.15); color: var(--accent2); border: 1px solid rgba(255,107,53,0.3); }
+        .num-nullif { background: rgba(255,214,0,0.15); color: var(--yellow); border: 1px solid rgba(255,214,0,0.3); }
+        .num-isnull { background: rgba(0,230,118,0.15); color: var(--green); border: 1px solid rgba(0,230,118,0.3); }
+        .num-join { background: rgba(236,72,153,0.15); color: #ec4899; border: 1px solid rgba(236,72,153,0.3); }
+        .num-compare { background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); }
+
+        .section-title {
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        .section-sub {
+            font-size: 13px;
+            color: var(--muted);
+            font-weight: 400;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 32px;
+            margin-bottom: 40px;
+            position: relative;
+            overflow: hidden;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 1px;
+        }
+
+        .card-agg::before { background: linear-gradient(90deg, transparent, var(--accent), transparent); }
+        .card-math::before { background: linear-gradient(90deg, transparent, var(--accent3), transparent); }
+        .card-sort::before { background: linear-gradient(90deg, transparent, var(--accent2), transparent); }
+        .card-nullif::before { background: linear-gradient(90deg, transparent, var(--yellow), transparent); }
+        .card-isnull::before { background: linear-gradient(90deg, transparent, var(--green), transparent); }
+        .card-join::before { background: linear-gradient(90deg, transparent, #ec4899, transparent); }
+        .card-compare::before { background: linear-gradient(90deg, transparent, #3b82f6, transparent); }
+
+        /* DEMO TABLE */
+        .demo-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .demo-table thead {
+            background: linear-gradient(135deg, rgba(0,212,255,0.15), rgba(0,212,255,0.05));
+            border-bottom: 2px solid var(--border);
+        }
+
+        .demo-table th {
+            padding: 12px 16px;
+            text-align: left;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--accent);
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .demo-table td {
+            padding: 10px 16px;
+            border-bottom: 1px solid rgba(30,39,64,0.5);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+        }
+
+        .demo-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .demo-table tr:hover {
+            background: rgba(0,212,255,0.05);
+        }
+
+        .null-badge {
+            display: inline-block;
+            background: rgba(236,72,153,0.15);
+            border: 1px solid rgba(236,72,153,0.3);
+            color: #ec4899;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .value-badge {
+            color: var(--green);
+            font-weight: 700;
+        }
+
+        .formula-box {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+        }
+
+        .kw { color: var(--accent3); font-weight: 700; }
+        .fn { color: var(--accent); font-weight: 700; }
+        .str { color: var(--green); }
+        .num { color: var(--yellow); }
+        .cmt { color: var(--muted); font-style: italic; }
+
+        .result-box {
+            background: linear-gradient(135deg, rgba(0,230,118,0.1), rgba(0,212,255,0.05));
+            border: 1px solid rgba(0,230,118,0.3);
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+        }
+
+        .result-title {
+            color: var(--green);
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .result-content {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--text);
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+            margin: 24px 0;
+        }
+
+        .comparison-item {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .comparison-item h4 {
+            font-size: 13px;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .comparison-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            font-weight: 700;
+            padding: 12px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 6px;
+            margin: 12px 0;
+        }
+
+        .comparison-desc {
+            font-size: 11px;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        .step-demo {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .step-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--accent);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .step-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .step-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            opacity: 0.4;
+            transition: all 0.4s;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+        }
+
+        .step-item.active {
+            opacity: 1;
+            border-color: var(--accent3);
+            background: rgba(124,58,237,0.08);
+            box-shadow: 0 0 12px rgba(124,58,237,0.15);
+        }
+
+        .step-item.done {
+            opacity: 0.7;
+            border-color: rgba(0,230,118,0.3);
+            background: rgba(0,230,118,0.05);
+        }
+
+        .step-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            flex-shrink: 0;
+            background: rgba(0,212,255,0.15);
+            border: 1px solid rgba(0,212,255,0.3);
+            color: var(--accent);
+        }
+
+        .step-item.active .step-icon {
+            background: rgba(124,58,237,0.2);
+            border-color: var(--accent3);
+            color: var(--accent3);
+        }
+
+        .step-item.done .step-icon {
+            background: rgba(0,230,118,0.15);
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        .step-label {
+            color: var(--muted);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 2px;
+        }
+
+        .step-content {
+            font-size: 12px;
+        }
+
+        .step-item.active .step-label,
+        .step-item.active .step-content {
+            color: var(--text);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 20px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-family: 'Syne', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: rgba(0,212,255,0.15);
+            border: 1px solid rgba(0,212,255,0.3);
+            color: var(--accent);
+        }
+
+        .btn-primary:hover {
+            background: rgba(0,212,255,0.25);
+            box-shadow: 0 0 16px rgba(0,212,255,0.2);
+        }
+
+        .tooltip-note {
+            margin-top: 16px;
+            padding: 12px 16px;
+            background: rgba(255,214,0,0.06);
+            border: 1px solid rgba(255,214,0,0.2);
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--yellow);
+            line-height: 1.6;
+        }
+
+        .divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 40px 0;
+        }
+
+        .concept-tabs {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--surface2);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+
+        .tab-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .tab-btn.active {
+            background: rgba(0,212,255,0.15);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .join-visual {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 20px;
+            align-items: center;
+            margin: 24px 0;
+        }
+
+        .join-table-viz {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .join-table-viz h4 {
+            font-size: 12px;
+            color: var(--accent);
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .join-row {
+            padding: 8px;
+            margin: 4px 0;
+            background: var(--surface);
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            border-left: 3px solid transparent;
+        }
+
+        .join-row.matched {
+            border-left-color: var(--green);
+            background: rgba(0,230,118,0.08);
+        }
+
+        .join-row.unmatched {
+            border-left-color: #ec4899;
+            background: rgba(236,72,153,0.08);
+        }
+
+        .join-arrow {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 20px;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .pulse {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        @media (max-width: 768px) {
+            .comparison-grid { grid-template-columns: 1fr; }
+            .join-visual { grid-template-columns: 1fr; }
+            .join-arrow { transform: rotate(90deg); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- HEADER -->
+    <header>
+        <div class="badge">SQL NULL HANDLING</div>
+        <h1>NULL Functions<br>Visualized</h1>
+        <p class="subtitle">Master essential SQL functions for handling NULL values in aggregation, operations, and comparisons</p>
+    </header>
+
+    <!-- ===================== SECTION 1 – DATA AGGREGATION ===================== -->
+    <div class="section-label">
+        <div class="section-num num-agg">01</div>
+        <div>
+            <div class="section-title">Data Aggregation with COALESCE</div>
+            <div class="section-sub">AVG(Score) ignores NULL — Replace NULL with 0 to include it</div>
+        </div>
+    </div>
+
+    <div class="card card-agg">
+        <h3 style="margin-bottom: 16px; color: var(--accent)">Problem: NULL in AVG() Calculation</h3>
+        
+        <table class="demo-table">
+            <thead>
+                <tr>
+                    <th>CustomerID</th>
+                    <th>FirstName</th>
+                    <th>Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1</td>
+                    <td>John</td>
+                    <td><span class="value-badge">85</span></td>
+                </tr>
+                <tr>
+                    <td>2</td>
+                    <td>Sarah</td>
+                    <td><span class="null-badge">NULL</span></td>
+                </tr>
+                <tr>
+                    <td>3</td>
+                    <td>Mike</td>
+                    <td><span class="value-badge">92</span></td>
+                </tr>
+                <tr>
+                    <td>4</td>
+                    <td>Emma</td>
+                    <td><span class="null-badge">NULL</span></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="formula-box">
+            <span class="kw">SELECT</span> <span class="fn">AVG</span>(Score) <span class="kw">AS</span> AvgScore<br>
+            <span class="kw">FROM</span> Customers;
+        </div>
+
+        <div class="result-box">
+            <div class="result-title">⚠️ Result Without COALESCE</div>
+            <div class="result-content">AvgScore = <span class="value-badge">88.5</span><br/>
+            <span class="cmt">Only 85 and 92 are averaged (NULL ignored)</span><br/>
+            <span class="cmt">(85 + 92) / 2 = 88.5</span>
+            </div>
+        </div>
+
+        <h3 style="margin-bottom: 16px; color: var(--accent); margin-top: 24px;">Solution: Replace NULL with COALESCE</h3>
+
+        <div class="formula-box">
+            <span class="kw">SELECT</span> <span class="fn">AVG</span>(<span class="fn">COALESCE</span>(Score, <span class="num">0</span>)) <span class="kw">AS</span> AvgScore<br>
+            <span class="kw">FROM</span> Customers;
+        </div>
+
+        <table class="demo-table">
+            <thead>
+                <tr>
+                    <th>Original Score</th>
+                    <th>COALESCE(Score, 0)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="value-badge">85</span></td>
+                    <td><span class="value-badge">85</span></td>
+                </tr>
+                <tr>
+                    <td><span class="null-badge">NULL</span></td>
+                    <td><span class="value-badge">0</span></td>
+                </tr>
+                <tr>
+                    <td><span class="value-badge">92</span></td>
+                    <td><span class="value-badge">92</span></td>
+                </tr>
+                <tr>
+                    <td><span class="null-badge">NULL</span></td>
+                    <td><span class="value-badge">0</span></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="result-box">
+            <div class="result-title">✓ Result With COALESCE</div>
+            <div class="result-content">AvgScore = <span class="value-badge">67.25</span><br/>
+            <span class="cmt">All 4 values included</span><br/>
+            <span class="cmt">(85 + 0 + 92 + 0) / 4 = 67.25</span>
+            </div>
+        </div>
+
+        <div class="tooltip-note">
+            💡 <strong>Key Insight:</strong> NULL is treated as "absence of data" by aggregate functions. Use COALESCE to convert NULL to a meaningful default before aggregation.
+        </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ===================== SECTION 2 – MATHEMATICAL OPERATORS ===================== -->
+    <div class="section-label">
+        <div class="section-num num-math">02</div>
+        <div>
+            <div class="section-title">Mathematical Operators with NULL</div>
+            <div class="section-sub">NULL + anything = NULL — Use COALESCE for arithmetic</div>
+        </div>
+    </div>
+
+    <div class="card card-math">
+        <h3 style="margin-bottom: 16px; color: var(--accent3)">Challenge: String Concatenation</h3>
+
+        <table class="demo-table">
+            <thead>
+                <tr>
+                    <th>CustomerID</th>
+                    <th>FirstName</th>
+                    <th>LastName</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1</td>
+                    <td>John</td>
+                    <td><span class="value-badge">Smith</span></td>
+                </tr>
+                <tr>
+                    <td>2</td>
+                    <td>Sarah</td>
+                    <td><span class="null-badge">NULL</span></td>
+                </tr>
+                <tr>
+                    <td>3</td>
+                    <td>Mike</td>
+                    <td><span class="value-badge">Johnson</span></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="formula-box">
+            <span class="kw">SELECT</span> FirstName + <span class="str">' '</span> + LastName <span class="kw">AS</span> FullName<br>
+            <span class="kw">FROM</span> Customers;
+        </div>
+
+        <div class="result-box">
+            <div class="result-title">⚠️ Without COALESCE</div>
+            <div class="result-content">
+                ✓ John Smith<br/>
+                ✗ <span class="null-badge">NULL</span> (Sarah + ' ' + NULL = NULL)<br/>
+                ✓ Mike Johnson
+            </div>
+        </div>
+
+        <h3 style="margin-bottom: 16px; color: var(--accent3); margin-top: 24px;">Solution: COALESCE with Empty String</h3>
+
+        <div class="formula-box">
+            <span class="kw">SELECT</span> FirstName + <span class="str">' '</span> + <span class="fn">COALESCE</span>(LastName, <span class="str">''</span>) <span class="kw">AS</span> FullName<br>
+            <span class="kw">FROM</span> Customers;
+        </div>
+
+        <table class="demo-table">
+            <thead>
+                <tr>
+                    <th>FirstName</th>
+                    <th>COALESCE(LastName, '')</th>
+                    <th>FullName</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>John</td>
+                    <td><span class="value-badge">Smith</span></td>
+                    <td><span class="value-badge">John Smith</span></td>
+                </tr>
+                <tr>
+                    <td>Sarah</td>
+                    <td><span class="value-badge">''</span></td>
+                    <td><span class="value-badge">Sarah </span></td>
+                </tr>
+                <tr>
+                    <td>Mike</td>
+                    <td><span class="value-badge">Johnson</span></td>
+                    <td><span class="value-badge">Mike Johnson</span></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3 style="margin-bottom: 16px; color: var(--accent3); margin-top: 24px;">Bonus Points: Arithmetic with Scores</h3>
+
+        <div class="formula-box">
+            <span class="kw">SELECT</span> Score, <span class="fn">COALESCE</span>(Score, <span class="num">0</span>) + <span class="num">10</span> <span class="kw">AS</span> ScoreWithBonus<br>
+            <span class="kw">FROM</span> Customers;
+        </div>
+
+        <table class="demo-table">
+            <thead>
+                <tr>
+                    <th>Score</th>
+                    <th>COALESCE(Score, 0)</th>
+                    <th>+ 10</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="value-badge">85</span></td>
+                    <td><span class="value-badge">85</span></td>
+                    <td><span class="value-badge">95</span></td>
+                </tr>
+                <tr>
+                    <td><span class="null-badge">NULL</span></td>
+                    <td><span class="value-badge">0</span></td>
+                    <td><span class="value-badge">10</span></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="tooltip-note">
+            💡 <strong>Golden Rule:</strong> NULL propagates through all arithmetic and string operations. Always use COALESCE to convert NULL before math.
+        </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ===================== SECTION 3 – SORTING DATA ===================== -->
+    <div class="section-label">
+        <div class="section-num num-sort">03</div>
+        <div>
+            <div class="section-title">Sorting with NULL Control</div>
+            <div class="section-sub">ORDER BY — Force NULLs to appear last (or first)</div>
+        </div>
+    </div>
+
+    <div class="card card-sort">
+        <h3 style="margin-bottom: 16px; color: var(--accent2)">Problem: Unpredictable NULL Placement</h3>
+
+        <table class="demo-table">
+            <thead>
+                <tr>
+                    <th>CustomerID</th>
+                    <th>Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1</td>
+                    <td><span class="value-badge">85</span></td>
+                </tr>
+                <tr>
+                    <td>2</td>
+                    <td><span class="null-badge">NULL</span></td>
+                </tr>
+                <tr>
+                    <td>3</td>
+                    <td><span class="value-badge">92</span></td>
+                </tr>
+                <tr>
+                    <td>4</td>
+                    <td><span class="null-badge">NULL</span></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="formula-box">
+            <span class="kw">SELECT</span> * <span class="kw">FROM</span> Customers<br>
+            <span class="kw">ORDER BY</span> Score <span class="kw">ASC</span>;
+        </div>
+
+        <div class="result-box">
+            <div class="result-title">⚠️ Database Default (Unpredictable)</div>
+            <div class="result-content">
+                <span class="null-badge">NULL</span> (Customer 2) — Position varies by database!<br/>
+                <span class="null-badge">NULL</span> (Customer 4)<br/>
+                <span class="value-badge">85</span> (Customer 1)<br/>
+                <span class="value-badge">92</span> (Customer 3)
+            </div>
+        </div>
+
+        <h3 style="margin-bottom: 16px; color: var(--accent2); margin-top: 24px;">Solution: Explicit CASE Control</h3>
+
+        <div class="formula-box">
+            <span class="kw">SELECT</span> * <span class="kw">FROM</span> Customers<br>
+            <span class="kw">ORDER BY</span> <span class="kw">CASE WHEN</span> Score <span class="kw">IS NULL THEN</span> <span class="num">1</span> <span class="kw">ELSE</span> <span class="num">0</span> <span class="kw">END</span>, Score;
+        </div>
+
+        <div class="step-demo">
+            <div class="step-title">🔍 How it works:</div>
+            <div class="step-list">
+                <div class="step-item" id="step1" onclick="showStep(1)">
+                    <div class="step-icon">1</div>
+                    <div>
+                        <div class="step-label">Step 1</div>
+                        <div class="step-content">CASE returns 0 for non-NULL, 1 for NULL</div>
+                    </div>
+                </div>
+                <div class="step-item" id="step2" onclick="showStep(2)">
+                    <div class="step-icon">2</div>
+                    <div>
+                        <div class="step-label">Step 2</div>
+                        <div class="step-content">0s sort before 1s → non-NULL rows first</div>
+                    </div>
+                </div>
+                <div class="step-item" id="step3" onclick="showStep(3)">
+                    <div class="step-icon">3</div>
+                    <div>
+                        <div class="step-label">Step 3</div>
+                        <div class="step-content">Then sort by Score → NULLs guaranteed last!</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="result-box">
+            <div class="result-title">✓ Controlled Sort Order</div>
+            <div class="result-content">
+                <span class="value-badge">85</span> (Customer 1) ✓<br/>
+                <span class="value-badge">92</span> (Customer 3) ✓<br/>
+                <span class="null-badge">NULL</span> (Customer 2) ← Last!<br/>
+                <span class="null-badge">NULL</span> (Customer 4) ← Last!
+            </div>
+        </div>
+
+        <div class="tooltip-note">
+            💡 <strong>Pro Tip:</strong> Change the CASE logic to put NULLs first: <code>CASE WHEN Score IS NULL THEN 0 ELSE 1 END</code>
+        </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ===================== SECTION 4 – NULLIF ===================== -->
+    <div class="section-label">
+        <div class="section-num num-nullif">04</div>
+        <div>
+            <div class="section-title">NULLIF – Prevent Division by Zero</div>
+            <div class="section-sub">NULLIF(Quantity, 0) converts 0 to NULL to avoid errors</div>
+        </div>
+    </div>
+
+    <div class="card card-nullif">
+        <h3 style="margin-bottom: 16px; color: var(--yellow)">The Problem: Division by Zero</h3>
+
+        <table class="demo-table">
+            <thead>
+                <tr>
+                    <th>OrderID</th>
+                    <th>Sales</th>
+                    <th>Quantity</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1</td>
+                    <td><span class="value-badge">100</span></td>
+                    <td><span class="value-badge">5</span></td>
+                </tr>
+                <tr>
+                    <td>2</td>
+                    <td><span class="value-badge">200</span></td>
+                    <td><span class="value-badge">0</span></td>
+                </tr>
+                <tr>
+                    <td>3</td>
+                    <td><span class="value-badge">150</span></td>
+                    <td><span class="value-badge">3</span></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="formula-box">
+            <span class="kw">SELECT</span> Sales / Quantity <span class="kw">AS</span> Price<br>
+            <span class="kw">FROM</span> Orders;
+        </div>
+
+        <div class="result-box">
+            <div class="result-title">❌ Error on Row 2</div>
+            <div class="result-content">
+                Msg 8134: Divide by zero error encountered<br/>
+                <span class="cmt">Query fails completely!</span>
+            </div>
+        </div>
+
+        <h3 style="margin-bottom: 16px; color: var(--yellow); margin-top: 24px;">Solution: NULLIF (Conditional NULL)</h3>
+
+        <div class="formula-box">
+            <span class="kw">SELECT</span> Sales / <span class="fn">NULLIF</span>(Quantity, <span class="num">0</span>) <span class="kw">AS</span> Price<br>
+            <span class="kw">FROM</span> Orders;
+        </div>
+
+        <table class="demo-table">
+            <thead>
+                <tr>
+                    <th>Sales</th>
+                    <th>Quantity</th>
+                    <th>NULLIF(Qty, 0)</th>
+                    <th>Result</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="value-badge">100</span></td>
+                    <td><span class="value-badge">5</span></td>
+                    <td><span class="value-badge">5</span></td>
+                    <td><span class="value-badge">20</span></td>
+                </tr>
+                <tr>
+                    <td><span class="value-badge">200</span></td>
+                    <td><span class="value-badge">0</span></td>
+                    <td><span class="null-badge">NULL</span></td>
+                    <td><span class="null-badge">NULL</span></td>
+                </tr>
+                <tr>
+                    <td><span class="value-badge">150</span></td>
+                    <td><span class="value-badge">3</span></td>
+                    <td><span class="value-badge">3</span></td>
+                    <td><span class="value-badge">50</span></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="result-box">
+            <div class="result-title">✓ Query Succeeds</div>
+            <div class="result-content">
+                <span class="value-badge">20</span> (Order 1)<br/>
+                <span class="null-badge">NULL</span> (Order 2) ← No error!<br/>
+                <span class="value-badge">50</span> (Order 3)
+            </div>
+        </div>
+
+        <div class="tooltip-note">
+            💡 <strong>NULLIF Logic:</strong> NULLIF(expr1, expr2) returns NULL if expr1 = expr2, otherwise returns expr1. Perfect for converting zero divisors to NULL.
+        </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ===================== SECTION 5 – IS NULL / IS NOT NULL ===================== -->
+    <div class="section-label">
+        <div class="section-num num-isnull">05</div>
+        <div>
+            <div class="section-title">IS NULL / IS NOT NULL – Filtering</div>
+            <div class="section-sub">Never use = NULL or ≠ NULL — Always use IS NULL</div>
+        </div>
+    </div>
+
+    <div class="card card-isnull">
+        <h3 style="margin-bottom: 16px; color: var(--green)">Finding Customers Without Scores</h3>
+
+        <table class="demo-table">
+            <thead>
+                <tr>
+                    <th>CustomerID</th>
+                    <th>Name</th>
+                    <th>Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1</td>
+                    <td>John</td>
+                    <td><span class="value-badge">85</span></td>
+                </tr>
+                <tr>
+                    <td>2</td>
+                    <td>Sarah</td>
+                    <td><span class="null-badge">NULL</span></td>
+                </tr>
+                <tr>
+                    <td>3</td>
+                    <td>Mike</td>
+                    <td><span class="value-badge">92</span></td>
+                </tr>
+                <tr>
+                    <td>4</td>
+                    <td>Emma</td>
+                    <td><span class="null-badge">NULL</span></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="comparison-grid">
+            <div class="comparison-item">
+                <h4>❌ Wrong: WHERE Score = NULL</h4>
+                <div class="comparison-value">No Results</div>
+                <div class="comparison-desc">NULL comparisons always return unknown. This never works!</div>
+            </div>
+            <div class="comparison-item">
+                <h4>✓ Correct: WHERE Score IS NULL</h4>
+                <div class="comparison-value">2 Rows</div>
+                <div class="comparison-desc">Sarah (CID 2) and Emma (CID 4)</div>
+            </div>
+        </div>
+
+        <div class="formula-box">
+            <span class="kw">SELECT</span> * <span class="kw">FROM</span> Customers<br>
+            <span class="kw">WHERE</span> Score <span class="kw">IS NULL</span>;
+        </div>
+
+        <div class="result-box">
+            <div class="result-title">✓ Find Rows with NULL</div>
+            <div class="result-content">
+                2, Sarah, <span class="null-badge">NULL</span><br/>
+                4, Emma, <span class="null-badge">NULL</span>
+            </div>
+        </div>
+
+        <h3 style="margin-bottom: 16px; color: var(--green); margin-top: 24px;">Opposite: IS NOT NULL</h3>
+
+        <div class="formula-box">
+            <span class="kw">SELECT</span> * <span class="kw">FROM</span> Customers<br>
+            <span class="kw">WHERE</span> Score <span class="kw">IS NOT NULL</span>;
+        </div>
+
+        <div class="result-box">
+            <div class="result-title">✓ Find Rows with Valid Data</div>
+            <div class="result-content">
+                1, John, <span class="value-badge">85</span><br/>
+                3, Mike, <span class="value-badge">92</span>
+            </div>
+        </div>
+
+        <div class="tooltip-note">
+            💡 <strong>Critical Rule:</strong> NULL is "unknown", so SQL can never confirm NULL = NULL. Always use IS NULL and IS NOT NULL for comparisons.
+        </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ===================== SECTION 6 – LEFT ANTI JOIN ===================== -->
+    <div class="section-label">
+        <div class="section-num num-join">06</div>
+        <div>
+            <div class="section-title">LEFT ANTI JOIN – Find Unmatched Records</div>
+            <div class="section-sub">Customers with no orders using NULL detection</div>
+        </div>
+    </div>
+
+    <div class="card card-join">
+        <h3 style="margin-bottom: 16px; color: #ec4899">The Pattern: Find Non-Matching Rows</h3>
+
+        <div class="join-visual">
+            <div class="join-table-viz">
+                <h4>Customers</h4>
+                <div class="join-row matched">C1: John ✓ (has orders)</div>
+                <div class="join-row unmatched">C2: Sarah ✗ (no orders)</div>
+                <div class="join-row matched">C3: Mike ✓ (has orders)</div>
+                <div class="join-row unmatched">C4: Emma ✗ (no orders)</div>
+            </div>
+            <div class="join-arrow">→</div>
+            <div class="join-table-viz">
+                <h4>Result: Unmatched Only</h4>
+                <div class="join-row unmatched">C2: Sarah</div>
+                <div class="join-row unmatched">C4: Emma</div>
+            </div>
+        </div>
+
+        <h3 style="margin-bottom: 16px; color: #ec4899; margin-top: 24px;">Query Pattern</h3>
+
+        <div class="formula-box">
+            <span class="kw">SELECT</span> c.* <span class="kw">FROM</span> Customers <span class="kw">AS</span> c<br>
+            <span class="kw">LEFT JOIN</span> Orders <span class="kw">AS</span> o <span class="kw">ON</span> c.CustomerID = o.CustomerID<br>
+            <span class="kw">WHERE</span> o.CustomerID <span class="kw">IS NULL</span>;
+        </div>
+
+        <table class="demo-table">
+            <thead>
+                <tr>
+                    <th>Step</th>
+                    <th>What Happens</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="value-badge">1. LEFT JOIN</span></td>
+                    <td>Keep ALL customers, add matching orders (NULL if no match)</td>
+                </tr>
+                <tr>
+                    <td><span class="value-badge">2. WHERE ... IS NULL</span></td>
+                    <td>Filter only rows where OrderID is NULL (unmatched)</td>
+                </tr>
+                <tr>
+                    <td><span class="value-badge">3. Result</span></td>
+                    <td>Customers with NO orders!</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="result-box">
+            <div class="result-title">✓ Customers Without Orders</div>
+            <div class="result-content">
+                2, Sarah<br/>
+                4, Emma
+            </div>
+        </div>
+
+        <div class="tooltip-note">
+            💡 <strong>LEFT ANTI JOIN Pattern:</strong> LEFT JOIN + IS NULL finds all rows from left table that have NO match in right table. Perfect for "find what's missing" queries.
+        </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ===================== SECTION 7 – COMPARISON ===================== -->
+    <div class="section-label">
+        <div class="section-num num-compare">07</div>
+        <div>
+            <div class="section-title">NULL vs Empty String vs Spaces</div>
+            <div class="section-sub">Three different values, three different behaviors</div>
+        </div>
+    </div>
+
+    <div class="card card-compare">
+        <h3 style="margin-bottom: 16px; color: #3b82f6">Understanding the Difference</h3>
+
+        <div class="comparison-grid">
+            <div class="comparison-item">
+                <h4>NULL</h4>
+                <div class="comparison-value">NULL</div>
+                <div class="comparison-desc">Unknown/Missing data. No value at all. Can't be compared.</div>
+            </div>
+            <div class="comparison-item">
+                <h4>Empty String</h4>
+                <div class="comparison-value">''</div>
+                <div class="comparison-desc">A real string with zero characters. A legitimate value.</div>
+            </div>
+            <div class="comparison-item">
+                <h4>Spaces</h4>
+                <div class="comparison-value">'  '</div>
+                <div class="comparison-desc">A string containing space characters. Visible content.</div>
+            </div>
+        </div>
+
+        <h3 style="margin-bottom: 16px; color: #3b82f6; margin-top: 24px;">Example Data</h3>
+
+        <table class="demo-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Category</th>
+                    <th>DATALENGTH</th>
+                    <th>Meaning</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1</td>
+                    <td><span class="value-badge">'A'</span></td>
+                    <td><span class="value-badge">1</span></td>
+                    <td>1 character</td>
+                </tr>
+                <tr>
+                    <td>2</td>
+                    <td><span class="null-badge">NULL</span></td>
+                    <td><span class="null-badge">NULL</span></td>
+                    <td>No data to measure</td>
+                </tr>
+                <tr>
+                    <td>3</td>
+                    <td><span class="value-badge">''</span></td>
+                    <td><span class="value-badge">0</span></td>
+                    <td>Empty, but real value</td>
+                </tr>
+                <tr>
+                    <td>4</td>
+                    <td><span class="value-badge">'  '</span></td>
+                    <td><span class="value-badge">2</span></td>
+                    <td>2 space characters</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3 style="margin-bottom: 16px; color: #3b82f6; margin-top: 24px;">Handling All Three: TRIM + NULLIF + COALESCE</h3>
+
+        <div class="formula-box">
+            <span class="kw">SELECT</span><br/>
+            &nbsp;&nbsp;Category,<br/>
+            &nbsp;&nbsp;<span class="fn">TRIM</span>(Category) <span class="kw">AS</span> Trimmed,<br/>
+            &nbsp;&nbsp;<span class="fn">NULLIF</span>(<span class="fn">TRIM</span>(Category), <span class="str">''</span>) <span class="kw">AS</span> NullIfEmpty,<br/>
+            &nbsp;&nbsp;<span class="fn">COALESCE</span>(<span class="fn">NULLIF</span>(<span class="fn">TRIM</span>(Category), <span class="str">''</span>), <span class="str">'unknown'</span>) <span class="kw">AS</span> Final<br/>
+            <span class="kw">FROM</span> Orders;
+        </div>
+
+        <table class="demo-table">
+            <thead>
+                <tr>
+                    <th>Original</th>
+                    <th>TRIM()</th>
+                    <th>NULLIF(TRIM(), '')</th>
+                    <th>COALESCE(..., 'unknown')</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="value-badge">'A'</span></td>
+                    <td><span class="value-badge">'A'</span></td>
+                    <td><span class="value-badge">'A'</span></td>
+                    <td><span class="value-badge">'A'</span></td>
+                </tr>
+                <tr>
+                    <td><span class="null-badge">NULL</span></td>
+                    <td><span class="null-badge">NULL</span></td>
+                    <td><span class="null-badge">NULL</span></td>
+                    <td><span class="value-badge">'unknown'</span></td>
+                </tr>
+                <tr>
+                    <td><span class="value-badge">''</span></td>
+                    <td><span class="value-badge">''</span></td>
+                    <td><span class="null-badge">NULL</span></td>
+                    <td><span class="value-badge">'unknown'</span></td>
+                </tr>
+                <tr>
+                    <td><span class="value-badge">'  '</span></td>
+                    <td><span class="value-badge">''</span></td>
+                    <td><span class="null-badge">NULL</span></td>
+                    <td><span class="value-badge">'unknown'</span></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="result-box">
+            <div class="result-title">✓ The Processing Pipeline</div>
+            <div class="result-content">
+                <strong>TRIM:</strong> Remove leading/trailing spaces<br/>
+                <strong>NULLIF:</strong> Convert empty strings to NULL<br/>
+                <strong>COALESCE:</strong> Replace NULL with 'unknown' default<br/><br/>
+                <span class="cmt">All three cases (NULL, empty, spaces) end up as 'unknown'!</span>
+            </div>
+        </div>
+
+        <div class="tooltip-note">
+            💡 <strong>Data Cleanup Pattern:</strong> Use TRIM + NULLIF + COALESCE as a triple combo to normalize all "empty-like" values consistently.
+        </div>
+    </div>
+
+</div>
+
+<script>
+    function showStep(stepNum) {
+        // Reset all steps
+        document.getElementById('step1').className = 'step-item';
+        document.getElementById('step2').className = 'step-item';
+        document.getElementById('step3').className = 'step-item';
+
+        // Mark previous steps as done
+        for (let i = 1; i < stepNum; i++) {
+            document.getElementById(`step${i}`).classList.add('done');
+        }
+
+        // Mark current step as active
+        document.getElementById(`step${stepNum}`).classList.add('active');
+
+        // Mark remaining steps as pending (default)
+    }
+
+    // Animation on scroll
+    const observerOptions = {
+        threshold: 0.3,
+        rootMargin: '0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.animation = 'fadeIn 0.8s ease-out';
+            }
+        });
+    }, observerOptions);
+
+    document.querySelectorAll('.card, .section-label').forEach(el => {
+        observer.observe(el);
+    });
+
+    // Show first step on page load
+    window.addEventListener('load', () => {
+        showStep(1);
+    });
+</script>
+
+</body>
+</html>
