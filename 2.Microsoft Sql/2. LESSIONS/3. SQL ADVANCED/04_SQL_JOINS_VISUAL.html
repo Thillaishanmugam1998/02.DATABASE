@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL Server JOINs — Interactive Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,600;0,700;1,400&family=Bricolage+Grotesque:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #06080f;
+  --s1: #0a0e1a;
+  --s2: #0f1424;
+  --s3: #141929;
+  --border: #1a2340;
+  --border2: #22304f;
+  --emp: #3b82f6;     /* blue – Employees */
+  --dep: #f59e0b;     /* amber – Departments */
+  --inner: #10b981;   /* green – INNER */
+  --left:  #8b5cf6;   /* purple – LEFT */
+  --right: #ef4444;   /* red – RIGHT */
+  --null-c: #475569;
+  --text: #dde4f0;
+  --muted: #3d5278;
+  --muted2: #5a7aa0;
+  --mono: 'IBM Plex Mono', monospace;
+  --display: 'Bricolage Grotesque', sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--display);
+  min-height:100vh;
+  overflow-x:hidden;
+}
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:
+    linear-gradient(rgba(59,130,246,0.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(59,130,246,0.03) 1px,transparent 1px);
+  background-size:52px 52px;
+  pointer-events:none;z-index:0;
+}
+body::after{
+  content:'';position:fixed;
+  bottom:-300px;right:-200px;
+  width:700px;height:700px;
+  background:radial-gradient(circle,rgba(245,158,11,0.04),transparent 65%);
+  pointer-events:none;z-index:0;
+}
+
+.wrap{position:relative;z-index:1;max-width:1240px;margin:0 auto;padding:44px 24px 100px;}
+
+/* ─── HEADER ─── */
+.hdr{text-align:center;margin-bottom:64px;}
+.hdr-pill{
+  display:inline-flex;align-items:center;gap:10px;
+  background:rgba(59,130,246,0.08);
+  border:1px solid rgba(59,130,246,0.22);
+  color:var(--emp);font-family:var(--mono);
+  font-size:10px;letter-spacing:3px;text-transform:uppercase;
+  padding:7px 20px;border-radius:3px;margin-bottom:24px;
+}
+.hdr-pill-dot{width:7px;height:7px;border-radius:50%;background:var(--emp);box-shadow:0 0 10px var(--emp);}
+h1{
+  font-size:clamp(32px,6vw,62px);
+  font-weight:800;line-height:1.05;letter-spacing:-2px;
+  margin-bottom:16px;
+}
+.h1-join{color:#fff;}
+.h1-vis{
+  background:linear-gradient(120deg,var(--emp) 0%,var(--inner) 40%,var(--dep) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.hdr-sub{color:var(--muted2);font-size:15px;font-weight:600;letter-spacing:-0.3px;}
+
+/* ─── SECTION ─── */
+.sec{margin-bottom:52px;}
+.sec-hdr{display:flex;align-items:center;gap:14px;margin-bottom:26px;}
+.sec-num{
+  width:40px;height:40px;border-radius:10px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:12px;font-weight:700;
+}
+.n1{background:rgba(59,130,246,0.12);border:1px solid rgba(59,130,246,0.3);color:var(--emp);}
+.n2{background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);color:var(--inner);}
+.n3{background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.3);color:var(--left);}
+.n4{background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:var(--right);}
+.sec-title{font-size:22px;font-weight:800;letter-spacing:-0.5px;}
+.sec-sub{font-family:var(--mono);font-size:11px;color:var(--muted2);margin-top:3px;}
+
+.card{
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:16px;padding:30px;
+  position:relative;overflow:hidden;
+}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;}
+.c-emp::before{background:linear-gradient(90deg,transparent,var(--emp),transparent);}
+.c-inner::before{background:linear-gradient(90deg,transparent,var(--inner),transparent);}
+.c-left::before{background:linear-gradient(90deg,transparent,var(--left),transparent);}
+.c-right::before{background:linear-gradient(90deg,transparent,var(--right),transparent);}
+
+.divider{height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);margin:44px 0;}
+
+/* ─── TABLE SCHEMA ─── */
+.schema-2col{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+@media(max-width:680px){.schema-2col{grid-template-columns:1fr;}}
+
+.tbl-box{background:var(--s2);border-radius:10px;overflow:hidden;border:1px solid var(--border2);}
+.tbl-head{
+  padding:11px 18px;
+  font-family:var(--mono);font-size:11px;font-weight:700;
+  display:flex;align-items:center;gap:10px;
+  border-bottom:1px solid var(--border);
+}
+.th-emp{background:rgba(59,130,246,0.1);color:var(--emp);}
+.th-dep{background:rgba(245,158,11,0.1);color:var(--dep);}
+.th-dot{width:8px;height:8px;border-radius:50%;}
+.td-emp-d{background:var(--emp);}
+.td-dep-d{background:var(--dep);}
+
+.col-tbl{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px;}
+.col-tbl th{padding:8px 16px;color:var(--muted);font-size:10px;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border);text-align:left;background:rgba(0,0,0,0.15);}
+.col-tbl td{padding:7px 16px;border-bottom:1px solid rgba(26,35,64,0.6);}
+.col-tbl tr:last-child td{border-bottom:none;}
+.col-tbl tr:hover td{background:rgba(255,255,255,0.02);}
+.c-pk{color:var(--dep);} .c-fk{color:var(--emp);} .c-type{color:var(--muted2);}
+.c-name{color:var(--text);}
+.badge{display:inline-block;padding:1px 7px;border-radius:3px;font-size:9px;margin-left:5px;vertical-align:middle;}
+.b-pk{background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);color:var(--dep);}
+.b-fk{background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.3);color:var(--emp);}
+
+/* data rows */
+.data-tbl-wrap{overflow-x:auto;}
+.data-tbl{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px;}
+.data-tbl th{padding:7px 14px;color:var(--muted);font-size:10px;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border);text-align:left;background:rgba(0,0,0,0.18);}
+.data-tbl td{padding:6px 14px;border-bottom:1px solid rgba(26,35,64,0.5);transition:background .2s;}
+.data-tbl tr:last-child td{border-bottom:none;}
+.data-tbl tr:hover td{background:rgba(255,255,255,0.025);}
+.data-tbl tr.row-hi-emp td{background:rgba(59,130,246,0.1)!important;border-left:3px solid var(--emp);}
+.data-tbl tr.row-hi-dep td{background:rgba(245,158,11,0.1)!important;border-left:3px solid var(--dep);}
+.data-tbl tr.row-hi-match td{background:rgba(16,185,129,0.1)!important;border-left:3px solid var(--inner);}
+.data-tbl tr.row-hi-null td{background:rgba(71,85,105,0.1)!important;}
+
+.v-emp{color:var(--emp);}
+.v-dep{color:var(--dep);}
+.v-null{color:var(--null-c);font-style:italic;}
+.v-match{color:var(--inner);}
+
+/* relationship arrow */
+.rel-row{display:flex;align-items:center;gap:12px;margin-top:16px;padding:12px 16px;
+  background:rgba(59,130,246,0.05);border:1px solid rgba(59,130,246,0.15);border-radius:8px;
+  font-family:var(--mono);font-size:11px;color:var(--muted2);}
+.rel-arrow{color:var(--emp);font-size:18px;}
+
+/* ─── JOIN TABS ─── */
+.join-tabs{display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap;}
+.jtab{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 22px;border-radius:8px;cursor:pointer;
+  font-family:var(--display);font-size:13px;font-weight:700;
+  border:1px solid var(--border2);background:var(--s2);
+  color:var(--muted2);transition:all .2s;
+}
+.jtab:hover{color:var(--text);border-color:var(--muted);}
+.jtab.active-inner{background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.4);color:var(--inner);}
+.jtab.active-left {background:rgba(139,92,246,0.1);border-color:rgba(139,92,246,0.4);color:var(--left);}
+.jtab.active-right{background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.4);color:var(--right);}
+.jtab-dot{width:8px;height:8px;border-radius:50%;}
+
+/* ─── JOIN PANEL ─── */
+.join-panel{display:none;}
+.join-panel.active{display:block;}
+
+/* ─── VENN ─── */
+.venn-row{display:flex;align-items:center;gap:32px;margin-bottom:28px;flex-wrap:wrap;}
+.venn-svg-wrap{flex-shrink:0;}
+.venn-explain{flex:1;min-width:200px;}
+.ve-title{font-size:18px;font-weight:800;letter-spacing:-0.5px;margin-bottom:8px;}
+.ve-desc{font-size:13px;color:var(--muted2);line-height:1.7;margin-bottom:14px;font-weight:600;}
+.ve-sql{
+  background:rgba(0,0,0,0.3);border:1px solid var(--border2);border-radius:8px;
+  padding:14px 18px;font-family:var(--mono);font-size:12px;line-height:1.8;
+}
+.kw{color:var(--left);}
+.tbl1{color:var(--emp);}
+.tbl2{color:var(--dep);}
+.on-kw{color:var(--inner);}
+
+/* ─── ANIMATION AREA ─── */
+.anim-wrap{
+  background:var(--s2);border:1px solid var(--border2);border-radius:12px;
+  padding:24px;margin-bottom:20px;
+}
+.anim-title{font-family:var(--mono);font-size:11px;color:var(--muted2);margin-bottom:16px;letter-spacing:1px;}
+
+.anim-tables{display:grid;grid-template-columns:1fr 60px 1fr;gap:0;align-items:start;}
+@media(max-width:700px){.anim-tables{grid-template-columns:1fr;gap:12px;}}
+
+.anim-tbl{border:1px solid var(--border2);border-radius:8px;overflow:hidden;background:var(--s3);}
+.anim-tbl-head{
+  padding:8px 14px;font-family:var(--mono);font-size:10px;font-weight:700;
+  border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;
+}
+.anim-row{
+  display:grid;font-family:var(--mono);font-size:11px;
+  padding:5px 14px;border-bottom:1px solid rgba(26,35,64,0.5);
+  transition:all .25s;cursor:default;
+}
+.anim-row:last-child{border-bottom:none;}
+.anim-row.ar-active-emp{background:rgba(59,130,246,0.18);border-left:3px solid var(--emp);}
+.anim-row.ar-active-dep{background:rgba(245,158,11,0.18);border-left:3px solid var(--dep);}
+.anim-row.ar-match{background:rgba(16,185,129,0.18);border-left:3px solid var(--inner);}
+.anim-row.ar-nomatch{background:rgba(71,85,105,0.08);opacity:.45;}
+.anim-row.ar-include-null{background:rgba(139,92,246,0.1);border-left:3px solid var(--left);opacity:1!important;}
+
+.arrow-col{
+  display:flex;align-items:center;justify-content:center;
+  padding-top:40px;
+}
+.arrow-svg{transition:all .3s;}
+
+/* result table */
+.result-wrap{
+  background:var(--s3);border:1px solid var(--border2);border-radius:10px;overflow:hidden;
+}
+.result-head{
+  padding:10px 18px;font-family:var(--mono);font-size:11px;font-weight:700;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.result-body{overflow-x:auto;}
+.res-tbl{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px;}
+.res-tbl th{padding:7px 14px;color:var(--muted);font-size:10px;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border);text-align:left;background:rgba(0,0,0,0.2);}
+.res-tbl td{padding:6px 14px;border-bottom:1px solid rgba(26,35,64,0.5);}
+.res-tbl tr:last-child td{border-bottom:none;}
+.res-row{opacity:0;transform:translateY(4px);transition:opacity .3s,transform .3s;}
+.res-row.show{opacity:1;transform:translateY(0);}
+
+/* buttons */
+.btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:9px 22px;border-radius:8px;border:none;cursor:pointer;
+  font-family:var(--display);font-size:13px;font-weight:700;
+  transition:all .2s;
+}
+.btn-inner{background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.35);color:var(--inner);}
+.btn-inner:hover{background:rgba(16,185,129,0.22);box-shadow:0 0 16px rgba(16,185,129,0.2);}
+.btn-left{background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.35);color:var(--left);}
+.btn-left:hover{background:rgba(139,92,246,0.22);box-shadow:0 0 16px rgba(139,92,246,0.2);}
+.btn-right{background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.35);color:var(--right);}
+.btn-right:hover{background:rgba(239,68,68,0.22);box-shadow:0 0 16px rgba(239,68,68,0.2);}
+
+.anim-status{font-family:var(--mono);font-size:12px;color:var(--muted2);min-height:20px;margin-top:10px;}
+
+/* key insight cards */
+.insight-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:20px;}
+@media(max-width:760px){.insight-grid{grid-template-columns:1fr;}}
+.insight{background:var(--s2);border:1px solid var(--border2);border-radius:10px;padding:16px;}
+.ins-icon{font-size:22px;margin-bottom:8px;}
+.ins-title{font-size:13px;font-weight:800;margin-bottom:6px;}
+.ins-desc{font-size:12px;color:var(--muted2);line-height:1.6;font-weight:600;}
+
+/* null badge */
+.null-badge{
+  display:inline-block;padding:1px 8px;border-radius:3px;
+  background:rgba(71,85,105,0.2);border:1px solid rgba(71,85,105,0.3);
+  color:var(--null-c);font-family:var(--mono);font-size:10px;font-style:italic;
+}
+
+/* ─── SPEED CONTROLLER ─── */
+.speed-bar{
+  position:sticky;top:0;z-index:100;
+  background:rgba(6,8,15,0.92);
+  backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border2);
+  padding:14px 28px;
+  display:flex;align-items:center;gap:20px;flex-wrap:wrap;
+}
+.speed-label{
+  font-family:var(--mono);font-size:11px;color:var(--muted2);
+  letter-spacing:1px;white-space:nowrap;flex-shrink:0;
+}
+.speed-presets{display:flex;gap:6px;flex-wrap:wrap;}
+.speed-chip{
+  padding:5px 13px;border-radius:5px;cursor:pointer;
+  font-family:var(--mono);font-size:11px;font-weight:700;
+  background:var(--s2);border:1px solid var(--border2);
+  color:var(--muted2);transition:all .18s;white-space:nowrap;
+}
+.speed-chip:hover{color:var(--text);border-color:var(--muted);}
+.speed-chip.sc-active{background:rgba(59,130,246,0.12);border-color:rgba(59,130,246,0.4);color:var(--emp);}
+.speed-slider-wrap{display:flex;align-items:center;gap:10px;flex:1;min-width:180px;}
+.speed-slider{
+  -webkit-appearance:none;appearance:none;
+  flex:1;height:4px;border-radius:2px;outline:none;cursor:pointer;
+  background:linear-gradient(90deg,var(--emp) 0%,var(--border2) 0%);
+  border:none;
+}
+.speed-slider::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:16px;height:16px;border-radius:50%;
+  background:var(--emp);border:2px solid #fff;
+  box-shadow:0 0 8px rgba(59,130,246,0.5);cursor:pointer;
+}
+.speed-val{
+  font-family:var(--mono);font-size:12px;font-weight:700;
+  color:var(--emp);min-width:44px;text-align:right;white-space:nowrap;
+}
+.speed-hint{font-family:var(--mono);font-size:10px;color:var(--muted);white-space:nowrap;}
+
+/* summary compare */
+.summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+@media(max-width:760px){.summary-grid{grid-template-columns:1fr;}}
+.sum-card{border-radius:10px;overflow:hidden;}
+.sum-hdr{padding:12px 18px;font-size:14px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.sh-inner{background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);color:var(--inner);}
+.sh-left {background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.3);color:var(--left);}
+.sh-right{background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:var(--right);}
+.sum-body{background:var(--s2);}
+.sb-inner{border:1px solid rgba(16,185,129,0.2);border-top:none;border-radius:0 0 10px 10px;}
+.sb-left {border:1px solid rgba(139,92,246,0.2);border-top:none;border-radius:0 0 10px 10px;}
+.sb-right{border:1px solid rgba(239,68,68,0.2);border-top:none;border-radius:0 0 10px 10px;}
+.sum-row{display:flex;align-items:flex-start;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);}
+.sum-row:last-child{border-bottom:none;}
+.sr-em{font-size:15px;flex-shrink:0;margin-top:1px;}
+.sr-lbl{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:2px;}
+.sr-val{font-size:12px;font-weight:700;}
+</style>
+</head>
+<body>
+
+<!-- ── STICKY SPEED CONTROLLER ── -->
+<div class="speed-bar">
+  <span class="speed-label">⏱ ANIMATION SPEED</span>
+  <div class="speed-presets">
+    <div class="speed-chip" onclick="setSpeed(2000)" id="sp-slow">🐢 Slow (2s)</div>
+    <div class="speed-chip sc-active" onclick="setSpeed(900)" id="sp-normal">▶ Normal (0.9s)</div>
+    <div class="speed-chip" onclick="setSpeed(400)" id="sp-fast">⚡ Fast (0.4s)</div>
+    <div class="speed-chip" onclick="setSpeed(150)" id="sp-turbo">🚀 Turbo (0.15s)</div>
+  </div>
+  <div class="speed-slider-wrap">
+    <span class="speed-label" style="font-size:10px;">Custom:</span>
+    <input type="range" class="speed-slider" id="speedSlider" min="100" max="3000" value="900" step="50" oninput="onSliderChange(this.value)">
+    <span class="speed-val" id="speedValDisplay">0.9s</span>
+  </div>
+  <span class="speed-hint">per row step</span>
+</div>
+
+<div class="wrap">
+<header class="hdr">
+  <div class="hdr-pill"><div class="hdr-pill-dot"></div>SQL SERVER INTERNALS · JOINS</div>
+  <h1>
+    <span class="h1-join">SQL Server </span>
+    <span class="h1-vis">JOINs</span><br>
+    <span class="h1-join">Visualized</span>
+  </h1>
+  <p class="hdr-sub">INNER JOIN · LEFT JOIN · RIGHT JOIN — see every row match, live</p>
+</header>
+
+<!-- ══════════════════════════════
+     SECTION 1 — TABLE STRUCTURES
+══════════════════════════════ -->
+<div class="sec">
+  <div class="sec-hdr">
+    <div class="sec-num n1">01</div>
+    <div>
+      <div class="sec-title">Table Structures</div>
+      <div class="sec-sub">Two tables · One relationship · FK = DeptID</div>
+    </div>
+  </div>
+  <div class="card c-emp">
+
+    <!-- Schema -->
+    <div class="schema-2col" style="margin-bottom:24px;">
+      <!-- Employees -->
+      <div class="tbl-box">
+        <div class="tbl-head th-emp"><div class="th-dot td-emp-d"></div>dbo.Employees</div>
+        <table class="col-tbl">
+          <thead><tr><th>Column</th><th>Type</th><th>Key</th></tr></thead>
+          <tbody>
+            <tr><td class="c-name">EmpID</td><td class="c-type">INT</td><td><span class="badge b-pk">PK</span></td></tr>
+            <tr><td class="c-name">EmpName</td><td class="c-type">VARCHAR(50)</td><td>—</td></tr>
+            <tr><td class="c-name">DeptID</td><td class="c-type">INT</td><td><span class="badge b-fk">FK</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <!-- Departments -->
+      <div class="tbl-box">
+        <div class="tbl-head th-dep"><div class="th-dot td-dep-d"></div>dbo.Departments</div>
+        <table class="col-tbl">
+          <thead><tr><th>Column</th><th>Type</th><th>Key</th></tr></thead>
+          <tbody>
+            <tr><td class="c-name">DeptID</td><td class="c-type">INT</td><td><span class="badge b-pk">PK</span></td></tr>
+            <tr><td class="c-name">DeptName</td><td class="c-type">VARCHAR(50)</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Relationship -->
+    <div class="rel-row">
+      <span style="color:var(--emp);font-weight:700;font-family:var(--mono);">Employees.DeptID</span>
+      <span class="rel-arrow">──▶</span>
+      <span style="color:var(--dep);font-weight:700;font-family:var(--mono);">Departments.DeptID</span>
+      <span style="margin-left:8px;">· Many-to-One · Foreign Key relationship</span>
+    </div>
+
+    <!-- Actual Data -->
+    <div style="margin-top:24px;">
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;margin-bottom:12px;">ACTUAL DATA — intentionally designed so some rows DON'T match (to show JOIN differences)</div>
+      <div class="schema-2col">
+        <!-- Employees data -->
+        <div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--emp);margin-bottom:8px;letter-spacing:1px;">📋 Employees (6 rows)</div>
+          <div class="data-tbl-wrap">
+            <table class="data-tbl" id="empDataTable">
+              <thead><tr><th>EmpID</th><th>EmpName</th><th>DeptID</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <!-- Departments data -->
+        <div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--dep);margin-bottom:8px;letter-spacing:1px;">📋 Departments (5 rows)</div>
+          <div class="data-tbl-wrap">
+            <table class="data-tbl" id="depDataTable">
+              <thead><tr><th>DeptID</th><th>DeptName</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:16px;padding:12px 16px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.2);border-radius:8px;font-family:var(--mono);font-size:11px;color:#d4a017;line-height:1.7;">
+        ⚠️ <strong>Notice:</strong> Alice (DeptID=99) has NO matching department · DeptID 5 (Legal) has NO matching employee<br>
+        → These "unmatched" rows are what make INNER vs LEFT vs RIGHT JOIN behave differently!
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════
+     SECTION 2 — JOIN EXPLORER
+══════════════════════════════ -->
+<div class="sec">
+  <div class="sec-hdr">
+    <div class="sec-num n2">02</div>
+    <div>
+      <div class="sec-title">JOIN Explorer — Animate &amp; Compare</div>
+      <div class="sec-sub">Select a JOIN type · Watch every row match happen live</div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="join-tabs">
+    <div class="jtab active-inner" id="tab-inner" onclick="switchTab('inner')">
+      <div class="jtab-dot" style="background:var(--inner);box-shadow:0 0 8px var(--inner);"></div>
+      INNER JOIN
+    </div>
+    <div class="jtab" id="tab-left" onclick="switchTab('left')">
+      <div class="jtab-dot" style="background:var(--left);"></div>
+      LEFT JOIN
+    </div>
+    <div class="jtab" id="tab-right" onclick="switchTab('right')">
+      <div class="jtab-dot" style="background:var(--right);"></div>
+      RIGHT JOIN
+    </div>
+  </div>
+
+  <!-- ── INNER JOIN ── -->
+  <div class="join-panel active card c-inner" id="panel-inner">
+    <!-- Venn -->
+    <div class="venn-row">
+      <div class="venn-svg-wrap">
+        <svg width="200" height="120" viewBox="0 0 200 120">
+          <circle cx="70" cy="60" r="52" fill="rgba(59,130,246,0.15)" stroke="rgba(59,130,246,0.5)" stroke-width="2"/>
+          <circle cx="130" cy="60" r="52" fill="rgba(245,158,11,0.15)" stroke="rgba(245,158,11,0.5)" stroke-width="2"/>
+          <!-- intersection filled green -->
+          <clipPath id="ci1"><circle cx="130" cy="60" r="52"/></clipPath>
+          <circle cx="70" cy="60" r="52" fill="rgba(16,185,129,0.45)" clip-path="url(#ci1)"/>
+          <text x="45" y="64" text-anchor="middle" fill="rgba(59,130,246,0.7)" font-family="IBM Plex Mono" font-size="9">Emp</text>
+          <text x="155" y="64" text-anchor="middle" fill="rgba(245,158,11,0.7)" font-family="IBM Plex Mono" font-size="9">Dept</text>
+          <text x="100" y="64" text-anchor="middle" fill="#10b981" font-family="IBM Plex Mono" font-size="8" font-weight="700">MATCH</text>
+        </svg>
+      </div>
+      <div class="venn-explain">
+        <div class="ve-title" style="color:var(--inner);">INNER JOIN</div>
+        <div class="ve-desc">Returns ONLY rows where <strong>DeptID matches in BOTH tables</strong>. Unmatched rows from either side are completely excluded.</div>
+        <div class="ve-sql">
+          <span class="kw">SELECT</span> e.EmpID, e.EmpName, d.DeptName<br>
+          <span class="kw">FROM</span> <span class="tbl1">Employees</span> e<br>
+          &nbsp;&nbsp;<span class="kw" style="color:var(--inner);">INNER JOIN</span> <span class="tbl2">Departments</span> d<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;<span class="on-kw">ON</span> e.DeptID = d.DeptID;
+        </div>
+      </div>
+    </div>
+    <!-- Animation -->
+    <div class="anim-wrap">
+      <div class="anim-title">ROW-BY-ROW MATCHING — Employees.DeptID ↔ Departments.DeptID</div>
+      <div class="anim-tables">
+        <div class="anim-tbl" id="inn-emp-tbl"></div>
+        <div class="arrow-col">
+          <svg id="inn-arrow" class="arrow-svg" width="50" height="40" viewBox="0 0 50 40">
+            <line x1="5" y1="20" x2="38" y2="20" stroke="#1a2340" stroke-width="2"/>
+            <polygon points="38,14 50,20 38,26" fill="#1a2340" id="inn-arrowhead"/>
+          </svg>
+        </div>
+        <div class="anim-tbl" id="inn-dep-tbl"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap;">
+        <button class="btn btn-inner" onclick="animateJoin('inner')">▶ Animate INNER JOIN</button>
+        <div class="anim-status" id="inn-status">Press button to start animation</div>
+      </div>
+    </div>
+    <!-- Result -->
+    <div class="result-wrap">
+      <div class="result-head">
+        <span style="color:var(--inner);font-family:var(--mono);font-size:11px;font-weight:700;">✅ RESULT SET</span>
+        <span id="inn-count" style="font-family:var(--mono);font-size:11px;color:var(--muted);">— rows</span>
+      </div>
+      <div class="result-body">
+        <table class="res-tbl">
+          <thead><tr><th>EmpID</th><th>EmpName</th><th>DeptID</th><th>DeptName</th></tr></thead>
+          <tbody id="inn-result"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="insight-grid">
+      <div class="insight"><div class="ins-icon">🎯</div><div class="ins-title" style="color:var(--inner)">Only Matches</div><div class="ins-desc">Alice (DeptID=99) excluded. Legal dept excluded. Only 5 matched rows.</div></div>
+      <div class="ins-icon-wrap insight"><div class="ins-icon">⚡</div><div class="ins-title" style="color:var(--inner)">Most Selective</div><div class="ins-desc">Fewest rows returned. Best for strict data — when you need clean matched pairs only.</div></div>
+      <div class="insight"><div class="ins-icon">📊</div><div class="ins-title" style="color:var(--inner)">Use When</div><div class="ins-desc">Reporting dashboards, calculations, aggregations where NULLs would break results.</div></div>
+    </div>
+  </div>
+
+  <!-- ── LEFT JOIN ── -->
+  <div class="join-panel card c-left" id="panel-left" style="display:none;">
+    <div class="venn-row">
+      <div class="venn-svg-wrap">
+        <svg width="200" height="120" viewBox="0 0 200 120">
+          <circle cx="70" cy="60" r="52" fill="rgba(139,92,246,0.4)" stroke="rgba(139,92,246,0.7)" stroke-width="2"/>
+          <circle cx="130" cy="60" r="52" fill="rgba(245,158,11,0.1)" stroke="rgba(245,158,11,0.4)" stroke-width="2"/>
+          <clipPath id="cl1"><circle cx="130" cy="60" r="52"/></clipPath>
+          <circle cx="70" cy="60" r="52" fill="rgba(139,92,246,0.55)" clip-path="url(#cl1)"/>
+          <text x="45" y="64" text-anchor="middle" fill="rgba(139,92,246,0.9)" font-family="IBM Plex Mono" font-size="9" font-weight="700">ALL</text>
+          <text x="155" y="64" text-anchor="middle" fill="rgba(245,158,11,0.5)" font-family="IBM Plex Mono" font-size="9">Dept</text>
+          <text x="100" y="64" text-anchor="middle" fill="#fff" font-family="IBM Plex Mono" font-size="8">MATCH</text>
+        </svg>
+      </div>
+      <div class="venn-explain">
+        <div class="ve-title" style="color:var(--left);">LEFT JOIN</div>
+        <div class="ve-desc">Returns <strong>ALL rows from the LEFT table</strong> (Employees). If no matching department exists, right side columns are filled with <span class="null-badge">NULL</span>.</div>
+        <div class="ve-sql">
+          <span class="kw">SELECT</span> e.EmpID, e.EmpName, d.DeptName<br>
+          <span class="kw">FROM</span> <span class="tbl1">Employees</span> e<br>
+          &nbsp;&nbsp;<span class="kw" style="color:var(--left);">LEFT JOIN</span> <span class="tbl2">Departments</span> d<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;<span class="on-kw">ON</span> e.DeptID = d.DeptID;
+        </div>
+      </div>
+    </div>
+    <div class="anim-wrap">
+      <div class="anim-title">ROW-BY-ROW MATCHING — ALL Employees kept · Dept = NULL if no match</div>
+      <div class="anim-tables">
+        <div class="anim-tbl" id="left-emp-tbl"></div>
+        <div class="arrow-col">
+          <svg class="arrow-svg" width="50" height="40" viewBox="0 0 50 40">
+            <line x1="5" y1="20" x2="38" y2="20" stroke="#8b5cf6" stroke-width="2"/>
+            <polygon points="38,14 50,20 38,26" fill="#8b5cf6"/>
+          </svg>
+        </div>
+        <div class="anim-tbl" id="left-dep-tbl"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap;">
+        <button class="btn btn-left" onclick="animateJoin('left')">▶ Animate LEFT JOIN</button>
+        <div class="anim-status" id="left-status">Press button to start animation</div>
+      </div>
+    </div>
+    <div class="result-wrap">
+      <div class="result-head">
+        <span style="color:var(--left);font-family:var(--mono);font-size:11px;font-weight:700;">✅ RESULT SET</span>
+        <span id="left-count" style="font-family:var(--mono);font-size:11px;color:var(--muted);">— rows</span>
+      </div>
+      <div class="result-body">
+        <table class="res-tbl">
+          <thead><tr><th>EmpID</th><th>EmpName</th><th>DeptID</th><th>DeptName</th></tr></thead>
+          <tbody id="left-result"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="insight-grid">
+      <div class="insight"><div class="ins-icon">🔒</div><div class="ins-title" style="color:var(--left)">Left Always Wins</div><div class="ins-desc">ALL 6 employees appear. Alice (DeptID=99) is kept with DeptName = NULL. Legal dept dropped.</div></div>
+      <div class="insight"><div class="ins-icon">🕵️</div><div class="ins-title" style="color:var(--left)">Find Orphans</div><div class="ins-desc">Add WHERE d.DeptID IS NULL → finds employees with no department assigned.</div></div>
+      <div class="insight"><div class="ins-icon">📊</div><div class="ins-title" style="color:var(--left)">Use When</div><div class="ins-desc">Show all employees even if not assigned. Reports where every left-table row must appear.</div></div>
+    </div>
+  </div>
+
+  <!-- ── RIGHT JOIN ── -->
+  <div class="join-panel card c-right" id="panel-right" style="display:none;">
+    <div class="venn-row">
+      <div class="venn-svg-wrap">
+        <svg width="200" height="120" viewBox="0 0 200 120">
+          <circle cx="70" cy="60" r="52" fill="rgba(59,130,246,0.1)" stroke="rgba(59,130,246,0.4)" stroke-width="2"/>
+          <circle cx="130" cy="60" r="52" fill="rgba(239,68,68,0.4)" stroke="rgba(239,68,68,0.7)" stroke-width="2"/>
+          <clipPath id="cr1"><circle cx="70" cy="60" r="52"/></clipPath>
+          <circle cx="130" cy="60" r="52" fill="rgba(239,68,68,0.55)" clip-path="url(#cr1)"/>
+          <text x="45" y="64" text-anchor="middle" fill="rgba(59,130,246,0.5)" font-family="IBM Plex Mono" font-size="9">Emp</text>
+          <text x="155" y="64" text-anchor="middle" fill="rgba(239,68,68,0.9)" font-family="IBM Plex Mono" font-size="9" font-weight="700">ALL</text>
+          <text x="100" y="64" text-anchor="middle" fill="#fff" font-family="IBM Plex Mono" font-size="8">MATCH</text>
+        </svg>
+      </div>
+      <div class="venn-explain">
+        <div class="ve-title" style="color:var(--right);">RIGHT JOIN</div>
+        <div class="ve-desc">Returns <strong>ALL rows from the RIGHT table</strong> (Departments). If no matching employee exists, left side columns are filled with <span class="null-badge">NULL</span>.</div>
+        <div class="ve-sql">
+          <span class="kw">SELECT</span> e.EmpID, e.EmpName, d.DeptName<br>
+          <span class="kw">FROM</span> <span class="tbl1">Employees</span> e<br>
+          &nbsp;&nbsp;<span class="kw" style="color:var(--right);">RIGHT JOIN</span> <span class="tbl2">Departments</span> d<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;<span class="on-kw">ON</span> e.DeptID = d.DeptID;
+        </div>
+      </div>
+    </div>
+    <div class="anim-wrap">
+      <div class="anim-title">ROW-BY-ROW MATCHING — ALL Departments kept · Emp = NULL if no match</div>
+      <div class="anim-tables">
+        <div class="anim-tbl" id="right-emp-tbl"></div>
+        <div class="arrow-col">
+          <svg class="arrow-svg" width="50" height="40" viewBox="0 0 50 40">
+            <line x1="5" y1="20" x2="38" y2="20" stroke="#ef4444" stroke-width="2"/>
+            <polygon points="12,14 0,20 12,26" fill="#ef4444"/>
+          </svg>
+        </div>
+        <div class="anim-tbl" id="right-dep-tbl"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap;">
+        <button class="btn btn-right" onclick="animateJoin('right')">▶ Animate RIGHT JOIN</button>
+        <div class="anim-status" id="right-status">Press button to start animation</div>
+      </div>
+    </div>
+    <div class="result-wrap">
+      <div class="result-head">
+        <span style="color:var(--right);font-family:var(--mono);font-size:11px;font-weight:700;">✅ RESULT SET</span>
+        <span id="right-count" style="font-family:var(--mono);font-size:11px;color:var(--muted);">— rows</span>
+      </div>
+      <div class="result-body">
+        <table class="res-tbl">
+          <thead><tr><th>EmpID</th><th>EmpName</th><th>DeptID</th><th>DeptName</th></tr></thead>
+          <tbody id="right-result"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="insight-grid">
+      <div class="insight"><div class="ins-icon">🏢</div><div class="ins-title" style="color:var(--right)">Right Always Wins</div><div class="ins-desc">ALL 5 departments appear. Legal dept (no employee) is kept with EmpID/EmpName = NULL.</div></div>
+      <div class="insight"><div class="ins-icon">🔍</div><div class="ins-title" style="color:var(--right)">Find Empty Depts</div><div class="ins-desc">Add WHERE e.EmpID IS NULL → finds departments with zero employees assigned.</div></div>
+      <div class="insight"><div class="ins-icon">📊</div><div class="ins-title" style="color:var(--right)">Use When</div><div class="ins-desc">Audit all departments even with no staff. Any scenario where every right-table row must appear.</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════
+     SECTION 3 — QUICK COMPARISON
+══════════════════════════════ -->
+<div class="sec">
+  <div class="sec-hdr">
+    <div class="sec-num n1">03</div>
+    <div>
+      <div class="sec-title">Quick Comparison</div>
+      <div class="sec-sub">Same two tables · Three different answers</div>
+    </div>
+  </div>
+  <div class="card c-emp">
+    <div class="summary-grid">
+      <div class="sum-card">
+        <div class="sum-hdr sh-inner">🎯 INNER JOIN</div>
+        <div class="sum-body sb-inner">
+          <div class="sum-row"><div class="sr-em">📄</div><div><div class="sr-lbl">ROWS RETURNED</div><div class="sr-val" style="color:var(--inner)">5 rows</div></div></div>
+          <div class="sum-row"><div class="sr-em">❌</div><div><div class="sr-lbl">ALICE (DeptID=99)</div><div class="sr-val" style="color:var(--null-c)">Excluded</div></div></div>
+          <div class="sum-row"><div class="sr-em">❌</div><div><div class="sr-lbl">LEGAL DEPT</div><div class="sr-val" style="color:var(--null-c)">Excluded</div></div></div>
+          <div class="sum-row"><div class="sr-em">🔑</div><div><div class="sr-lbl">RULE</div><div class="sr-val">Match in BOTH tables</div></div></div>
+        </div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-hdr sh-left">🔵 LEFT JOIN</div>
+        <div class="sum-body sb-left">
+          <div class="sum-row"><div class="sr-em">📄</div><div><div class="sr-lbl">ROWS RETURNED</div><div class="sr-val" style="color:var(--left)">6 rows</div></div></div>
+          <div class="sum-row"><div class="sr-em">✅</div><div><div class="sr-lbl">ALICE (DeptID=99)</div><div class="sr-val" style="color:var(--left)">Included (NULL dept)</div></div></div>
+          <div class="sum-row"><div class="sr-em">❌</div><div><div class="sr-lbl">LEGAL DEPT</div><div class="sr-val" style="color:var(--null-c)">Excluded</div></div></div>
+          <div class="sum-row"><div class="sr-em">🔑</div><div><div class="sr-lbl">RULE</div><div class="sr-val">ALL left rows kept</div></div></div>
+        </div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-hdr sh-right">🔴 RIGHT JOIN</div>
+        <div class="sum-body sb-right">
+          <div class="sum-row"><div class="sr-em">📄</div><div><div class="sr-lbl">ROWS RETURNED</div><div class="sr-val" style="color:var(--right)">6 rows</div></div></div>
+          <div class="sum-row"><div class="sr-em">❌</div><div><div class="sr-lbl">ALICE (DeptID=99)</div><div class="sr-val" style="color:var(--null-c)">Excluded</div></div></div>
+          <div class="sum-row"><div class="sr-em">✅</div><div><div class="sr-lbl">LEGAL DEPT</div><div class="sr-val" style="color:var(--right)">Included (NULL emp)</div></div></div>
+          <div class="sum-row"><div class="sr-em">🔑</div><div><div class="sr-lbl">RULE</div><div class="sr-val">ALL right rows kept</div></div></div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:20px;padding:14px 18px;background:rgba(16,185,129,0.05);border:1px solid rgba(16,185,129,0.2);border-radius:8px;font-family:var(--mono);font-size:11px;color:#10b981;line-height:1.8;">
+      💡 <strong>Pro tip:</strong> Any RIGHT JOIN can be rewritten as a LEFT JOIN by swapping the table order.<br>
+      <span style="color:var(--muted2);">RIGHT JOIN is rarely used in practice — most developers prefer LEFT JOIN for readability.</span>
+    </div>
+  </div>
+</div>
+
+</div>
+
+
+<script>
+// ══════════════════════════════════════════
+// DATA
+// ══════════════════════════════════════════
+const EMPS = [
+  {EmpID:1, EmpName:'Alice',  DeptID:99},  // intentionally no matching dept
+  {EmpID:2, EmpName:'Bob',    DeptID:1},
+  {EmpID:3, EmpName:'Carol',  DeptID:2},
+  {EmpID:4, EmpName:'David',  DeptID:3},
+  {EmpID:5, EmpName:'Eva',    DeptID:4},
+  {EmpID:6, EmpName:'Frank',  DeptID:1},
+];
+const DEPTS = [
+  {DeptID:1, DeptName:'Engineering'},
+  {DeptID:2, DeptName:'Marketing'},
+  {DeptID:3, DeptName:'HR'},
+  {DeptID:4, DeptName:'Finance'},
+  {DeptID:5, DeptName:'Legal'},  // intentionally no matching employee
+];
+
+// ══════════════════════════════════════════
+// SPEED CONTROLLER
+// ══════════════════════════════════════════
+let STEP_MS = 900;
+
+function setSpeed(ms) {
+  STEP_MS = ms;
+  document.getElementById('speedSlider').value = ms;
+  updateSliderDisplay(ms);
+  ['sp-slow','sp-normal','sp-fast','sp-turbo'].forEach(id=>
+    document.getElementById(id).classList.remove('sc-active')
+  );
+  const map = {2000:'sp-slow',900:'sp-normal',400:'sp-fast',150:'sp-turbo'};
+  if (map[ms]) document.getElementById(map[ms]).classList.add('sc-active');
+}
+
+function onSliderChange(val) {
+  STEP_MS = parseInt(val);
+  updateSliderDisplay(STEP_MS);
+  ['sp-slow','sp-normal','sp-fast','sp-turbo'].forEach(id=>
+    document.getElementById(id).classList.remove('sc-active')
+  );
+  // update slider fill
+  const pct = ((STEP_MS - 100) / (3000 - 100)) * 100;
+  document.getElementById('speedSlider').style.background =
+    `linear-gradient(90deg, var(--emp) ${pct}%, var(--border2) ${pct}%)`;
+}
+
+function updateSliderDisplay(ms) {
+  document.getElementById('speedValDisplay').textContent = (ms/1000).toFixed(2).replace(/\.?0+$/,'') + 's';
+  const pct = ((ms - 100) / (3000 - 100)) * 100;
+  document.getElementById('speedSlider').style.background =
+    `linear-gradient(90deg, var(--emp) ${pct}%, var(--border2) ${pct}%)`;
+}
+
+// ══════════════════════════════════════════
+// JOIN LOGIC
+// ══════════════════════════════════════════
+function innerJoin() {
+  const res = [];
+  EMPS.forEach(e => {
+    const d = DEPTS.find(d => d.DeptID === e.DeptID);
+    if (d) res.push({EmpID:e.EmpID, EmpName:e.EmpName, DeptID:d.DeptID, DeptName:d.DeptName});
+  });
+  return res;
+}
+function leftJoin() {
+  return EMPS.map(e => {
+    const d = DEPTS.find(d => d.DeptID === e.DeptID);
+    return {EmpID:e.EmpID, EmpName:e.EmpName, DeptID:d?d.DeptID:null, DeptName:d?d.DeptName:null};
+  });
+}
+function rightJoin() {
+  const res = [];
+  DEPTS.forEach(d => {
+    const matched = EMPS.filter(e => e.DeptID === d.DeptID);
+    if (matched.length) {
+      matched.forEach(e => res.push({EmpID:e.EmpID, EmpName:e.EmpName, DeptID:d.DeptID, DeptName:d.DeptName}));
+    } else {
+      res.push({EmpID:null, EmpName:null, DeptID:d.DeptID, DeptName:d.DeptName});
+    }
+  });
+  return res;
+}
+
+// ══════════════════════════════════════════
+// SCHEMA TABLE RENDER
+// ══════════════════════════════════════════
+function renderSchemaTables() {
+  const empTb = document.querySelector('#empDataTable tbody');
+  const depTb = document.querySelector('#depDataTable tbody');
+  EMPS.forEach(e => {
+    const tr = document.createElement('tr');
+    const matched = DEPTS.find(d => d.DeptID === e.DeptID);
+    tr.innerHTML = `<td class="v-emp">${e.EmpID}</td><td>${e.EmpName}</td>
+      <td class="${matched?'v-dep':'v-null'}">${e.DeptID}${!matched?' ⚠️':''}</td>`;
+    empTb.appendChild(tr);
+  });
+  DEPTS.forEach(d => {
+    const tr = document.createElement('tr');
+    const hasEmp = EMPS.some(e => e.DeptID === d.DeptID);
+    tr.innerHTML = `<td class="v-dep">${d.DeptID}</td><td>${d.DeptName}${!hasEmp?' ⚠️':''}</td>`;
+    depTb.appendChild(tr);
+  });
+}
+
+// ══════════════════════════════════════════
+// BUILD ANIMATION ROW TABLES
+// ══════════════════════════════════════════
+function buildAnimTbl(containerId, rows, side) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const isEmp = side === 'emp';
+  const color = isEmp ? 'var(--emp)' : 'var(--dep)';
+  const bg    = isEmp ? 'rgba(59,130,246,0.08)' : 'rgba(245,158,11,0.08)';
+  const label = isEmp ? '📋 Employees' : '📋 Departments';
+  el.innerHTML = `<div class="anim-tbl-head" style="background:${bg};color:${color};border-bottom:1px solid var(--border);">${label}</div>`;
+  rows.forEach(row => {
+    const div = document.createElement('div');
+    div.className = 'anim-row';
+    div.id = `${containerId}--${isEmp ? row.EmpID : row.DeptID}`;
+    div.style.display = 'grid';
+    div.style.gridTemplateColumns = '40px 1fr 60px';
+    const idVal  = isEmp ? row.EmpID   : row.DeptID;
+    const name   = isEmp ? row.EmpName : row.DeptName;
+    const keyVal = isEmp ? row.DeptID  : row.DeptID;
+    div.innerHTML = `
+      <span style="color:${color}">${idVal}</span>
+      <span style="color:var(--text)">${name}</span>
+      <span style="color:var(--dep)">${keyVal}</span>`;
+    el.appendChild(div);
+  });
+}
+
+function buildAllAnimTables() {
+  ['inn','left','right'].forEach(pfx => {
+    buildAnimTbl(`${pfx}-emp-tbl`, EMPS,  'emp');
+    buildAnimTbl(`${pfx}-dep-tbl`, DEPTS, 'dep');
+  });
+}
+
+// ══════════════════════════════════════════
+// RESULT TABLE RENDER
+// ══════════════════════════════════════════
+function renderResult(tbodyId, rows, countId) {
+  const tbody   = document.getElementById(tbodyId);
+  const countEl = document.getElementById(countId);
+  tbody.innerHTML = '';
+  countEl.textContent = `${rows.length} row(s) returned`;
+  rows.forEach((r, i) => {
+    const tr = document.createElement('tr');
+    tr.className = 'res-row';
+    tr.id = `res-${tbodyId}-${i}`;
+    const cell = (val, cls) => val != null
+      ? `<td class="${cls}">${val}</td>`
+      : `<td><span class="null-badge">NULL</span></td>`;
+    tr.innerHTML =
+      cell(r.EmpID,   'v-emp') +
+      cell(r.EmpName, '') +
+      cell(r.DeptID,  'v-dep') +
+      cell(r.DeptName,'v-dep');
+    tbody.appendChild(tr);
+  });
+}
+
+function showResultRows(tbodyId, count) {
+  for (let i = 0; i < count; i++) {
+    const el = document.getElementById(`res-${tbodyId}-${i}`);
+    if (el) el.classList.add('show');
+  }
+}
+
+// ══════════════════════════════════════════
+// TABS
+// ══════════════════════════════════════════
+function switchTab(type) {
+  ['inner','left','right'].forEach(t => {
+    document.getElementById(`tab-${t}`).className = 'jtab';
+    document.getElementById(`panel-${t}`).style.display = 'none';
+  });
+  document.getElementById(`tab-${type}`).className = `jtab active-${type}`;
+  document.getElementById(`panel-${type}`).style.display = 'block';
+}
+
+// ══════════════════════════════════════════
+// ANIMATION ENGINE — FULLY FIXED
+// ══════════════════════════════════════════
+const running = {inner:false, left:false, right:false};
+
+function resetAnim(type) {
+  // Reset all row highlights
+  document.querySelectorAll(`[id^="inn-emp-tbl--"],[id^="inn-dep-tbl--"],
+    [id^="left-emp-tbl--"],[id^="left-dep-tbl--"],
+    [id^="right-emp-tbl--"],[id^="right-dep-tbl--"]`).forEach(el => {
+    el.className = 'anim-row';
+  });
+}
+
+async function animateJoin(type) {
+  if (running[type]) return;
+  running[type] = true;
+
+  const pfx      = type;
+  const statusEl = document.getElementById(`${pfx}-status`);
+  const color    = type==='inner' ? 'var(--inner)' : type==='left' ? 'var(--left)' : 'var(--right)';
+
+  // Full reset
+  resetAnim(type);
+  document.getElementById(`${pfx}-result`).innerHTML = '';
+  document.getElementById(`${pfx}-count`).textContent = '— rows';
+  statusEl.style.color = 'var(--muted2)';
+
+  const T1 = Math.round(STEP_MS * 0.5);  // pause after highlighting driving row
+  const T2 = Math.round(STEP_MS * 0.5);  // pause after match decision
+
+  // For INNER and LEFT: drive = EMPS, lookup = DEPTS
+  // For RIGHT:          drive = DEPTS, lookup = EMPS
+  const driveIsEmp = (type !== 'right');
+  const driveData  = driveIsEmp ? EMPS  : DEPTS;
+  const lookupData = driveIsEmp ? DEPTS : EMPS;
+
+  const drivePfx  = `${pfx}-${driveIsEmp  ? 'emp' : 'dep'}-tbl--`;
+  const lookupPfx = `${pfx}-${driveIsEmp  ? 'dep' : 'emp'}-tbl--`;
+
+  const resAccum = [];
+
+  for (let i = 0; i < driveData.length; i++) {
+    const dr    = driveData[i];
+    const drId  = driveIsEmp ? dr.EmpID  : dr.DeptID;
+    const drKey = dr.DeptID;  // always the join key
+
+    // 1) Highlight the current driving row
+    const drEl = document.getElementById(`${drivePfx}${drId}`);
+    if (drEl) drEl.className = `anim-row ${driveIsEmp ? 'ar-active-emp' : 'ar-active-dep'}`;
+
+    statusEl.textContent = `🔍 Row ${i+1}/${driveData.length} — ${driveIsEmp?'Emp':'Dept'} #${drId} · DeptID = ${drKey} · scanning right table...`;
+    await sleep(T1);
+
+    // 2) Find match in lookup table
+    const matchRow = lookupData.find(r => r.DeptID === drKey);
+    const matchId  = matchRow ? (driveIsEmp ? matchRow.DeptID : matchRow.EmpID) : null;
+    const matchEl  = matchId != null ? document.getElementById(`${lookupPfx}${matchId}`) : null;
+
+    if (matchRow && matchEl) {
+      // ── MATCH FOUND ──
+      matchEl.className = 'anim-row ar-match';
+      if (drEl) drEl.className = 'anim-row ar-match';
+      statusEl.innerHTML = `<span style="color:var(--inner)">✅ MATCH! DeptID ${drKey} → ${driveIsEmp ? matchRow.DeptName : matchRow.EmpName} · Row added to result</span>`;
+
+      // For RIGHT JOIN with multiple employees per dept, add all
+      if (type === 'right') {
+        const allEmpMatches = EMPS.filter(e => e.DeptID === drKey);
+        allEmpMatches.forEach(e => {
+          resAccum.push({EmpID:e.EmpID, EmpName:e.EmpName, DeptID:dr.DeptID, DeptName:dr.DeptName});
+        });
+      } else {
+        // INNER / LEFT — add this employee's matched row
+        resAccum.push({EmpID:dr.EmpID, EmpName:dr.EmpName, DeptID:matchRow.DeptID, DeptName:matchRow.DeptName});
+      }
+    } else {
+      // ── NO MATCH ──
+      if (type === 'inner') {
+        if (drEl) drEl.className = 'anim-row ar-nomatch';
+        statusEl.innerHTML = `<span style="color:var(--null-c)">❌ No dept with DeptID=${drKey} — Row EXCLUDED from INNER JOIN result</span>`;
+      } else {
+        // LEFT or RIGHT — keep with NULL
+        if (drEl) drEl.className = 'anim-row ar-include-null';
+        statusEl.innerHTML = `<span style="color:${color}">⚠️ No match for DeptID=${drKey} — Row KEPT with <span style="font-style:italic;color:var(--null-c)">NULL</span> (${type.toUpperCase()} JOIN)</span>`;
+        if (type === 'left') {
+          resAccum.push({EmpID:dr.EmpID, EmpName:dr.EmpName, DeptID:null, DeptName:null});
+        } else {
+          resAccum.push({EmpID:null, EmpName:null, DeptID:dr.DeptID, DeptName:dr.DeptName});
+        }
+      }
+    }
+
+    // 3) Update result table live
+    renderResult(`${pfx}-result`, resAccum, `${pfx}-count`);
+    await sleep(80);
+    showResultRows(`${pfx}-result`, resAccum.length);
+
+    await sleep(T2);
+  }
+
+  statusEl.innerHTML = `<span style="color:${color}">🎉 ${type.toUpperCase()} JOIN complete! <strong>${resAccum.length}</strong> row(s) in result set.</span>`;
+  running[type] = false;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ══════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════
+renderSchemaTables();
+buildAllAnimTables();
+
+// Pre-fill all result tables immediately
+renderResult('inn-result',   innerJoin(), 'inn-count');
+renderResult('left-result',  leftJoin(),  'left-count');
+renderResult('right-result', rightJoin(), 'right-count');
+setTimeout(() => {
+  document.querySelectorAll('.res-row').forEach((el, i) => {
+    setTimeout(() => el.classList.add('show'), i * 55);
+  });
+}, 300);
+
+// Init slider display
+updateSliderDisplay(STEP_MS);
+</script>
+</div><!-- /wrap -->
+</body>
+</html>

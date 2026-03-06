@@ -22,6 +22,292 @@
 =================================================================================
 */
 
+
+
+/* =================================================================================================
+SECTION 1 — WHAT IS AN INDEX?
+----------------------------------------------------------------------------------------------------
+An Index is a database object that improves the speed of data retrieval operations on a table.
+
+Without Index:
+    SQL Server performs a TABLE SCAN (reads the entire table).
+
+With Index:
+    SQL Server performs an INDEX SEEK (directly finds required rows).
+
+Real Life Example:
+    Think about a BOOK.
+    If you want to find "SQL Server" in a 500-page book:
+
+    Without index → read page by page.
+    With index → go to index page → jump to the correct page instantly.
+
+This is exactly how database indexing works.
+================================================================================================= */
+
+
+/* =================================================================================================
+SECTION 2 — HOW INDEX STRUCTURE WORKS (B-TREE STRUCTURE)
+----------------------------------------------------------------------------------------------------
+
+SQL Server uses a B-Tree structure for indexes.
+
+Structure:
+
+        Root Node
+            ↓
+     Intermediate Nodes
+            ↓
+        Leaf Nodes
+
+Root Node:
+    Entry point of the index.
+
+Intermediate Nodes:
+    Helps navigate to correct data location.
+
+Leaf Nodes:
+    Clustered Index → contains actual data rows
+    Non‑Clustered Index → contains key + pointer to data
+
+This structure allows SQL Server to locate rows very quickly.
+================================================================================================= */
+
+
+/* =================================================================================================
+SECTION 3 — INDEX STORAGE TYPES
+----------------------------------------------------------------------------------------------------
+
+SQL Server mainly uses two storage types.
+
+1. ROWSTORE INDEX
+   Data stored row-by-row.
+
+   Example:
+
+   ID | Name  | Salary
+   --------------------
+   1  | John  | 50000
+   2  | Maria | 60000
+
+
+2. COLUMNSTORE INDEX
+   Data stored column-by-column.
+
+   ID Column:
+   1
+   2
+
+   Name Column:
+   John
+   Maria
+
+Columnstore indexes are used mainly for analytics and reporting systems.
+================================================================================================= */
+
+
+/* =================================================================================================
+SECTION 4 — CLUSTERED INDEX (Structure)
+----------------------------------------------------------------------------------------------------
+
+Definition:
+A Clustered Index sorts and stores the actual table data based on the index key.
+
+Important Rule:
+    Only ONE clustered index per table.
+
+Why?
+    Because the table rows themselves are stored in sorted order.
+
+Example:
+================================================================================================= */
+
+CREATE CLUSTERED INDEX IX_Employees_EmployeeID
+ON Employees(EmployeeID);
+GO
+
+
+/* Example Table After Clustered Index */
+
+-- EmployeeID | Name
+-- 1          | John
+-- 2          | Maria
+-- 3          | David
+
+/* Leaf nodes contain the actual table data */
+
+
+/* =================================================================================================
+SECTION 5 — NON-CLUSTERED INDEX (Structure)
+----------------------------------------------------------------------------------------------------
+
+Definition:
+A Non-Clustered Index is a separate structure that stores:
+
+    Index Key + Pointer to actual row
+
+Example:
+================================================================================================= */
+
+CREATE NONCLUSTERED INDEX IX_Employees_Department
+ON Employees(Department);
+GO
+
+/* Example Structure */
+
+-- Department | Row Pointer
+-- HR         | Row 2
+-- IT         | Row 1
+-- IT         | Row 3
+
+/* SQL Server first finds the row in index then fetches actual data */
+
+
+/* =================================================================================================
+SECTION 6 — COLUMNSTORE INDEX   (Storage)
+----------------------------------------------------------------------------------------------------
+
+Used for data warehouse / analytics queries.
+
+Instead of storing rows:
+
+Row Storage:
+1 John 50000
+2 Maria 60000
+
+Column Storage:
+
+ID column
+1
+2
+
+Name column
+John
+Maria
+
+Salary column
+50000
+60000
+================================================================================================= */
+
+CREATE CLUSTERED COLUMNSTORE INDEX IX_Sales_ColumnStore
+ON Sales;
+GO
+
+
+/* =================================================================================================
+SECTION 7 — OTHER IMPORTANT INDEX TYPES
+----------------------------------------------------------------------------------------------------
+
+1. COMPOSITE INDEX
+   Index on multiple columns
+================================================================================================= */
+
+CREATE INDEX IX_Orders_Customer_OrderDate
+ON Orders(CustomerID, OrderDate);
+GO
+
+
+/* UNIQUE INDEX
+Ensures column values are unique */
+
+CREATE UNIQUE INDEX IX_Users_Email
+ON Users(Email);
+GO
+
+
+/* FILTERED INDEX
+Index only part of a table */
+
+CREATE INDEX IX_Users_Active
+ON Users(Status)
+WHERE Status = 'Active';
+GO
+
+
+/* =================================================================================================
+SECTION 8 — FUNCTIONS OF INDEXES
+----------------------------------------------------------------------------------------------------
+
+Indexes improve performance of:
+
+1. WHERE clause
+2. JOIN operations
+3. ORDER BY
+4. GROUP BY
+
+Example:
+================================================================================================= */
+
+SELECT *
+FROM Employees
+WHERE EmployeeID = 10;
+GO
+
+
+/* =================================================================================================
+SECTION 9 — REAL TIME EXAMPLE (E-COMMERCE SYSTEM)
+----------------------------------------------------------------------------------------------------
+
+Table:
+Orders
+
+Query used thousands of times:
+
+SELECT *
+FROM Orders
+WHERE CustomerID = 100
+
+To improve performance we create index:
+================================================================================================= */
+
+CREATE INDEX IX_Orders_CustomerID
+ON Orders(CustomerID);
+GO
+
+
+/* =================================================================================================
+SECTION 10 — WHEN NOT TO USE INDEXES
+----------------------------------------------------------------------------------------------------
+
+Avoid indexes on:
+
+• Small tables
+• Frequently updated columns
+• Low cardinality columns (Gender, Status)
+
+Because indexes slow down:
+
+INSERT
+UPDATE
+DELETE
+
+SQL Server must update indexes whenever table data changes.
+================================================================================================= */
+
+
+/* =================================================================================================
+SECTION 11 — PERFORMANCE ANALYSIS
+----------------------------------------------------------------------------------------------------
+
+Use Execution Plan in SQL Server Management Studio.
+
+Good Plan:
+    INDEX SEEK
+
+Bad Plan:
+    TABLE SCAN
+
+You can also use:
+
+SET STATISTICS IO ON
+SET STATISTICS TIME ON
+
+to analyze query performance.
+================================================================================================= */
+
+
+
 /* ==============================================================================
    Clustered and Non-Clustered Indexes
 ============================================================================== */

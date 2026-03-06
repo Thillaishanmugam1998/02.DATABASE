@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL Server Storage – Heap & B-Tree</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0d14;
+    --surface: #111520;
+    --surface2: #161c2e;
+    --border: #1e2740;
+    --accent: #00d4ff;
+    --accent2: #ff6b35;
+    --accent3: #7c3aed;
+    --green: #00e676;
+    --yellow: #ffd600;
+    --red: #ff4444;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --page-bg: #1a2035;
+    --page-border: #2a3a5c;
+    --row-odd: #141927;
+    --row-even: #1a2235;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* BACKGROUND GRID */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  /* HEADER */
+  header {
+    text-align: center;
+    margin-bottom: 60px;
+  }
+
+  .badge {
+    display: inline-block;
+    background: rgba(0,212,255,0.1);
+    border: 1px solid rgba(0,212,255,0.3);
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding: 6px 16px;
+    border-radius: 2px;
+    margin-bottom: 20px;
+  }
+
+  h1 {
+    font-size: clamp(28px, 5vw, 52px);
+    font-weight: 800;
+    line-height: 1.1;
+    background: linear-gradient(135deg, #fff 0%, var(--accent) 50%, var(--accent3) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 16px;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 16px;
+    font-weight: 400;
+  }
+
+  /* SECTION HEADERS */
+  .section-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  .section-num {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .num-heap { background: rgba(255,107,53,0.15); color: var(--accent2); border: 1px solid rgba(255,107,53,0.3); }
+  .num-btree { background: rgba(124,58,237,0.15); color: var(--accent3); border: 1px solid rgba(124,58,237,0.3); }
+  .num-compare { background: rgba(0,230,118,0.15); color: var(--green); border: 1px solid rgba(0,230,118,0.3); }
+
+  .section-title {
+    font-size: 22px;
+    font-weight: 700;
+  }
+
+  .section-sub {
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 400;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* CARD */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px;
+    margin-bottom: 40px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+  }
+
+  .card-heap::before { background: linear-gradient(90deg, transparent, var(--accent2), transparent); }
+  .card-btree::before { background: linear-gradient(90deg, transparent, var(--accent3), transparent); }
+  .card-compare::before { background: linear-gradient(90deg, transparent, var(--green), transparent); }
+
+  /* ========================
+     HEAP SECTION
+  ======================== */
+
+  .heap-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 32px;
+  }
+
+  @media (max-width: 768px) {
+    .heap-layout { grid-template-columns: 1fr; }
+  }
+
+  .mdf-box {
+    background: var(--surface2);
+    border: 1px dashed var(--page-border);
+    border-radius: 8px;
+    padding: 20px;
+  }
+
+  .mdf-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .mdf-title::before {
+    content: '';
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    flex-shrink: 0;
+  }
+
+  .page-type-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .page-type {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+
+  .page-type-data { background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.2); }
+  .page-type-index { background: rgba(124,58,237,0.08); border: 1px solid rgba(124,58,237,0.2); }
+  .page-type-meta { background: rgba(255,214,0,0.08); border: 1px solid rgba(255,214,0,0.2); }
+
+  .pt-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .pt-dot-data { background: var(--accent); }
+  .pt-dot-index { background: var(--accent3); }
+  .pt-dot-meta { background: var(--yellow); }
+
+  /* DATA PAGE VISUAL */
+  .page-header-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 12px;
+    letter-spacing: 1px;
+  }
+
+  .data-page {
+    border: 1px solid var(--page-border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--page-bg);
+  }
+
+  .dp-header {
+    background: linear-gradient(135deg, rgba(0,212,255,0.15), rgba(0,212,255,0.05));
+    border-bottom: 1px solid var(--page-border);
+    padding: 10px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .dp-header-title { color: var(--accent); font-weight: 700; }
+  .dp-header-info { color: var(--muted); }
+
+  .dp-rows {
+    padding: 0;
+  }
+
+  .dp-row {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    border-bottom: 1px solid rgba(30,39,64,0.5);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    transition: background 0.15s;
+    cursor: default;
+  }
+
+  .dp-row:last-child { border-bottom: none; }
+
+  .dp-row:hover { background: rgba(0,212,255,0.05); }
+
+  .dp-row.highlight {
+    background: rgba(0,230,118,0.12) !important;
+    border-left: 3px solid var(--green);
+  }
+
+  .dp-col-id {
+    padding: 7px 16px;
+    color: var(--yellow);
+    border-right: 1px solid rgba(30,39,64,0.5);
+    background: rgba(0,0,0,0.1);
+  }
+
+  .dp-col-name {
+    padding: 7px 16px;
+    color: var(--text);
+  }
+
+  .dp-col-header {
+    color: var(--muted) !important;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    background: rgba(0,0,0,0.2) !important;
+  }
+
+  .dp-slot {
+    background: rgba(255,107,53,0.08);
+    border-top: 1px solid var(--page-border);
+    padding: 8px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--accent2);
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .slot-item {
+    background: rgba(255,107,53,0.15);
+    border: 1px solid rgba(255,107,53,0.2);
+    padding: 2px 8px;
+    border-radius: 3px;
+  }
+
+  /* SCAN ANIMATION */
+  .scan-demo {
+    margin-top: 24px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+  }
+
+  .scan-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--accent2);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .scan-row-track {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+
+  .scan-cell {
+    width: 38px;
+    height: 32px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    transition: all 0.3s;
+    cursor: pointer;
+  }
+
+  .scan-cell.scanning {
+    background: rgba(255,214,0,0.15);
+    border-color: var(--yellow);
+    color: var(--yellow);
+    box-shadow: 0 0 8px rgba(255,214,0,0.3);
+  }
+
+  .scan-cell.found {
+    background: rgba(0,230,118,0.2);
+    border-color: var(--green);
+    color: var(--green);
+    box-shadow: 0 0 12px rgba(0,230,118,0.4);
+    font-weight: 700;
+  }
+
+  .scan-cell.passed {
+    background: rgba(255,68,68,0.08);
+    border-color: rgba(255,68,68,0.2);
+    color: rgba(255,68,68,0.5);
+  }
+
+  .scan-status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    min-height: 20px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 20px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    transition: all 0.2s;
+    margin-top: 12px;
+  }
+
+  .btn-heap {
+    background: rgba(255,107,53,0.15);
+    border: 1px solid rgba(255,107,53,0.3);
+    color: var(--accent2);
+  }
+
+  .btn-heap:hover {
+    background: rgba(255,107,53,0.25);
+    box-shadow: 0 0 16px rgba(255,107,53,0.2);
+  }
+
+  .btn-btree {
+    background: rgba(124,58,237,0.15);
+    border: 1px solid rgba(124,58,237,0.3);
+    color: var(--accent3);
+  }
+
+  .btn-btree:hover {
+    background: rgba(124,58,237,0.25);
+    box-shadow: 0 0 16px rgba(124,58,237,0.2);
+  }
+
+  /* ========================
+     B-TREE SECTION
+  ======================== */
+
+  .btree-svg-wrap {
+    overflow-x: auto;
+    padding: 20px 0;
+  }
+
+  svg.btree {
+    display: block;
+    margin: 0 auto;
+    max-width: 100%;
+  }
+
+  /* B-TREE SEEK DEMO */
+  .seek-demo {
+    margin-top: 24px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+  }
+
+  .seek-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 16px 0;
+  }
+
+  .seek-step {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    opacity: 0.3;
+    transition: all 0.4s;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+  }
+
+  .seek-step.active {
+    opacity: 1;
+    border-color: var(--accent3);
+    background: rgba(124,58,237,0.08);
+    box-shadow: 0 0 12px rgba(124,58,237,0.15);
+  }
+
+  .seek-step.done {
+    opacity: 0.7;
+    border-color: rgba(0,230,118,0.3);
+    background: rgba(0,230,118,0.05);
+  }
+
+  .seek-step.found-step {
+    opacity: 1;
+    border-color: var(--green);
+    background: rgba(0,230,118,0.1);
+    box-shadow: 0 0 16px rgba(0,230,118,0.2);
+    color: var(--green);
+  }
+
+  .step-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  .icon-root { background: rgba(0,212,255,0.15); color: var(--accent); border: 1px solid rgba(0,212,255,0.3); }
+  .icon-mid { background: rgba(124,58,237,0.15); color: var(--accent3); border: 1px solid rgba(124,58,237,0.3); }
+  .icon-leaf { background: rgba(255,214,0,0.15); color: var(--yellow); border: 1px solid rgba(255,214,0,0.3); }
+  .icon-found { background: rgba(0,230,118,0.15); color: var(--green); border: 1px solid rgba(0,230,118,0.3); }
+
+  /* ========================
+     COMPARE SECTION
+  ======================== */
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  @media (max-width: 600px) {
+    .compare-grid { grid-template-columns: 1fr; }
+  }
+
+  .compare-col {
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .compare-header {
+    padding: 14px 20px;
+    font-size: 14px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .cmp-heap-hdr { background: rgba(255,107,53,0.15); border: 1px solid rgba(255,107,53,0.3); color: var(--accent2); border-bottom: none; }
+  .cmp-btree-hdr { background: rgba(124,58,237,0.15); border: 1px solid rgba(124,58,237,0.3); color: var(--accent3); border-bottom: none; }
+
+  .compare-body {
+    background: var(--surface2);
+    border-radius: 0 0 8px 8px;
+  }
+
+  .cmp-body-heap { border: 1px solid rgba(255,107,53,0.3); border-top: none; }
+  .cmp-body-btree { border: 1px solid rgba(124,58,237,0.3); border-top: none; }
+
+  .cmp-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+
+  .cmp-row:last-child { border-bottom: none; }
+
+  .cmp-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+  .cmp-label { color: var(--muted); font-size: 11px; font-family: 'JetBrains Mono', monospace; margin-bottom: 2px; }
+  .cmp-val { font-size: 13px; }
+
+  /* PAGE SIZE LEGEND */
+  .legend-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 20px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  /* TOOLTIP */
+  .tooltip-note {
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: rgba(255,214,0,0.06);
+    border: 1px solid rgba(255,214,0,0.2);
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--yellow);
+    line-height: 1.6;
+  }
+
+  .query-box {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+
+  .kw { color: var(--accent3); }
+  .tbl { color: var(--yellow); }
+  .val { color: var(--green); }
+
+  /* divider */
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    margin: 40px 0;
+  }
+
+  /* ROW SIZE BREAKDOWN */
+  .row-breakdown {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+  }
+
+  .rb-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .rb-bar {
+    height: 28px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 0 6px;
+    white-space: nowrap;
+  }
+
+  .rb-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .rb-empid { background: rgba(0,212,255,0.2); color: var(--accent); border: 1px solid rgba(0,212,255,0.3); width: 52px; }
+  .rb-name  { background: rgba(124,58,237,0.2); color: var(--accent3); border: 1px solid rgba(124,58,237,0.3); width: 100px; }
+  .rb-oh    { background: rgba(255,107,53,0.2); color: var(--accent2); border: 1px solid rgba(255,107,53,0.3); width: 72px; }
+  .rb-total { background: rgba(0,230,118,0.2); color: var(--green); border: 1px solid rgba(0,230,118,0.3); width: 52px; }
+
+  .rb-plus { color: var(--muted); font-size: 18px; align-self: center; padding-bottom: 18px; }
+  .rb-eq   { color: var(--muted); font-size: 18px; align-self: center; padding-bottom: 18px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HEADER -->
+  <header>
+    <div class="badge">SQL SERVER INTERNALS</div>
+    <h1>Heap Storage &amp; B-Tree<br>Visualized</h1>
+    <p class="subtitle">How SQL Server physically stores your data — from raw pages to indexed structures</p>
+  </header>
+
+  <!-- ===================== SECTION 1 – HEAP ===================== -->
+  <div class="section-label">
+    <div class="section-num num-heap">01</div>
+    <div>
+      <div class="section-title">HEAP TABLE — No Order, Raw Storage</div>
+      <div class="section-sub">Table without a Clustered Index · Rows stored in arrival order</div>
+    </div>
+  </div>
+
+  <div class="card card-heap">
+
+    <!-- MDF File structure -->
+    <div class="heap-layout">
+      <div class="mdf-box">
+        <div class="mdf-title">CompanyDB.mdf</div>
+        <div class="page-type-list">
+          <div class="page-type page-type-data"><span class="pt-dot pt-dot-data"></span>Data Pages ← our rows live here</div>
+          <div class="page-type page-type-index"><span class="pt-dot pt-dot-index"></span>Index Pages</div>
+          <div class="page-type page-type-meta"><span class="pt-dot pt-dot-meta"></span>Metadata Pages</div>
+        </div>
+      </div>
+
+      <!-- Row size breakdown -->
+      <div class="mdf-box">
+        <div class="mdf-title">Row Size Estimation</div>
+        <div class="row-breakdown">
+          <div class="rb-block">
+            <div class="rb-bar rb-empid">4 bytes</div>
+            <div class="rb-label">EmpID</div>
+          </div>
+          <div class="rb-plus">+</div>
+          <div class="rb-block">
+            <div class="rb-bar rb-name">~50 bytes</div>
+            <div class="rb-label">Name</div>
+          </div>
+          <div class="rb-plus">+</div>
+          <div class="rb-block">
+            <div class="rb-bar rb-oh">7 bytes</div>
+            <div class="rb-label">Overhead</div>
+          </div>
+          <div class="rb-eq">=</div>
+          <div class="rb-block">
+            <div class="rb-bar rb-total">61 B</div>
+            <div class="rb-label">/ row</div>
+          </div>
+        </div>
+        <div class="tooltip-note" style="margin-top:14px">
+          📄 1 Page = 8192 bytes &nbsp;→&nbsp; 8192 ÷ 61 ≈ <strong>130 rows/page</strong><br>
+          20 rows → fits in <strong>1 single page</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Single Data Page -->
+    <div class="page-header-label">DATA PAGE 1 — All 20 rows (heap, unordered, inserted as-is)</div>
+    <div class="data-page">
+      <div class="dp-header">
+        <span class="dp-header-title">📄 Page 1 · ObjectID: Employees · 8KB</span>
+        <span class="dp-header-info">PageType: DATA · 20 rows · FreeSpace: ~6968B</span>
+      </div>
+      <div class="dp-rows" id="heapRows">
+        <div class="dp-row">
+          <div class="dp-col-id dp-col-header">EmpID</div>
+          <div class="dp-col-name dp-col-header">Name</div>
+        </div>
+        <!-- rows injected by JS -->
+      </div>
+      <div class="dp-slot" id="slotArray">
+        <strong style="color:var(--muted);margin-right:4px">SLOT ARRAY:</strong>
+      </div>
+    </div>
+
+    <!-- TABLE SCAN demo -->
+    <div class="scan-demo">
+      <div class="scan-title">⚡ TABLE SCAN — <span class="kw">SELECT * FROM</span> <span class="tbl">Employees</span> <span class="kw">WHERE</span> EmpID = <span class="val">18</span></div>
+      <div class="query-box">
+        <span class="kw">SELECT</span> * <span class="kw">FROM</span> <span class="tbl">Employees</span> <span class="kw">WHERE</span> EmpID = <span class="val">18</span>;
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;font-family:'JetBrains Mono',monospace">
+        No index → SQL Server must check every row sequentially:
+      </div>
+      <div class="scan-row-track" id="scanTrack"></div>
+      <div class="scan-status" id="scanStatus">Press "Run Table Scan" to simulate</div>
+      <button class="btn btn-heap" onclick="runTableScan()">▶ Run Table Scan</button>
+    </div>
+
+    <!-- Multi-page note -->
+    <div class="tooltip-note" style="margin-top:20px">
+      📦 <strong>If table grows to 200 rows:</strong> Page 1 → rows 1–130 &nbsp;|&nbsp; Page 2 → rows 131–200<br>
+      Query must scan <strong>ALL pages</strong>. More data = more pages = slower scan.
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ===================== SECTION 2 – B-TREE ===================== -->
+  <div class="section-label">
+    <div class="section-num num-btree">02</div>
+    <div>
+      <div class="section-title">CLUSTERED INDEX — B-Tree Structure</div>
+      <div class="section-sub">CREATE CLUSTERED INDEX IX_Employees_EmpID ON Employees(EmpID)</div>
+    </div>
+  </div>
+
+  <div class="card card-btree">
+
+    <!-- B-TREE SVG -->
+    <div class="btree-svg-wrap">
+      <svg class="btree" viewBox="0 0 900 520" width="900" height="520" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#2a3a5c"/>
+          </marker>
+          <marker id="arr-active" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#7c3aed"/>
+          </marker>
+          <filter id="glow-blue">
+            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="glow-purple">
+            <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="glow-green">
+            <feGaussianBlur stdDeviation="5" result="coloredBlur"/>
+            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        <!-- BACKGROUND LABELS -->
+        <text x="450" y="24" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="11" letter-spacing="2">LEVEL 0 — ROOT NODE</text>
+        <text x="450" y="200" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="11" letter-spacing="2">LEVEL 1 — INTERMEDIATE NODES</text>
+        <text x="450" y="370" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="11" letter-spacing="2">LEVEL 2 — LEAF NODES (Actual Data Pages)</text>
+
+        <!-- CONNECTOR LINES Root to Intermediate -->
+        <line x1="450" y1="100" x2="200" y2="210" stroke="#1e2740" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="450" y1="100" x2="700" y2="210" stroke="#1e2740" stroke-width="1.5" marker-end="url(#arr)"/>
+
+        <!-- CONNECTOR LINES Intermediate to Leaf -->
+        <line x1="200" y1="270" x2="90" y2="380" stroke="#1e2740" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="200" y1="270" x2="200" y2="380" stroke="#1e2740" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="200" y1="270" x2="310" y2="380" stroke="#1e2740" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="700" y1="270" x2="590" y2="380" stroke="#1e2740" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="700" y1="270" x2="700" y2="380" stroke="#1e2740" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="700" y1="270" x2="810" y2="380" stroke="#1e2740" stroke-width="1.5" marker-end="url(#arr)"/>
+
+        <!-- Leaf-level chain (linked list) -->
+        <line x1="143" y1="440" x2="155" y2="440" stroke="#1e2740" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="248" y1="440" x2="260" y2="440" stroke="#1e2740" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="363" y1="440" x2="545" y2="440" stroke="#1e2740" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="653" y1="440" x2="665" y2="440" stroke="#1e2740" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="755" y1="440" x2="768" y2="440" stroke="#1e2740" stroke-width="1" stroke-dasharray="3,3"/>
+
+        <!-- ===== ROOT NODE ===== -->
+        <rect id="bt-root" x="330" y="40" width="240" height="60" rx="8"
+              fill="#111520" stroke="#00d4ff" stroke-width="1.5" filter="url(#glow-blue)"/>
+        <text x="450" y="62" text-anchor="middle" fill="#00d4ff" font-family="JetBrains Mono" font-size="10" font-weight="700" letter-spacing="1">ROOT PAGE</text>
+        <line x1="370" y1="70" x2="530" y2="70" stroke="#1e2740" stroke-width="1"/>
+        <text x="395" y="88" text-anchor="middle" fill="#e2e8f0" font-family="JetBrains Mono" font-size="11">1–500</text>
+        <line x1="420" y1="68" x2="420" y2="92" stroke="#1e2740" stroke-width="1"/>
+        <text x="450" y="88" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="9">ptr</text>
+        <line x1="480" y1="68" x2="480" y2="92" stroke="#1e2740" stroke-width="1"/>
+        <text x="505" y="88" text-anchor="middle" fill="#e2e8f0" font-family="JetBrains Mono" font-size="11">501–1000</text>
+
+        <!-- ===== INTERMEDIATE LEFT ===== -->
+        <rect id="bt-int-l" x="100" y="210" width="200" height="60" rx="8"
+              fill="#111520" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="200" y="232" text-anchor="middle" fill="#7c3aed" font-family="JetBrains Mono" font-size="10" font-weight="700" letter-spacing="1">INTERMEDIATE</text>
+        <line x1="120" y1="240" x2="280" y2="240" stroke="#1e2740" stroke-width="1"/>
+        <text x="148" y="257" text-anchor="middle" fill="#e2e8f0" font-family="JetBrains Mono" font-size="10">1–130</text>
+        <line x1="170" y1="238" x2="170" y2="262" stroke="#1e2740" stroke-width="1"/>
+        <text x="200" y="257" text-anchor="middle" fill="#e2e8f0" font-family="JetBrains Mono" font-size="10">131–260</text>
+        <line x1="230" y1="238" x2="230" y2="262" stroke="#1e2740" stroke-width="1"/>
+        <text x="258" y="257" text-anchor="middle" fill="#e2e8f0" font-family="JetBrains Mono" font-size="10">261–390</text>
+
+        <!-- ===== INTERMEDIATE RIGHT ===== -->
+        <rect id="bt-int-r" x="600" y="210" width="200" height="60" rx="8"
+              fill="#111520" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="700" y="232" text-anchor="middle" fill="#7c3aed" font-family="JetBrains Mono" font-size="10" font-weight="700" letter-spacing="1">INTERMEDIATE</text>
+        <line x1="620" y1="240" x2="780" y2="240" stroke="#1e2740" stroke-width="1"/>
+        <text x="648" y="257" text-anchor="middle" fill="#e2e8f0" font-family="JetBrains Mono" font-size="10">501–650</text>
+        <line x1="670" y1="238" x2="670" y2="262" stroke="#1e2740" stroke-width="1"/>
+        <text x="700" y="257" text-anchor="middle" fill="#e2e8f0" font-family="JetBrains Mono" font-size="10">651–780</text>
+        <line x1="730" y1="238" x2="730" y2="262" stroke="#1e2740" stroke-width="1"/>
+        <text x="758" y="257" text-anchor="middle" fill="#e2e8f0" font-family="JetBrains Mono" font-size="10">781–910</text>
+
+        <!-- ===== LEAF LEFT – 3 pages ===== -->
+        <!-- Leaf 1 -->
+        <rect x="40" y="380" width="103" height="74" rx="6" fill="#1a2035" stroke="#ffd600" stroke-width="1"/>
+        <text x="91" y="397" text-anchor="middle" fill="#ffd600" font-family="JetBrains Mono" font-size="9" font-weight="700">DATA PAGE 1</text>
+        <line x1="52" y1="403" x2="130" y2="403" stroke="#1e2740" stroke-width="1"/>
+        <text x="91" y="417" text-anchor="middle" fill="#e2e8f0" font-family="JetBrains Mono" font-size="9">EmpID 1–130</text>
+        <text x="91" y="430" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="8">Emp1…Emp130</text>
+        <text x="91" y="444" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="8">130 rows · 7.9KB</text>
+
+        <!-- Leaf 2 -->
+        <rect x="155" y="380" width="103" height="74" rx="6" fill="#1a2035" stroke="#ffd600" stroke-width="1"/>
+        <text x="206" y="397" text-anchor="middle" fill="#ffd600" font-family="JetBrains Mono" font-size="9" font-weight="700">DATA PAGE 2</text>
+        <line x1="167" y1="403" x2="245" y2="403" stroke="#1e2740" stroke-width="1"/>
+        <text x="206" y="417" text-anchor="middle" fill="#e2e8f0" font-family="JetBrains Mono" font-size="9">EmpID 131–260</text>
+        <text x="206" y="430" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="8">Emp131…Emp260</text>
+        <text x="206" y="444" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="8">130 rows · 7.9KB</text>
+
+        <!-- Leaf 3 -->
+        <rect x="270" y="380" width="103" height="74" rx="6" fill="#1a2035" stroke="#ffd600" stroke-width="1"/>
+        <text x="321" y="397" text-anchor="middle" fill="#ffd600" font-family="JetBrains Mono" font-size="9" font-weight="700">DATA PAGE 3</text>
+        <line x1="282" y1="403" x2="360" y2="403" stroke="#1e2740" stroke-width="1"/>
+        <text x="321" y="417" text-anchor="middle" fill="#e2e8f0" font-family="JetBrains Mono" font-size="9">EmpID 261–390</text>
+        <text x="321" y="430" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="8">Emp261…Emp390</text>
+        <text x="321" y="444" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="8">130 rows · 7.9KB</text>
+
+        <!-- ===== LEAF RIGHT – 3 pages ===== -->
+        <!-- Leaf 4 (651-780) HIGHLIGHTED TARGET -->
+        <rect id="bt-target-page" x="545" y="380" width="108" height="74" rx="6" fill="#1a2035" stroke="#ffd600" stroke-width="1"/>
+        <text x="599" y="397" text-anchor="middle" fill="#ffd600" font-family="JetBrains Mono" font-size="9" font-weight="700">DATA PAGE 6</text>
+        <line x1="557" y1="403" x2="641" y2="403" stroke="#1e2740" stroke-width="1"/>
+        <text x="599" y="417" text-anchor="middle" fill="#e2e8f0" font-family="JetBrains Mono" font-size="9">EmpID 651–780</text>
+        <text x="599" y="430" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="8">Emp651…Emp780</text>
+        <text x="599" y="444" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="8">130 rows · 7.9KB</text>
+
+        <!-- Leaf 5 -->
+        <rect x="665" y="380" width="103" height="74" rx="6" fill="#1a2035" stroke="#ffd600" stroke-width="1"/>
+        <text x="716" y="397" text-anchor="middle" fill="#ffd600" font-family="JetBrains Mono" font-size="9" font-weight="700">DATA PAGE 7</text>
+        <line x1="677" y1="403" x2="755" y2="403" stroke="#1e2740" stroke-width="1"/>
+        <text x="716" y="417" text-anchor="middle" fill="#e2e8f0" font-family="JetBrains Mono" font-size="9">EmpID 781–910</text>
+        <text x="716" y="430" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="8">Emp781…Emp910</text>
+        <text x="716" y="444" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="8">130 rows · 7.9KB</text>
+
+        <!-- Leaf 6 -->
+        <rect x="780" y="380" width="103" height="74" rx="6" fill="#1a2035" stroke="#ffd600" stroke-width="1"/>
+        <text x="831" y="397" text-anchor="middle" fill="#ffd600" font-family="JetBrains Mono" font-size="9" font-weight="700">DATA PAGE 8</text>
+        <line x1="792" y1="403" x2="870" y2="403" stroke="#1e2740" stroke-width="1"/>
+        <text x="831" y="417" text-anchor="middle" fill="#e2e8f0" font-family="JetBrains Mono" font-size="9">EmpID 911–1000</text>
+        <text x="831" y="430" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="8">Emp911…Emp1000</text>
+        <text x="831" y="444" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono" font-size="8">90 rows · 5.5KB</text>
+
+        <!-- Level labels on right -->
+        <text x="888" y="75" text-anchor="end" fill="#00d4ff" font-family="JetBrains Mono" font-size="9" opacity="0.6">L0</text>
+        <text x="888" y="245" text-anchor="end" fill="#7c3aed" font-family="JetBrains Mono" font-size="9" opacity="0.6">L1</text>
+        <text x="888" y="420" text-anchor="end" fill="#ffd600" font-family="JetBrains Mono" font-size="9" opacity="0.6">L2</text>
+
+        <!-- ===== SEEK PATH OVERLAY (hidden initially, shown by JS) ===== -->
+        <!-- Root highlight -->
+        <rect id="seek-root" x="330" y="40" width="240" height="60" rx="8"
+              fill="none" stroke="#7c3aed" stroke-width="3" opacity="0" filter="url(#glow-purple)"/>
+        <!-- Intermediate right highlight -->
+        <rect id="seek-int" x="600" y="210" width="200" height="60" rx="8"
+              fill="none" stroke="#7c3aed" stroke-width="3" opacity="0" filter="url(#glow-purple)"/>
+        <!-- Arrow root→int-right -->
+        <line id="seek-line1" x1="450" y1="100" x2="700" y2="210"
+              stroke="#7c3aed" stroke-width="2.5" opacity="0" marker-end="url(#arr-active)"/>
+        <!-- Arrow int-right→leaf-6 -->
+        <line id="seek-line2" x1="700" y1="270" x2="599" y2="380"
+              stroke="#7c3aed" stroke-width="2.5" opacity="0" marker-end="url(#arr-active)"/>
+        <!-- Leaf-6 highlight -->
+        <rect id="seek-leaf" x="545" y="380" width="108" height="74" rx="6"
+              fill="rgba(0,230,118,0.1)" stroke="#00e676" stroke-width="3" opacity="0" filter="url(#glow-green)"/>
+        <!-- Found text -->
+        <text id="seek-found" x="599" y="468" text-anchor="middle"
+              fill="#00e676" font-family="JetBrains Mono" font-size="10" font-weight="700" opacity="0">✓ EmpID=700 FOUND</text>
+      </svg>
+    </div>
+
+    <!-- INDEX SEEK DEMO -->
+    <div class="seek-demo">
+      <div class="scan-title" style="color:var(--accent3)">🎯 INDEX SEEK — <span class="kw">SELECT * FROM</span> <span class="tbl">Employees</span> <span class="kw">WHERE</span> EmpID = <span class="val">700</span></div>
+      <div class="query-box">
+        <span class="kw">SELECT</span> * <span class="kw">FROM</span> <span class="tbl">Employees</span> <span class="kw">WHERE</span> EmpID = <span class="val">700</span>;
+      </div>
+      <div class="seek-steps">
+        <div class="seek-step" id="step1">
+          <div class="step-icon icon-root">📋</div>
+          <div><div class="cmp-label">STEP 1 · ROOT NODE</div>700 &gt; 500 → follow right pointer to Intermediate (501–1000)</div>
+        </div>
+        <div class="seek-step" id="step2">
+          <div class="step-icon icon-mid">🔀</div>
+          <div><div class="cmp-label">STEP 2 · INTERMEDIATE NODE</div>700 is in range 651–780 → navigate to Data Page 6</div>
+        </div>
+        <div class="seek-step" id="step3">
+          <div class="step-icon icon-leaf">📄</div>
+          <div><div class="cmp-label">STEP 3 · LEAF NODE — DATA PAGE 6</div>Binary search within page → EmpID 700 located at slot offset</div>
+        </div>
+        <div class="seek-step" id="step4">
+          <div class="step-icon icon-found">✓</div>
+          <div><div class="cmp-label">RESULT · 3 PAGE READS TOTAL</div><strong style="color:var(--green)">EmpID = 700 → Row found! INDEX SEEK complete.</strong></div>
+        </div>
+      </div>
+      <button class="btn btn-btree" onclick="runIndexSeek()">▶ Run Index Seek</button>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ===================== SECTION 3 – COMPARE ===================== -->
+  <div class="section-label">
+    <div class="section-num num-compare">03</div>
+    <div>
+      <div class="section-title">Head-to-Head: Heap vs Clustered Index</div>
+      <div class="section-sub">Same query · Same data · Very different performance</div>
+    </div>
+  </div>
+
+  <div class="card card-compare">
+    <div class="compare-grid">
+      <!-- HEAP -->
+      <div class="compare-col">
+        <div class="compare-header cmp-heap-hdr">⚡ HEAP (No Index)</div>
+        <div class="compare-body cmp-body-heap">
+          <div class="cmp-row">
+            <div class="cmp-icon">🔍</div>
+            <div><div class="cmp-label">OPERATION</div><div class="cmp-val">TABLE SCAN</div></div>
+          </div>
+          <div class="cmp-row">
+            <div class="cmp-icon">📄</div>
+            <div><div class="cmp-label">PAGES READ (1000 rows)</div><div class="cmp-val" style="color:var(--red)">~8 pages (ALL of them)</div></div>
+          </div>
+          <div class="cmp-row">
+            <div class="cmp-icon">🔢</div>
+            <div><div class="cmp-label">ROW COMPARISONS</div><div class="cmp-val" style="color:var(--red)">Up to 1000 rows checked</div></div>
+          </div>
+          <div class="cmp-row">
+            <div class="cmp-icon">⏱️</div>
+            <div><div class="cmp-label">PERFORMANCE</div><div class="cmp-val" style="color:var(--red)">O(n) — gets worse as data grows</div></div>
+          </div>
+          <div class="cmp-row">
+            <div class="cmp-icon">🗂️</div>
+            <div><div class="cmp-label">ROW ORDER</div><div class="cmp-val">Unordered — insertion order</div></div>
+          </div>
+          <div class="cmp-row">
+            <div class="cmp-icon">📦</div>
+            <div><div class="cmp-label">BEST USE CASE</div><div class="cmp-val">Staging tables, bulk insert targets</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CLUSTERED INDEX -->
+      <div class="compare-col">
+        <div class="compare-header cmp-btree-hdr">🎯 CLUSTERED INDEX (B-Tree)</div>
+        <div class="compare-body cmp-body-btree">
+          <div class="cmp-row">
+            <div class="cmp-icon">🔍</div>
+            <div><div class="cmp-label">OPERATION</div><div class="cmp-val">INDEX SEEK</div></div>
+          </div>
+          <div class="cmp-row">
+            <div class="cmp-icon">📄</div>
+            <div><div class="cmp-label">PAGES READ (1000 rows)</div><div class="cmp-val" style="color:var(--green)">3 pages (Root → Int → Leaf)</div></div>
+          </div>
+          <div class="cmp-row">
+            <div class="cmp-icon">🔢</div>
+            <div><div class="cmp-label">ROW COMPARISONS</div><div class="cmp-val" style="color:var(--green)">~10 comparisons (log₂ 1000)</div></div>
+          </div>
+          <div class="cmp-row">
+            <div class="cmp-icon">⏱️</div>
+            <div><div class="cmp-label">PERFORMANCE</div><div class="cmp-val" style="color:var(--green)">O(log n) — scales beautifully</div></div>
+          </div>
+          <div class="cmp-row">
+            <div class="cmp-icon">🗂️</div>
+            <div><div class="cmp-label">ROW ORDER</div><div class="cmp-val">Physically sorted by index key</div></div>
+          </div>
+          <div class="cmp-row">
+            <div class="cmp-icon">📦</div>
+            <div><div class="cmp-label">BEST USE CASE</div><div class="cmp-val">Primary key, range queries, frequent lookups</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="legend-row">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div>Root Node — entry point for all seeks</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--accent3)"></div>Intermediate Nodes — range routing</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--yellow)"></div>Leaf Nodes — actual data rows (sorted)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>Found row via INDEX SEEK</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ===================== HEAP ROWS RENDER =====================
+  const heapRowsEl = document.getElementById('heapRows');
+  const slotArrayEl = document.getElementById('slotArray');
+
+  for (let i = 1; i <= 20; i++) {
+    const row = document.createElement('div');
+    row.className = 'dp-row';
+    row.id = `row-${i}`;
+    row.innerHTML = `<div class="dp-col-id">${i}</div><div class="dp-col-name">Emp${i}</div>`;
+    heapRowsEl.appendChild(row);
+
+    const slot = document.createElement('span');
+    slot.className = 'slot-item';
+    slot.id = `slot-${i}`;
+    slot.textContent = `s${i}`;
+    slotArrayEl.appendChild(slot);
+  }
+
+  // ===================== TABLE SCAN ANIMATION =====================
+  const scanTrack = document.getElementById('scanTrack');
+  const scanStatus = document.getElementById('scanStatus');
+  let scanRunning = false;
+
+  // Build scan cells
+  for (let i = 1; i <= 20; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'scan-cell';
+    cell.id = `sc-${i}`;
+    cell.textContent = i;
+    scanTrack.appendChild(cell);
+  }
+
+  function resetScan() {
+    for (let i = 1; i <= 20; i++) {
+      const c = document.getElementById(`sc-${i}`);
+      c.className = 'scan-cell';
+      const r = document.getElementById(`row-${i}`);
+      if (r) r.classList.remove('highlight');
+    }
+    scanStatus.textContent = 'Press "Run Table Scan" to simulate';
+  }
+
+  async function runTableScan() {
+    if (scanRunning) return;
+    scanRunning = true;
+    resetScan();
+    const target = 18;
+    scanStatus.textContent = `🔍 Scanning... SQL Server checks every row until EmpID = ${target} is found`;
+
+    for (let i = 1; i <= 20; i++) {
+      await sleep(180);
+      const c = document.getElementById(`sc-${i}`);
+      const r = document.getElementById(`row-${i}`);
+      if (i === target) {
+        c.className = 'scan-cell found';
+        if (r) r.classList.add('highlight');
+        scanStatus.innerHTML = `✅ <span style="color:var(--green)">EmpID = ${target} FOUND after checking ${i} rows — TABLE SCAN complete.</span>`;
+        scanRunning = false;
+        return;
+      } else {
+        c.className = 'scan-cell passed';
+        await sleep(20);
+      }
+    }
+    scanRunning = false;
+  }
+
+  // ===================== INDEX SEEK ANIMATION =====================
+  let seekRunning = false;
+
+  function resetSeek() {
+    ['seek-root','seek-int','seek-line1','seek-line2','seek-leaf','seek-found'].forEach(id => {
+      document.getElementById(id).setAttribute('opacity','0');
+    });
+    ['step1','step2','step3','step4'].forEach(id => {
+      const el = document.getElementById(id);
+      el.className = 'seek-step';
+    });
+  }
+
+  async function runIndexSeek() {
+    if (seekRunning) return;
+    seekRunning = true;
+    resetSeek();
+
+    // Step 1 – Root
+    await sleep(300);
+    document.getElementById('seek-root').setAttribute('opacity','1');
+    document.getElementById('step1').className = 'seek-step active';
+    await sleep(1000);
+    document.getElementById('step1').className = 'seek-step done';
+
+    // Step 2 – Intermediate Right
+    await sleep(200);
+    document.getElementById('seek-line1').setAttribute('opacity','1');
+    document.getElementById('seek-int').setAttribute('opacity','1');
+    document.getElementById('step2').className = 'seek-step active';
+    await sleep(1000);
+    document.getElementById('step2').className = 'seek-step done';
+
+    // Step 3 – Leaf
+    await sleep(200);
+    document.getElementById('seek-line2').setAttribute('opacity','1');
+    document.getElementById('seek-leaf').setAttribute('opacity','1');
+    document.getElementById('step3').className = 'seek-step active';
+    await sleep(1000);
+    document.getElementById('step3').className = 'seek-step done';
+
+    // Step 4 – Found
+    await sleep(200);
+    document.getElementById('seek-found').setAttribute('opacity','1');
+    document.getElementById('step4').className = 'seek-step found-step';
+
+    seekRunning = false;
+  }
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+</script>
+</body>
+</html>
