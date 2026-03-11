@@ -1,0 +1,1764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL Subquery Functions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0a0d14; --bg2:#0f1320; --card:#111520; --border:#1e2535;
+  --cyan:#00d4ff; --purple:#a855f7; --orange:#f97316;
+  --green:#22d3a0; --pink:#f43f5e; --yellow:#fbbf24; --blue:#3b82f6;
+  --text:#e2e8f0; --muted:#64748b;
+  --mono:'JetBrains Mono',monospace;
+  --head:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;min-height:100vh;overflow-x:hidden}
+.grid-bg{background-image:linear-gradient(rgba(0,212,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.025) 1px,transparent 1px);background-size:44px 44px;position:fixed;inset:0;pointer-events:none;z-index:0}
+.wrap{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:0 20px 60px}
+
+/* ── SPEED BAR ── */
+#speedBar{position:sticky;top:0;z-index:200;background:rgba(10,13,20,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.sp-label{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap}
+.sp-btn{font-family:var(--mono);font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--muted);cursor:pointer;transition:all .2s;position:relative;overflow:visible}
+.sp-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.sp-btn.on{background:var(--cyan);border-color:var(--cyan);color:#000;font-weight:700;box-shadow:0 0 12px rgba(0,212,255,.4)}
+.sp-btn.on::after{content:"";position:absolute;inset:-4px;border-radius:8px;border:2px solid var(--cyan);animation:spRing .9s ease infinite;pointer-events:none}
+.sp-divider{width:1px;height:18px;background:var(--border)}
+.sp-custom-input{width:80px;padding:5px 8px;background:#080b12;border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:12px;text-align:center}
+.sp-custom-input:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 8px rgba(0,212,255,.25)}
+.sp-unit{font-family:var(--mono);font-size:11px;color:var(--muted)}
+#execStatus{font-family:var(--mono);font-size:11px;color:var(--muted)}
+#progWrap{position:absolute;bottom:0;left:0;right:0;height:2px;background:transparent}
+#execBar{height:2px;width:0;background:linear-gradient(90deg,var(--cyan),var(--purple));transition:width .3s}
+
+/* ── HEADER ── */
+.page-header{padding:48px 0 32px;text-align:center}
+.badge-pill{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;padding:5px 14px;border:1px solid var(--cyan);color:var(--cyan);border-radius:20px;margin-bottom:20px}
+.page-title{font-family:var(--head);font-size:clamp(28px,5vw,52px);font-weight:800;background:linear-gradient(135deg,var(--cyan),var(--purple),var(--pink));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1.15;margin-bottom:12px}
+.page-sub{color:var(--muted);font-size:13px;max-width:600px;margin:0 auto}
+
+/* ── NAV PILLS ── */
+.nav-pills{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:0 0 32px}
+.nav-pill{font-family:var(--mono);font-size:11px;padding:5px 14px;border:1px solid var(--border);border-radius:20px;color:var(--muted);text-decoration:none;transition:all .2s}
+.nav-pill:hover{border-color:var(--cyan);color:var(--cyan)}
+.nav-pill.ds{border-color:var(--purple);color:var(--purple)}
+
+/* ── GOLDEN RULE BANNER ── */
+.golden-rule{background:linear-gradient(135deg,rgba(168,85,247,.08),rgba(0,212,255,.06));border:1px solid rgba(168,85,247,.3);border-radius:12px;padding:18px 24px;margin-bottom:32px;text-align:center}
+.golden-rule .gr-title{font-family:var(--head);font-size:16px;font-weight:700;color:var(--yellow);margin-bottom:6px}
+.golden-rule .gr-text{color:var(--muted);font-size:12px}
+.golden-rule .gr-text strong{color:var(--cyan)}
+
+/* ── CARD ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;margin-bottom:32px;overflow:hidden;scroll-margin-top:60px}
+.card-inner{padding:24px}
+.card-title{font-family:var(--head);font-size:18px;font-weight:700;margin-bottom:6px}
+.card-sub{color:var(--muted);font-size:11px;margin-bottom:20px}
+.section-num{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;color:var(--muted);margin-bottom:4px}
+
+/* ── CARD TOP BORDERS ── */
+.s01{border-top:3px solid transparent;border-image:linear-gradient(90deg,var(--cyan),var(--purple)) 1}
+.s02{border-top:3px solid transparent;border-image:linear-gradient(90deg,var(--purple),var(--pink)) 1}
+.s03{border-top:3px solid transparent;border-image:linear-gradient(90deg,var(--orange),var(--yellow)) 1}
+.s04{border-top:3px solid transparent;border-image:linear-gradient(90deg,var(--green),var(--cyan)) 1}
+.s05{border-top:3px solid transparent;border-image:linear-gradient(90deg,var(--pink),var(--orange)) 1}
+.s06{border-top:3px solid transparent;border-image:linear-gradient(90deg,var(--yellow),var(--green)) 1}
+.s07{border-top:3px solid transparent;border-image:linear-gradient(90deg,var(--blue),var(--purple)) 1}
+.s08{border-top:3px solid transparent;border-image:linear-gradient(90deg,var(--cyan),var(--orange)) 1}
+.s09{border-top:3px solid transparent;border-image:linear-gradient(90deg,var(--purple),var(--green)) 1}
+.ds-card{border-top:3px solid transparent;border-image:linear-gradient(90deg,var(--cyan),var(--purple),var(--orange),var(--green)) 1}
+
+/* ── EXPLAIN BLOCK ── */
+.explain{border-left:3px solid var(--cyan);background:rgba(0,212,255,.04);padding:14px 18px;border-radius:0 8px 8px 0;margin-bottom:20px;font-size:13px;color:var(--muted);line-height:1.7}
+.explain.ep{border-left-color:var(--purple);background:rgba(168,85,247,.04)}
+.explain.eo{border-left-color:var(--orange);background:rgba(249,115,22,.04)}
+.explain.eg{border-left-color:var(--green);background:rgba(34,211,160,.04)}
+.explain.epk{border-left-color:var(--pink);background:rgba(244,63,94,.04)}
+.explain.ey{border-left-color:var(--yellow);background:rgba(251,191,36,.04)}
+.explain.eb{border-left-color:var(--blue);background:rgba(59,130,246,.04)}
+.explain strong{color:var(--text)}
+
+/* ── SQL BOX ── */
+.sql-box{background:#080b12;border:1px solid var(--border);border-radius:10px;margin-bottom:20px;overflow:hidden}
+.sql-header{display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border)}
+.mac-dots{display:flex;gap:6px;margin-right:12px}
+.mac-dot{width:12px;height:12px;border-radius:50%}
+.mac-r{background:#f43f5e} .mac-y{background:#fbbf24} .mac-g{background:#22d3a0}
+.sql-lang{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-left:auto}
+.sql-body{padding:16px 18px;font-family:var(--mono);font-size:12px;line-height:1.9;white-space:pre;overflow-x:auto}
+.kw{color:var(--purple);font-weight:700}
+.fn{color:var(--cyan)}
+.hk{color:var(--yellow);font-weight:700}
+.cm{color:var(--muted);font-style:italic}
+.str{color:var(--green)}
+
+/* ── TAB SWITCHER ── */
+.tabs{display:flex;gap:0;margin-bottom:16px;border-bottom:1px solid var(--border)}
+.tab{font-family:var(--mono);font-size:11px;padding:8px 16px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;transition:all .2s;background:none;border-top:none;border-left:none;border-right:none}
+.tab.active{color:var(--orange);border-bottom-color:var(--orange);background:rgba(249,115,22,.05)}
+.tab-content{display:none}.tab-content.active{display:block}
+
+/* ── PIPELINE ── */
+.pipeline{display:flex;align-items:center;gap:0;margin-bottom:20px;flex-wrap:wrap}
+.pipe-step{position:relative;font-family:var(--mono);font-size:10px;padding:8px 14px;border:1px solid var(--border);border-radius:8px;color:var(--muted);text-align:center;min-width:90px;transition:all .3s}
+.pipe-step.active{border-color:var(--yellow);color:var(--yellow);background:rgba(251,191,36,.07);box-shadow:0 0 12px rgba(251,191,36,.2)}
+.pipe-step.done{border-color:var(--green);color:var(--green);background:rgba(34,211,160,.07)}
+.pipe-step.active::after{content:"";position:absolute;inset:-4px;border-radius:10px;border:2px solid var(--yellow);animation:ring .9s ease infinite;pointer-events:none}
+.adn{font-size:16px;color:var(--muted);padding:0 4px;transition:color .3s}
+.adn.lit{color:var(--yellow)}
+.adn.ok{color:var(--green)}
+
+/* ── BUTTONS ── */
+.btn-exec{background:linear-gradient(135deg,var(--cyan),var(--purple));border:none;color:#fff;font-family:var(--mono);font-size:12px;font-weight:700;padding:10px 24px;border-radius:8px;cursor:pointer;transition:all .2s;letter-spacing:.5px}
+.btn-exec:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 4px 20px rgba(0,212,255,.3)}
+.btn-exec:disabled{opacity:.4;cursor:not-allowed}
+.btn-reset{background:transparent;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:12px;padding:10px 20px;border-radius:8px;cursor:pointer;transition:all .2s;margin-left:10px}
+.btn-reset:hover{border-color:var(--orange);color:var(--orange)}
+.btn-row{display:flex;align-items:center;margin-bottom:20px;gap:8px}
+
+/* ── STAGES ── */
+.stage{display:none}
+.stage.show{display:block;animation:fadeUp .4s ease both}
+.stage-title{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+
+/* ── TABLES ── */
+.tbl-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px}
+.tbl-title{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);padding:8px 14px;border-bottom:1px solid var(--border)}
+table{width:100%;border-collapse:collapse}
+th{color:var(--cyan);background:rgba(0,212,255,.05);font-family:var(--mono);font-size:11px;font-weight:700;padding:9px 13px;text-align:left;border-bottom:1px solid var(--border)}
+td{font-family:var(--mono);font-size:12px;padding:8px 13px;border-bottom:1px solid rgba(30,37,53,.5);transition:background .2s}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(0,212,255,.03)}
+tr.hl-y td{background:rgba(251,191,36,.12)!important;transition:background .15s}
+tr.hl-c td{background:rgba(0,212,255,.08)!important}
+tr.hl-o td{background:rgba(249,115,22,.08)!important}
+tr.hl-p td{background:rgba(168,85,247,.08)!important}
+tr.hl-g td{background:rgba(34,211,160,.08)!important}
+tr:nth-child(odd){background:rgba(0,212,255,.02)}
+
+/* ── VALUE COLORS ── */
+.vc{color:var(--cyan)}
+.vo{color:var(--orange)}
+.vp{color:var(--purple)}
+.vg{color:var(--green);font-weight:700}
+.vy{color:var(--yellow)}
+.vm{color:var(--muted)}
+.vpk{color:var(--pink)}
+.vb{color:var(--blue)}
+.vi{font-style:italic}
+
+/* ── GRID LAYOUTS ── */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+@media(max-width:720px){.two-col,.three-col{grid-template-columns:1fr}}
+
+/* ── RESULT BOXES ── */
+.res-bad{border:1px solid var(--pink);background:rgba(244,63,94,.05);border-radius:8px;padding:14px;margin-bottom:12px}
+.res-good{border:1px solid var(--green);background:rgba(34,211,160,.05);border-radius:8px;padding:14px;margin-bottom:12px}
+.res-info{border:1px solid var(--cyan);background:rgba(0,212,255,.05);border-radius:8px;padding:14px;margin-bottom:12px}
+.res-label{font-family:var(--mono);font-size:10px;letter-spacing:1px;font-weight:700;margin-bottom:8px}
+.res-bad .res-label{color:var(--pink)}
+.res-good .res-label{color:var(--green)}
+.res-info .res-label{color:var(--cyan)}
+
+/* ── IMPACT BADGE ── */
+.impact{font-family:var(--mono);font-size:11px;padding:5px 12px;border-radius:20px;display:inline-block;margin-top:12px;border:1px solid}
+.imp-c{color:var(--cyan);border-color:var(--cyan);background:rgba(0,212,255,.07)}
+.imp-p{color:var(--purple);border-color:var(--purple);background:rgba(168,85,247,.07)}
+.imp-o{color:var(--orange);border-color:var(--orange);background:rgba(249,115,22,.07)}
+.imp-g{color:var(--green);border-color:var(--green);background:rgba(34,211,160,.07)}
+.imp-pk{color:var(--pink);border-color:var(--pink);background:rgba(244,63,94,.07)}
+.imp-y{color:var(--yellow);border-color:var(--yellow);background:rgba(251,191,36,.07)}
+.imp-b{color:var(--blue);border-color:var(--blue);background:rgba(59,130,246,.07)}
+
+/* ── STATS BADGES ── */
+.stats-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+.stat-badge{font-family:var(--mono);font-size:11px;padding:5px 12px;border-radius:20px;border:1px solid var(--border);color:var(--muted)}
+.stat-badge.sc{border-color:rgba(0,212,255,.3);color:var(--cyan)}
+.stat-badge.sy{border-color:rgba(251,191,36,.3);color:var(--yellow)}
+.stat-badge.sg{border-color:rgba(34,211,160,.3);color:var(--green)}
+.stat-badge.so{border-color:rgba(249,115,22,.3);color:var(--orange)}
+
+/* ── COL HEADER DOTS ── */
+.th-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px}
+.dc{background:var(--cyan)}.dp{background:var(--purple)}.do{background:var(--orange)}
+.dy{background:var(--yellow)}.dg{background:var(--green)}.dpk{background:var(--pink)}
+
+/* ── DATASET PREVIEW ROWS STAGGER ── */
+.preview-row{animation:fadeUp .4s ease both}
+.preview-row:nth-child(1){animation-delay:.05s}
+.preview-row:nth-child(2){animation-delay:.10s}
+.preview-row:nth-child(3){animation-delay:.15s}
+.preview-row:nth-child(4){animation-delay:.20s}
+.preview-row:nth-child(5){animation-delay:.25s}
+.preview-row:nth-child(6){animation-delay:.30s}
+.preview-row:nth-child(7){animation-delay:.35s}
+.preview-row:nth-child(8){animation-delay:.40s}
+
+/* ── SUMMARY TABLE ── */
+.summary-card{background:var(--card);border:1px solid var(--border);border-radius:14px;margin-bottom:32px;overflow:hidden;border-top:3px solid transparent;border-image:linear-gradient(90deg,var(--cyan),var(--purple),var(--pink),var(--orange)) 1}
+.summary-th{color:var(--purple)!important}
+
+/* ── FOOTER ── */
+.footer{text-align:center;padding:32px 0;color:var(--muted);font-size:11px;border-top:1px solid var(--border)}
+.footer span{color:var(--cyan)}
+
+/* ── KEYFRAMES ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes ring{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.2);opacity:0}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.1}}
+@keyframes spRing{0%{transform:scale(1);opacity:.6}100%{transform:scale(1.3);opacity:0}}
+@keyframes pulseY{0%,100%{background:rgba(251,191,36,.12)}50%{background:rgba(251,191,36,.22)}}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+
+<!-- SPEED BAR -->
+<div id="speedBar">
+  <span class="sp-label">⚡ Execution Speed</span>
+  <button class="sp-btn" id="sp1" onclick="setSpeed(1)">1x</button>
+  <button class="sp-btn" id="sp2" onclick="setSpeed(2)">2x</button>
+  <button class="sp-btn on" id="sp3" onclick="setSpeed(3)">3x</button>
+  <button class="sp-btn" id="sp5" onclick="setSpeed(5)">5x</button>
+  <button class="sp-btn" id="sp8" onclick="setSpeed(8)">8x</button>
+  <div class="sp-divider"></div>
+  <span class="sp-label">Custom:</span>
+  <input class="sp-custom-input" type="number" id="customMs" min="100" max="10000" step="100" value="1000" placeholder="1000">
+  <span class="sp-unit">ms</span>
+  <div class="sp-divider"></div>
+  <span class="sp-label">Step: <span id="stepVal">1.0s</span> · Row: <span id="rowVal">0.5s</span></span>
+  <div class="sp-divider"></div>
+  <span id="execStatus">● Ready</span>
+  <div id="progWrap"><div id="execBar"></div></div>
+</div>
+
+<div class="wrap">
+
+<!-- HEADER -->
+<div class="page-header">
+  <div class="badge-pill">SQL • Subqueries</div>
+  <h1 class="page-title">SQL Subquery Functions</h1>
+  <p class="page-sub">A query inside another query — master scalar, row, table subqueries and all their operators</p>
+</div>
+
+<!-- NAV PILLS -->
+<div class="nav-pills">
+  <a class="nav-pill ds" href="#dataset">📋 Dataset</a>
+  <a class="nav-pill" href="#s01">S01 Result Types</a>
+  <a class="nav-pill" href="#s02">S02 FROM Clause</a>
+  <a class="nav-pill" href="#s03">S03 SELECT</a>
+  <a class="nav-pill" href="#s04">S04 JOIN Clause</a>
+  <a class="nav-pill" href="#s05">S05 Comparison</a>
+  <a class="nav-pill" href="#s06">S06 IN Operator</a>
+  <a class="nav-pill" href="#s07">S07 ANY Operator</a>
+  <a class="nav-pill" href="#s08">S08 Correlated</a>
+  <a class="nav-pill" href="#s09">S09 EXISTS</a>
+  <a class="nav-pill" href="#summary">📊 Summary</a>
+</div>
+
+<!-- GOLDEN RULE BANNER -->
+<div class="golden-rule">
+  <div class="gr-title">⚡ The Golden Rule of Subqueries</div>
+  <div class="gr-text">A <strong>subquery</strong> is a complete SQL SELECT statement nested inside another query. The inner query executes first, and its result is passed to the outer query. They can appear in <strong>SELECT</strong>, <strong>FROM</strong>, <strong>WHERE</strong>, and <strong>JOIN</strong> clauses.</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- DATASET PREVIEW -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="card ds-card" id="dataset">
+  <div class="card-inner">
+    <div class="card-title" style="font-family:var(--head)">📋 Source Dataset — Sales.Orders + Sales.Products + Sales.Customers + Sales.Employees</div>
+    <div class="card-sub">This dataset is used in all sections below</div>
+
+    <div style="margin-bottom:20px">
+      <div class="tbl-title">Sales.Orders — 8 rows</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th><span class="th-dot dc"></span>OrderID</th>
+            <th><span class="th-dot dp"></span>OrderDate</th>
+            <th><span class="th-dot do"></span>CustomerID</th>
+            <th><span class="th-dot do"></span>ProductID</th>
+            <th><span class="th-dot dy"></span>Sales</th>
+            <th><span class="th-dot dg"></span>Status</th>
+          </tr></thead>
+          <tbody>
+            <tr class="preview-row"><td class="vc">1001</td><td class="vp">2024-01-05</td><td class="vo">C01</td><td class="vc">P01</td><td class="vy">320</td><td class="vg">Shipped</td></tr>
+            <tr class="preview-row"><td class="vc">1002</td><td class="vp">2024-01-12</td><td class="vo">C02</td><td class="vc">P02</td><td class="vy">150</td><td class="vo">Pending</td></tr>
+            <tr class="preview-row"><td class="vc">1003</td><td class="vp">2024-02-03</td><td class="vp">C03</td><td class="vc">P01</td><td class="vy">480</td><td class="vg">Shipped</td></tr>
+            <tr class="preview-row"><td class="vc">1004</td><td class="vp">2024-02-18</td><td class="vo">C01</td><td class="vp">P03</td><td class="vy">210</td><td class="vpk">Cancelled</td></tr>
+            <tr class="preview-row"><td class="vc">1005</td><td class="vp">2024-03-07</td><td class="vb">C04</td><td class="vc">P02</td><td class="vy">560</td><td class="vg">Shipped</td></tr>
+            <tr class="preview-row"><td class="vc">1006</td><td class="vp">2024-03-22</td><td class="vp">C03</td><td class="vp">P03</td><td class="vy">95</td><td class="vo">Pending</td></tr>
+            <tr class="preview-row"><td class="vc">1007</td><td class="vp">2024-04-10</td><td class="vb">C04</td><td class="vc">P01</td><td class="vy">740</td><td class="vg">Shipped</td></tr>
+            <tr class="preview-row"><td class="vc">1008</td><td class="vp">2024-04-28</td><td class="vo">C02</td><td class="vp">P03</td><td class="vy">305</td><td class="vpk">Cancelled</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div>
+        <div class="tbl-title">Sales.Products — 3 rows</div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th><span class="th-dot dc"></span>ProductID</th>
+              <th><span class="th-dot do"></span>Product</th>
+              <th><span class="th-dot dy"></span>Price</th>
+            </tr></thead>
+            <tbody>
+              <tr class="preview-row"><td class="vc">P01</td><td class="vo">Laptop</td><td class="vy">1200</td></tr>
+              <tr class="preview-row"><td class="vc">P02</td><td class="vp">Mouse</td><td class="vy">45</td></tr>
+              <tr class="preview-row"><td class="vc">P03</td><td class="vb">Keyboard</td><td class="vy">120</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div>
+        <div class="tbl-title">Sales.Customers — 4 rows</div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th><span class="th-dot dc"></span>CustomerID</th>
+              <th><span class="th-dot do"></span>Name</th>
+              <th><span class="th-dot do"></span>Country</th>
+            </tr></thead>
+            <tbody>
+              <tr class="preview-row"><td class="vc">C01</td><td class="vo">Anna</td><td class="vg">Germany</td></tr>
+              <tr class="preview-row"><td class="vc">C02</td><td class="vp">Ben</td><td class="vb">USA</td></tr>
+              <tr class="preview-row"><td class="vc">C03</td><td class="vb">Carlos</td><td class="vg">Germany</td></tr>
+              <tr class="preview-row"><td class="vc">C04</td><td class="vo">Diana</td><td class="vo">France</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="tbl-title" style="margin-top:16px">Sales.Employees — 6 rows</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th><span class="th-dot dc"></span>EmployeeID</th>
+          <th><span class="th-dot do"></span>FirstName</th>
+          <th><span class="th-dot do"></span>Gender</th>
+          <th><span class="th-dot dy"></span>Salary</th>
+        </tr></thead>
+        <tbody>
+          <tr class="preview-row"><td class="vc">E01</td><td class="vo">Alice</td><td class="vpk">F</td><td class="vy">72000</td></tr>
+          <tr class="preview-row"><td class="vc">E02</td><td class="vp">Bob</td><td class="vc">M</td><td class="vy">65000</td></tr>
+          <tr class="preview-row"><td class="vc">E03</td><td class="vb">Carol</td><td class="vpk">F</td><td class="vy">58000</td></tr>
+          <tr class="preview-row"><td class="vc">E04</td><td class="vo">Dan</td><td class="vc">M</td><td class="vy">80000</td></tr>
+          <tr class="preview-row"><td class="vc">E05</td><td class="vg">Eve</td><td class="vpk">F</td><td class="vy">91000</td></tr>
+          <tr class="preview-row"><td class="vc">E06</td><td class="vp">Frank</td><td class="vc">M</td><td class="vy">55000</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="stats-row">
+      <span class="stat-badge sc">📦 8 orders</span>
+      <span class="stat-badge sy">💰 Orders total: 2,860</span>
+      <span class="stat-badge so">🛒 3 products</span>
+      <span class="stat-badge sc">👥 4 customers</span>
+      <span class="stat-badge sg">🌍 2 in Germany</span>
+      <span class="stat-badge">👤 6 employees</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- SECTION 01 — SUBQUERY RESULT TYPES -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="card s01" id="s01" style="scroll-margin-top:60px">
+  <div class="card-inner">
+    <div class="section-num">SECTION 01</div>
+    <div class="card-title" style="font-family:var(--head);color:var(--cyan)">Subquery Result Types</div>
+
+    <div class="explain">
+      Subqueries can return three types of results: a <strong>Scalar</strong> (single value — one row, one column), a <strong>Row</strong> (single row, multiple columns), or a <strong>Table</strong> (multiple rows and columns). The result type determines where and how the subquery can be used.
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('s01','scalar')">Scalar Query</button>
+      <button class="tab" onclick="switchTab('s01','row')">Row Query</button>
+      <button class="tab" onclick="switchTab('s01','table')">Table Query</button>
+    </div>
+
+    <div class="tab-content active" id="s01-scalar">
+      <div class="sql-box">
+        <div class="sql-header"><div class="mac-dots"><div class="mac-dot mac-r"></div><div class="mac-dot mac-y"></div><div class="mac-dot mac-g"></div></div><span class="sql-lang">SQL — Scalar</span></div>
+        <div class="sql-body"><span class="cm">-- Returns ONE value (single row, single column)</span>
+<span class="kw">SELECT</span>
+    <span class="hk">AVG</span>(<span class="fn">Sales</span>)   <span class="cm">-- ← scalar result</span>
+<span class="kw">FROM</span> Sales.Orders;</div>
+      </div>
+    </div>
+    <div class="tab-content" id="s01-row">
+      <div class="sql-box">
+        <div class="sql-header"><div class="mac-dots"><div class="mac-dot mac-r"></div><div class="mac-dot mac-y"></div><div class="mac-dot mac-g"></div></div><span class="sql-lang">SQL — Row</span></div>
+        <div class="sql-body"><span class="cm">-- Returns ONE column (many rows)</span>
+<span class="kw">SELECT</span>
+    <span class="hk">CustomerID</span>    <span class="cm">-- ← row/list result</span>
+<span class="kw">FROM</span> Sales.Orders;</div>
+      </div>
+    </div>
+    <div class="tab-content" id="s01-table">
+      <div class="sql-box">
+        <div class="sql-header"><div class="mac-dots"><div class="mac-dot mac-r"></div><div class="mac-dot mac-y"></div><div class="mac-dot mac-g"></div></div><span class="sql-lang">SQL — Table</span></div>
+        <div class="sql-body"><span class="cm">-- Returns a full table (many rows, many columns)</span>
+<span class="kw">SELECT</span>
+    <span class="hk">OrderID</span>,
+    <span class="hk">OrderDate</span>    <span class="cm">-- ← table result</span>
+<span class="kw">FROM</span> Sales.Orders;</div>
+      </div>
+    </div>
+
+    <div class="pipeline">
+      <div class="pipe-step" id="p01_1">① Scan</div>
+      <span class="adn" id="a01_1">→</span>
+      <div class="pipe-step" id="p01_2">② Compute</div>
+      <span class="adn" id="a01_2">→</span>
+      <div class="pipe-step" id="p01_3">③ Return Type</div>
+      <span class="adn" id="a01_3">→</span>
+      <div class="pipe-step" id="p01_4">④ Result</div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-exec" id="btn01" onclick="runS01()">▶ Execute</button>
+      <button class="btn-reset" onclick="resetS01()">↻ Reset</button>
+    </div>
+
+    <div class="stage" id="s01_1">
+      <div class="stage-title">① Scanning Sales.Orders — reading Sales column</div>
+      <div class="tbl-wrap"><div class="tbl-title">Sales.Orders — Scan</div>
+        <table><thead><tr><th><span class="th-dot dc"></span>OrderID</th><th><span class="th-dot dy"></span>Sales</th></tr></thead>
+        <tbody id="tb01_1"></tbody></table>
+      </div>
+    </div>
+
+    <div class="stage" id="s01_2">
+      <div class="stage-title">② Computing AVG(Sales)</div>
+      <div class="tbl-wrap"><div class="tbl-title">Running Sum → AVG</div>
+        <table><thead><tr><th>Step</th><th>Running Sum</th><th>Count</th><th class="vy">Current AVG</th></tr></thead>
+        <tbody id="tb01_2"></tbody></table>
+      </div>
+    </div>
+
+    <div class="stage" id="s01_3">
+      <div class="stage-title">③ Return Type Classification</div>
+      <div class="three-col">
+        <div class="res-info"><div class="res-label">SCALAR (1 × 1)</div><div style="font-family:var(--mono);font-size:22px;color:var(--cyan);margin:8px 0">357.5</div><div style="color:var(--muted);font-size:11px">AVG(Sales) → single number</div></div>
+        <div class="tbl-wrap" style="padding:14px"><div class="res-label" style="color:var(--purple);margin-bottom:8px">ROW (n × 1)</div><div class="vm" style="font-size:11px">C01, C02, C03, C01, C04, C03, C04, C02</div><div style="color:var(--muted);font-size:11px;margin-top:6px">CustomerID → list</div></div>
+        <div class="tbl-wrap" style="padding:14px"><div class="res-label" style="color:var(--orange);margin-bottom:8px">TABLE (n × m)</div><div class="vm" style="font-size:11px">OrderID + OrderDate → full table</div><div style="color:var(--muted);font-size:11px;margin-top:6px">multiple columns</div></div>
+      </div>
+    </div>
+
+    <div class="stage" id="s01_4">
+      <div class="stage-title">④ Final Scalar Result</div>
+      <div class="res-good"><div class="res-label">✓ SCALAR SUBQUERY RESULT</div>
+        <table style="width:auto"><thead><tr><th>AVG(Sales)</th></tr></thead>
+        <tbody><tr><td class="vy" style="font-size:18px;font-weight:700">357.5</td></tr></tbody></table>
+      </div>
+      <span class="impact imp-c">💡 Scalar = exactly 1 value. Use anywhere a single value is expected.</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- SECTION 02 — FROM CLAUSE -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="card s02" id="s02" style="scroll-margin-top:60px">
+  <div class="card-inner">
+    <div class="section-num">SECTION 02</div>
+    <div class="card-title" style="font-family:var(--head);color:var(--purple)">Subquery in FROM Clause</div>
+
+    <div class="explain ep">
+      A subquery in the <strong>FROM clause</strong> acts as a derived table (inline view). The outer query treats the subquery's result as if it were a regular table. You must give it an alias using <strong>AS t</strong>. Great for pre-aggregating or pre-filtering before the main query runs.
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('s02','task1')">Task 1 — Above Avg Price</button>
+      <button class="tab" onclick="switchTab('s02','task2')">Task 2 — Rank Customers</button>
+    </div>
+
+    <div class="tab-content active" id="s02-task1">
+      <div class="sql-box">
+        <div class="sql-header"><div class="mac-dots"><div class="mac-dot mac-r"></div><div class="mac-dot mac-y"></div><div class="mac-dot mac-g"></div></div><span class="sql-lang">SQL — Task 1</span></div>
+        <div class="sql-body"><span class="cm">-- Task 1: Products with price higher than average</span>
+<span class="kw">SELECT</span> *
+<span class="kw">FROM</span> (
+    <span class="cm">-- Subquery (derived table)</span>
+    <span class="kw">SELECT</span>
+        ProductID,
+        Price,
+        <span class="hk">AVG</span>(<span class="fn">Price</span>) <span class="kw">OVER</span> () <span class="kw">AS</span> AvgPrice
+    <span class="kw">FROM</span> Sales.Products
+) <span class="kw">AS</span> t
+<span class="kw">WHERE</span> Price > AvgPrice;</div>
+      </div>
+    </div>
+    <div class="tab-content" id="s02-task2">
+      <div class="sql-box">
+        <div class="sql-header"><div class="mac-dots"><div class="mac-dot mac-r"></div><div class="mac-dot mac-y"></div><div class="mac-dot mac-g"></div></div><span class="sql-lang">SQL — Task 2</span></div>
+        <div class="sql-body"><span class="cm">-- Task 2: Rank customers by total sales</span>
+<span class="kw">SELECT</span>
+    *,
+    <span class="hk">RANK</span>() <span class="kw">OVER</span> (<span class="kw">ORDER BY</span> TotalSales <span class="kw">DESC</span>) <span class="kw">AS</span> CustomerRank
+<span class="kw">FROM</span> (
+    <span class="cm">-- Subquery aggregates first</span>
+    <span class="kw">SELECT</span>
+        CustomerID,
+        <span class="fn">SUM</span>(Sales) <span class="kw">AS</span> TotalSales
+    <span class="kw">FROM</span> Sales.Orders
+    <span class="kw">GROUP BY</span> CustomerID
+) <span class="kw">AS</span> t;</div>
+      </div>
+    </div>
+
+    <div class="pipeline">
+      <div class="pipe-step" id="p02_1">① Subquery</div>
+      <span class="adn" id="a02_1">→</span>
+      <div class="pipe-step" id="p02_2">② Derived Table</div>
+      <span class="adn" id="a02_2">→</span>
+      <div class="pipe-step" id="p02_3">③ Filter/Rank</div>
+      <span class="adn" id="a02_3">→</span>
+      <div class="pipe-step" id="p02_4">④ Result</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-exec" id="btn02" onclick="runS02()">▶ Execute</button>
+      <button class="btn-reset" onclick="resetS02()">↻ Reset</button>
+    </div>
+
+    <div class="stage" id="s02_1">
+      <div class="stage-title">① Inner Subquery — Products with AVG(Price)</div>
+      <div class="tbl-wrap"><div class="tbl-title">Subquery result (derived table t)</div>
+        <table><thead><tr><th><span class="th-dot dc"></span>ProductID</th><th><span class="th-dot do"></span>Product</th><th><span class="th-dot dy"></span>Price</th><th><span class="th-dot dy"></span>AvgPrice</th></tr></thead>
+        <tbody id="tb02_1"></tbody></table>
+      </div>
+    </div>
+    <div class="stage" id="s02_2">
+      <div class="stage-title">② Derived Table Available to Outer Query</div>
+      <div class="res-info"><div class="res-label">ℹ️ DERIVED TABLE ALIAS</div>
+        <span style="color:var(--text)">The subquery result is now addressable as <span class="vy">t</span>. Outer query can filter, sort, or rank it like a real table.</span>
+      </div>
+    </div>
+    <div class="stage" id="s02_3">
+      <div class="stage-title">③ Applying WHERE Price > AvgPrice (AvgPrice = 455)</div>
+      <div class="tbl-wrap"><div class="tbl-title">Filtering rows</div>
+        <table><thead><tr><th>ProductID</th><th>Price</th><th>AvgPrice</th><th>Price > Avg?</th></tr></thead>
+        <tbody id="tb02_3"></tbody></table>
+      </div>
+    </div>
+    <div class="stage" id="s02_4">
+      <div class="stage-title">④ Final Result — Products above average price</div>
+      <div class="res-good"><div class="res-label">✓ RESULT</div>
+        <table><thead><tr><th>ProductID</th><th>Product</th><th>Price</th><th>AvgPrice</th></tr></thead>
+        <tbody><tr><td class="vc">P01</td><td class="vo">Laptop</td><td class="vg">1200</td><td class="vy">455</td></tr></tbody>
+      </table></div>
+      <span class="impact imp-p">💡 FROM subquery = derived table. Must have an alias (AS t).</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- SECTION 03 — SELECT SUBQUERY -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="card s03" id="s03" style="scroll-margin-top:60px">
+  <div class="card-inner">
+    <div class="section-num">SECTION 03</div>
+    <div class="card-title" style="font-family:var(--head);color:var(--orange)">Subquery in SELECT</div>
+
+    <div class="explain eo">
+      A subquery inside the <strong>SELECT list</strong> must return a <strong>scalar</strong> (exactly one value). It is evaluated once per row (or once globally if no correlation). Perfect for adding aggregate context columns like "total orders" next to product details.
+    </div>
+
+    <div class="sql-box">
+      <div class="sql-header"><div class="mac-dots"><div class="mac-dot mac-r"></div><div class="mac-dot mac-y"></div><div class="mac-dot mac-g"></div></div><span class="sql-lang">SQL — Task 3</span></div>
+      <div class="sql-body"><span class="cm">-- Task 3: Show products + total order count</span>
+<span class="kw">SELECT</span>
+    ProductID,
+    Product,
+    Price,
+    (<span class="kw">SELECT</span> <span class="hk">COUNT</span>(*) <span class="kw">FROM</span> Sales.Orders) <span class="kw">AS</span> TotalOrders
+    <span class="cm">-- ↑ scalar subquery in SELECT</span>
+<span class="kw">FROM</span> Sales.Products;</div>
+    </div>
+
+    <div class="pipeline">
+      <div class="pipe-step" id="p03_1">① Scan Products</div>
+      <span class="adn" id="a03_1">→</span>
+      <div class="pipe-step" id="p03_2">② Scalar Subquery</div>
+      <span class="adn" id="a03_2">→</span>
+      <div class="pipe-step" id="p03_3">③ Inject Value</div>
+      <span class="adn" id="a03_3">→</span>
+      <div class="pipe-step" id="p03_4">④ Result</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-exec" id="btn03" onclick="runS03()">▶ Execute</button>
+      <button class="btn-reset" onclick="resetS03()">↻ Reset</button>
+    </div>
+
+    <div class="stage" id="s03_1">
+      <div class="stage-title">① Scanning Sales.Products</div>
+      <div class="tbl-wrap"><div class="tbl-title">Products table scan</div>
+        <table><thead><tr><th>ProductID</th><th>Product</th><th>Price</th></tr></thead>
+        <tbody id="tb03_1"></tbody></table>
+      </div>
+    </div>
+    <div class="stage" id="s03_2">
+      <div class="stage-title">② Scalar Subquery Executes Once: COUNT(*) FROM Sales.Orders</div>
+      <div class="res-info"><div class="res-label">ℹ️ SCALAR SUBQUERY RESULT</div>
+        <span style="color:var(--text)">SELECT COUNT(*) FROM Sales.Orders → <span class="vy" style="font-size:18px;font-weight:700"> 8 </span> (one value, reused for every row)</span>
+      </div>
+    </div>
+    <div class="stage" id="s03_3">
+      <div class="stage-title">③ TotalOrders = 8 injected into every product row</div>
+      <div class="tbl-wrap"><div class="tbl-title">Building result rows</div>
+        <table><thead><tr><th>ProductID</th><th>Product</th><th>Price</th><th class="vy">TotalOrders</th></tr></thead>
+        <tbody id="tb03_3"></tbody></table>
+      </div>
+    </div>
+    <div class="stage" id="s03_4">
+      <div class="stage-title">④ Final Result</div>
+      <div class="res-good"><div class="res-label">✓ RESULT — same TotalOrders on every row</div>
+        <table><thead><tr><th>ProductID</th><th>Product</th><th>Price</th><th>TotalOrders</th></tr></thead>
+        <tbody>
+          <tr><td class="vc">P01</td><td class="vo">Laptop</td><td class="vy">1200</td><td class="vg">8</td></tr>
+          <tr><td class="vc">P02</td><td class="vp">Mouse</td><td class="vy">45</td><td class="vg">8</td></tr>
+          <tr><td class="vc">P03</td><td class="vb">Keyboard</td><td class="vy">120</td><td class="vg">8</td></tr>
+        </tbody>
+      </table></div>
+      <span class="impact imp-o">💡 SELECT subquery must be scalar. Great for adding global aggregate context.</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- SECTION 04 — JOIN CLAUSE -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="card s04" id="s04" style="scroll-margin-top:60px">
+  <div class="card-inner">
+    <div class="section-num">SECTION 04</div>
+    <div class="card-title" style="font-family:var(--head);color:var(--green)">Subquery in JOIN Clause</div>
+
+    <div class="explain eg">
+      You can use a subquery in a <strong>JOIN</strong> instead of a real table. The subquery creates a derived table that gets joined. Combined with <strong>LEFT JOIN</strong>, this lets you attach aggregated information (like TotalSales or TotalOrders) to every customer, even those with no orders.
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('s04','task4')">Task 4 — Total Sales</button>
+      <button class="tab" onclick="switchTab('s04','task5')">Task 5 — Total Orders</button>
+    </div>
+    <div class="tab-content active" id="s04-task4">
+      <div class="sql-box">
+        <div class="sql-header"><div class="mac-dots"><div class="mac-dot mac-r"></div><div class="mac-dot mac-y"></div><div class="mac-dot mac-g"></div></div><span class="sql-lang">SQL — Task 4</span></div>
+        <div class="sql-body"><span class="kw">SELECT</span>
+    c.*,
+    t.TotalSales
+<span class="kw">FROM</span> Sales.Customers <span class="kw">AS</span> c
+<span class="hk">LEFT JOIN</span> (
+    <span class="kw">SELECT</span>
+        CustomerID,
+        <span class="fn">SUM</span>(Sales) <span class="kw">AS</span> TotalSales
+    <span class="kw">FROM</span> Sales.Orders
+    <span class="kw">GROUP BY</span> CustomerID
+) <span class="kw">AS</span> t
+    <span class="kw">ON</span> c.CustomerID = t.CustomerID;</div>
+      </div>
+    </div>
+    <div class="tab-content" id="s04-task5">
+      <div class="sql-box">
+        <div class="sql-header"><div class="mac-dots"><div class="mac-dot mac-r"></div><div class="mac-dot mac-y"></div><div class="mac-dot mac-g"></div></div><span class="sql-lang">SQL — Task 5</span></div>
+        <div class="sql-body"><span class="kw">SELECT</span>
+    c.*,
+    o.TotalOrders
+<span class="kw">FROM</span> Sales.Customers <span class="kw">AS</span> c
+<span class="hk">LEFT JOIN</span> (
+    <span class="kw">SELECT</span>
+        CustomerID,
+        <span class="fn">COUNT</span>(*) <span class="kw">AS</span> TotalOrders
+    <span class="kw">FROM</span> Sales.Orders
+    <span class="kw">GROUP BY</span> CustomerID
+) <span class="kw">AS</span> o
+    <span class="kw">ON</span> c.CustomerID = o.CustomerID;</div>
+      </div>
+    </div>
+
+    <div class="pipeline">
+      <div class="pipe-step" id="p04_1">① Subquery</div>
+      <span class="adn" id="a04_1">→</span>
+      <div class="pipe-step" id="p04_2">② Aggregate</div>
+      <span class="adn" id="a04_2">→</span>
+      <div class="pipe-step" id="p04_3">③ LEFT JOIN</div>
+      <span class="adn" id="a04_3">→</span>
+      <div class="pipe-step" id="p04_4">④ Result</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-exec" id="btn04" onclick="runS04()">▶ Execute</button>
+      <button class="btn-reset" onclick="resetS04()">↻ Reset</button>
+    </div>
+
+    <div class="stage" id="s04_1">
+      <div class="stage-title">① Subquery: Aggregate orders per customer</div>
+      <div class="tbl-wrap"><div class="tbl-title">Derived table t — SUM(Sales) per CustomerID</div>
+        <table><thead><tr><th>CustomerID</th><th>TotalSales</th></tr></thead>
+        <tbody id="tb04_1"></tbody></table>
+      </div>
+    </div>
+    <div class="stage" id="s04_2">
+      <div class="stage-title">② LEFT JOIN — match customers to aggregates</div>
+      <div class="two-col">
+        <div class="tbl-wrap"><div class="tbl-title">Customers (left)</div>
+          <table><thead><tr><th>CustomerID</th><th>Name</th><th>Country</th></tr></thead>
+          <tbody>
+            <tr><td class="vc">C01</td><td class="vo">Anna</td><td class="vg">Germany</td></tr>
+            <tr><td class="vc">C02</td><td class="vp">Ben</td><td class="vb">USA</td></tr>
+            <tr><td class="vc">C03</td><td class="vb">Carlos</td><td class="vg">Germany</td></tr>
+            <tr><td class="vc">C04</td><td class="vo">Diana</td><td class="vo">France</td></tr>
+          </tbody>
+        </table></div>
+        <div class="tbl-wrap"><div class="tbl-title">Derived table t (right)</div>
+          <table><thead><tr><th>CustomerID</th><th>TotalSales</th></tr></thead>
+          <tbody id="tb04_2b"></tbody>
+        </table></div>
+      </div>
+    </div>
+    <div class="stage" id="s04_3">
+      <div class="stage-title">③ Joining on CustomerID</div>
+      <div class="tbl-wrap"><div class="tbl-title">Joined result</div>
+        <table><thead><tr><th>CustomerID</th><th>Name</th><th>Country</th><th>TotalSales</th></tr></thead>
+        <tbody id="tb04_3"></tbody></table>
+      </div>
+    </div>
+    <div class="stage" id="s04_4">
+      <div class="stage-title">④ Final Result</div>
+      <div class="res-good"><div class="res-label">✓ All customers shown, NULL where no orders</div>
+        <table><thead><tr><th>CustomerID</th><th>Name</th><th>Country</th><th>TotalSales</th></tr></thead>
+        <tbody>
+          <tr><td class="vc">C01</td><td class="vo">Anna</td><td class="vg">Germany</td><td class="vg">530</td></tr>
+          <tr><td class="vc">C02</td><td class="vp">Ben</td><td class="vb">USA</td><td class="vy">455</td></tr>
+          <tr><td class="vc">C03</td><td class="vb">Carlos</td><td class="vg">Germany</td><td class="vy">575</td></tr>
+          <tr><td class="vc">C04</td><td class="vo">Diana</td><td class="vo">France</td><td class="vg">1300</td></tr>
+        </tbody>
+      </table></div>
+      <span class="impact imp-g">💡 JOIN subquery = powerful way to attach aggregates without losing any customers.</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- SECTION 05 — COMPARISON OPERATORS -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="card s05" id="s05" style="scroll-margin-top:60px">
+  <div class="card-inner">
+    <div class="section-num">SECTION 05</div>
+    <div class="card-title" style="font-family:var(--head);color:var(--pink)">Subquery with Comparison Operators</div>
+
+    <div class="explain epk">
+      Use a scalar subquery with comparison operators (<strong>&gt;</strong>, <strong>&lt;</strong>, <strong>=</strong>, <strong>!=</strong>) in a WHERE clause. The subquery must return exactly one value. Here we find products priced above average by comparing directly to <strong>(SELECT AVG(Price) ...)</strong>.
+    </div>
+
+    <div class="sql-box">
+      <div class="sql-header"><div class="mac-dots"><div class="mac-dot mac-r"></div><div class="mac-dot mac-y"></div><div class="mac-dot mac-g"></div></div><span class="sql-lang">SQL — Task 6</span></div>
+      <div class="sql-body"><span class="cm">-- Task 6: Products priced above average</span>
+<span class="kw">SELECT</span>
+    ProductID,
+    Price,
+    (<span class="kw">SELECT</span> <span class="fn">AVG</span>(Price) <span class="kw">FROM</span> Sales.Products) <span class="kw">AS</span> AvgPrice
+<span class="kw">FROM</span> Sales.Products
+<span class="kw">WHERE</span> Price <span class="hk">&gt;</span> (<span class="kw">SELECT</span> <span class="fn">AVG</span>(Price) <span class="kw">FROM</span> Sales.Products);</div>
+    </div>
+
+    <div class="pipeline">
+      <div class="pipe-step" id="p05_1">① Compute AVG</div>
+      <span class="adn" id="a05_1">→</span>
+      <div class="pipe-step" id="p05_2">② Compare Each</div>
+      <span class="adn" id="a05_2">→</span>
+      <div class="pipe-step" id="p05_3">③ Filter</div>
+      <span class="adn" id="a05_3">→</span>
+      <div class="pipe-step" id="p05_4">④ Result</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-exec" id="btn05" onclick="runS05()">▶ Execute</button>
+      <button class="btn-reset" onclick="resetS05()">↻ Reset</button>
+    </div>
+
+    <div class="stage" id="s05_1">
+      <div class="stage-title">① Scalar subquery: AVG(Price)</div>
+      <div class="res-info"><div class="res-label">ℹ️ INNER QUERY</div>
+        <span style="color:var(--text)">SELECT AVG(Price) FROM Sales.Products → <span class="vy" style="font-size:18px;font-weight:700"> 455 </span></span>
+      </div>
+    </div>
+    <div class="stage" id="s05_2">
+      <div class="stage-title">② Compare each product price to 455</div>
+      <div class="tbl-wrap"><div class="tbl-title">Row-by-row comparison</div>
+        <table><thead><tr><th>ProductID</th><th>Product</th><th>Price</th><th>AvgPrice</th><th>Price > Avg?</th></tr></thead>
+        <tbody id="tb05_2"></tbody></table>
+      </div>
+    </div>
+    <div class="stage" id="s05_3">
+      <div class="stage-title">③ Filtering: only rows where Price > 455</div>
+      <div class="tbl-wrap"><div class="tbl-title">Filtered rows</div>
+        <table><thead><tr><th>ProductID</th><th>Price</th><th>AvgPrice</th></tr></thead>
+        <tbody id="tb05_3"></tbody></table>
+      </div>
+    </div>
+    <div class="stage" id="s05_4">
+      <div class="stage-title">④ Final Result</div>
+      <div class="res-good"><div class="res-label">✓ RESULT</div>
+        <table><thead><tr><th>ProductID</th><th>Price</th><th>AvgPrice</th></tr></thead>
+        <tbody><tr><td class="vc">P01</td><td class="vg">1200</td><td class="vy">455</td></tr></tbody>
+      </table></div>
+      <span class="impact imp-pk">💡 Comparison operators require a scalar subquery (one value only).</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- SECTION 06 — IN OPERATOR -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="card s06" id="s06" style="scroll-margin-top:60px">
+  <div class="card-inner">
+    <div class="section-num">SECTION 06</div>
+    <div class="card-title" style="font-family:var(--head);color:var(--yellow)">Subquery with IN Operator</div>
+
+    <div class="explain ey">
+      The <strong>IN</strong> operator checks if a value matches any value in a list returned by a subquery (row-type result). <strong>NOT IN</strong> filters out rows that match. Very useful for cross-table lookups like "orders from customers in Germany."
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('s06','task7')">Task 7 — IN Germany</button>
+      <button class="tab" onclick="switchTab('s06','task8')">Task 8 — NOT IN Germany</button>
+    </div>
+    <div class="tab-content active" id="s06-task7">
+      <div class="sql-box">
+        <div class="sql-header"><div class="mac-dots"><div class="mac-dot mac-r"></div><div class="mac-dot mac-y"></div><div class="mac-dot mac-g"></div></div><span class="sql-lang">SQL — Task 7</span></div>
+        <div class="sql-body"><span class="kw">SELECT</span> *
+<span class="kw">FROM</span> Sales.Orders
+<span class="kw">WHERE</span> CustomerID <span class="hk">IN</span> (
+    <span class="kw">SELECT</span> CustomerID
+    <span class="kw">FROM</span> Sales.Customers
+    <span class="kw">WHERE</span> Country = <span class="str">'Germany'</span>
+);</div>
+      </div>
+    </div>
+    <div class="tab-content" id="s06-task8">
+      <div class="sql-box">
+        <div class="sql-header"><div class="mac-dots"><div class="mac-dot mac-r"></div><div class="mac-dot mac-y"></div><div class="mac-dot mac-g"></div></div><span class="sql-lang">SQL — Task 8</span></div>
+        <div class="sql-body"><span class="kw">SELECT</span> *
+<span class="kw">FROM</span> Sales.Orders
+<span class="kw">WHERE</span> CustomerID <span class="hk">NOT IN</span> (
+    <span class="kw">SELECT</span> CustomerID
+    <span class="kw">FROM</span> Sales.Customers
+    <span class="kw">WHERE</span> Country = <span class="str">'Germany'</span>
+);</div>
+      </div>
+    </div>
+
+    <div class="pipeline">
+      <div class="pipe-step" id="p06_1">① Get German IDs</div>
+      <span class="adn" id="a06_1">→</span>
+      <div class="pipe-step" id="p06_2">② Build List</div>
+      <span class="adn" id="a06_2">→</span>
+      <div class="pipe-step" id="p06_3">③ IN Check</div>
+      <span class="adn" id="a06_3">→</span>
+      <div class="pipe-step" id="p06_4">④ Result</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-exec" id="btn06" onclick="runS06()">▶ Execute</button>
+      <button class="btn-reset" onclick="resetS06()">↻ Reset</button>
+    </div>
+
+    <div class="stage" id="s06_1">
+      <div class="stage-title">① Subquery: CustomerIDs from Germany</div>
+      <div class="tbl-wrap"><div class="tbl-title">Customers WHERE Country = 'Germany'</div>
+        <table><thead><tr><th>CustomerID</th><th>Name</th><th>Country</th></tr></thead>
+        <tbody id="tb06_1"></tbody></table>
+      </div>
+    </div>
+    <div class="stage" id="s06_2">
+      <div class="stage-title">② IN list = (C01, C03)</div>
+      <div class="res-info"><div class="res-label">ℹ️ SUBQUERY RESULT LIST</div>
+        <span style="color:var(--text)">CustomerID <span class="hk">IN</span> (<span class="vc">C01</span>, <span class="vc">C03</span>)</span>
+      </div>
+    </div>
+    <div class="stage" id="s06_3">
+      <div class="stage-title">③ Checking each order's CustomerID against the list</div>
+      <div class="tbl-wrap"><div class="tbl-title">Orders — IN check (✓ = match)</div>
+        <table><thead><tr><th>OrderID</th><th>CustomerID</th><th>Sales</th><th>IN (C01,C03)?</th></tr></thead>
+        <tbody id="tb06_3"></tbody></table>
+      </div>
+    </div>
+    <div class="stage" id="s06_4">
+      <div class="stage-title">④ Result — Orders from German customers</div>
+      <div class="two-col">
+        <div class="res-good"><div class="res-label">✓ IN — German orders</div>
+          <table><thead><tr><th>OrderID</th><th>CustomerID</th><th>Sales</th></tr></thead>
+          <tbody id="tb06_4a"></tbody></table>
+        </div>
+        <div class="res-bad"><div class="res-label">✗ NOT IN — Non-German orders</div>
+          <table><thead><tr><th>OrderID</th><th>CustomerID</th><th>Sales</th></tr></thead>
+          <tbody id="tb06_4b"></tbody></table>
+        </div>
+      </div>
+      <span class="impact imp-y">💡 IN subquery returns a list. NOT IN excludes matching rows.</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- SECTION 07 — ANY OPERATOR -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="card s07" id="s07" style="scroll-margin-top:60px">
+  <div class="card-inner">
+    <div class="section-num">SECTION 07</div>
+    <div class="card-title" style="font-family:var(--head);color:var(--blue)">Subquery with ANY Operator</div>
+
+    <div class="explain eb">
+      <strong>ANY</strong> compares a value against all values in the subquery result. <code>salary &gt; ANY (...)</code> is TRUE if the salary is greater than <em>at least one</em> value in the list. Equivalent to <code>&gt; MIN(...)</code>. Useful for threshold comparisons across groups.
+    </div>
+
+    <div class="sql-box">
+      <div class="sql-header"><div class="mac-dots"><div class="mac-dot mac-r"></div><div class="mac-dot mac-y"></div><div class="mac-dot mac-g"></div></div><span class="sql-lang">SQL — Task 9</span></div>
+      <div class="sql-body"><span class="cm">-- Task 9: Female employees earning more than ANY male</span>
+<span class="kw">SELECT</span> EmployeeID, FirstName, Salary
+<span class="kw">FROM</span> Sales.Employees
+<span class="kw">WHERE</span> Gender = <span class="str">'F'</span>
+  <span class="kw">AND</span> Salary <span class="hk">&gt; ANY</span> (
+      <span class="kw">SELECT</span> Salary
+      <span class="kw">FROM</span> Sales.Employees
+      <span class="kw">WHERE</span> Gender = <span class="str">'M'</span>
+  );</div>
+    </div>
+
+    <div class="pipeline">
+      <div class="pipe-step" id="p07_1">① Male Salaries</div>
+      <span class="adn" id="a07_1">→</span>
+      <div class="pipe-step" id="p07_2">② ANY List</div>
+      <span class="adn" id="a07_2">→</span>
+      <div class="pipe-step" id="p07_3">③ Compare F</div>
+      <span class="adn" id="a07_3">→</span>
+      <div class="pipe-step" id="p07_4">④ Result</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-exec" id="btn07" onclick="runS07()">▶ Execute</button>
+      <button class="btn-reset" onclick="resetS07()">↻ Reset</button>
+    </div>
+
+    <div class="stage" id="s07_1">
+      <div class="stage-title">① Subquery: Male salaries</div>
+      <div class="tbl-wrap"><div class="tbl-title">Employees WHERE Gender = 'M'</div>
+        <table><thead><tr><th>EmployeeID</th><th>FirstName</th><th>Salary</th></tr></thead>
+        <tbody id="tb07_1"></tbody></table>
+      </div>
+    </div>
+    <div class="stage" id="s07_2">
+      <div class="stage-title">② ANY list = (65000, 80000, 55000) → need salary > 55000 (MIN)</div>
+      <div class="res-info"><div class="res-label">ℹ️ ANY LOGIC</div>
+        <span style="color:var(--text)"><span class="hk">&gt; ANY</span> means "greater than at least one value in the list" = <span class="vy">&gt; MIN(male salaries)</span> = &gt; 55,000</span>
+      </div>
+    </div>
+    <div class="stage" id="s07_3">
+      <div class="stage-title">③ Checking each female employee</div>
+      <div class="tbl-wrap"><div class="tbl-title">Female employees > ANY male salary?</div>
+        <table><thead><tr><th>EmployeeID</th><th>FirstName</th><th>Salary</th><th>> ANY male?</th></tr></thead>
+        <tbody id="tb07_3"></tbody></table>
+      </div>
+    </div>
+    <div class="stage" id="s07_4">
+      <div class="stage-title">④ Final Result</div>
+      <div class="res-good"><div class="res-label">✓ Female employees earning more than at least one male</div>
+        <table><thead><tr><th>EmployeeID</th><th>FirstName</th><th>Salary</th></tr></thead>
+        <tbody id="tb07_4"></tbody></table>
+      </div>
+      <span class="impact imp-b">💡 > ANY = > MIN of the list. ALL = must exceed every value (= > MAX).</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- SECTION 08 — CORRELATED SUBQUERY -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="card s08" id="s08" style="scroll-margin-top:60px">
+  <div class="card-inner">
+    <div class="section-num">SECTION 08</div>
+    <div class="card-title" style="font-family:var(--head);color:var(--cyan)">Correlated Subquery</div>
+
+    <div class="explain">
+      A <strong>correlated subquery</strong> references a column from the outer query. It re-executes for <em>every row</em> of the outer query, passing the outer value (e.g. <code>c.CustomerID</code>) into the inner query. Powerful but can be slower on large datasets than a JOIN approach.
+    </div>
+
+    <div class="sql-box">
+      <div class="sql-header"><div class="mac-dots"><div class="mac-dot mac-r"></div><div class="mac-dot mac-y"></div><div class="mac-dot mac-g"></div></div><span class="sql-lang">SQL — Task 10</span></div>
+      <div class="sql-body"><span class="cm">-- Task 10: Total orders per customer (correlated)</span>
+<span class="kw">SELECT</span>
+    *,
+    (<span class="kw">SELECT</span> <span class="fn">COUNT</span>(*)
+     <span class="kw">FROM</span> Sales.Orders o
+     <span class="kw">WHERE</span> o.CustomerID <span class="hk">=</span> c.CustomerID) <span class="kw">AS</span> TotalOrders
+     <span class="cm">-- ↑ references outer alias c</span>
+<span class="kw">FROM</span> Sales.Customers <span class="kw">AS</span> c;</div>
+    </div>
+
+    <div class="pipeline">
+      <div class="pipe-step" id="p08_1">① Outer Row</div>
+      <span class="adn" id="a08_1">→</span>
+      <div class="pipe-step" id="p08_2">② Inner Query</div>
+      <span class="adn" id="a08_2">→</span>
+      <div class="pipe-step" id="p08_3">③ Inject Count</div>
+      <span class="adn" id="a08_3">→</span>
+      <div class="pipe-step" id="p08_4">④ Next Row</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-exec" id="btn08" onclick="runS08()">▶ Execute</button>
+      <button class="btn-reset" onclick="resetS08()">↻ Reset</button>
+    </div>
+
+    <div class="stage" id="s08_1">
+      <div class="stage-title">① Outer query scans Sales.Customers row by row</div>
+      <div class="tbl-wrap"><div class="tbl-title">Processing customers one at a time</div>
+        <table><thead><tr><th>CustomerID</th><th>Name</th><th>Country</th><th class="vy">TotalOrders</th></tr></thead>
+        <tbody id="tb08_1"></tbody></table>
+      </div>
+    </div>
+    <div class="stage" id="s08_2">
+      <div class="stage-title">② For each customer, inner query runs separately</div>
+      <div class="tbl-wrap"><div class="tbl-title">Correlated execution log</div>
+        <table><thead><tr><th>Customer</th><th>Inner Query</th><th>Result</th></tr></thead>
+        <tbody id="tb08_2"></tbody></table>
+      </div>
+    </div>
+    <div class="stage" id="s08_3">
+      <div class="stage-title">③ Injecting TotalOrders into each row</div>
+      <div class="tbl-wrap"><div class="tbl-title">Building result</div>
+        <table><thead><tr><th>CustomerID</th><th>Name</th><th>Country</th><th class="vy">TotalOrders</th></tr></thead>
+        <tbody id="tb08_3"></tbody></table>
+      </div>
+    </div>
+    <div class="stage" id="s08_4">
+      <div class="stage-title">④ Final Result</div>
+      <div class="res-good"><div class="res-label">✓ All customers with their order count</div>
+        <table><thead><tr><th>CustomerID</th><th>Name</th><th>Country</th><th>TotalOrders</th></tr></thead>
+        <tbody>
+          <tr><td class="vc">C01</td><td class="vo">Anna</td><td class="vg">Germany</td><td class="vg">2</td></tr>
+          <tr><td class="vc">C02</td><td class="vp">Ben</td><td class="vb">USA</td><td class="vy">2</td></tr>
+          <tr><td class="vc">C03</td><td class="vb">Carlos</td><td class="vg">Germany</td><td class="vy">2</td></tr>
+          <tr><td class="vc">C04</td><td class="vo">Diana</td><td class="vo">France</td><td class="vg">2</td></tr>
+        </tbody>
+      </table></div>
+      <div class="res-bad" style="margin-top:12px"><div class="res-label">⚠️ PERFORMANCE NOTE</div>
+        <span style="color:var(--muted)">Correlated subquery runs N times (once per outer row). For large tables, prefer <span class="vc">LEFT JOIN</span> with aggregation.</span>
+      </div>
+      <span class="impact imp-c">💡 Correlated = inner query sees outer row's values. Re-runs for each row.</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- SECTION 09 — EXISTS -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="card s09" id="s09" style="scroll-margin-top:60px">
+  <div class="card-inner">
+    <div class="section-num">SECTION 09</div>
+    <div class="card-title" style="font-family:var(--head);color:var(--purple)">Subquery with EXISTS Operator</div>
+
+    <div class="explain ep">
+      <strong>EXISTS</strong> returns TRUE if the subquery returns at least one row. It's always a correlated subquery — the inner query references the outer table. <strong>NOT EXISTS</strong> is the inverse. EXISTS is often faster than IN because it short-circuits as soon as one match is found.
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('s09','task11')">Task 11 — EXISTS Germany</button>
+      <button class="tab" onclick="switchTab('s09','task12')">Task 12 — NOT EXISTS</button>
+    </div>
+    <div class="tab-content active" id="s09-task11">
+      <div class="sql-box">
+        <div class="sql-header"><div class="mac-dots"><div class="mac-dot mac-r"></div><div class="mac-dot mac-y"></div><div class="mac-dot mac-g"></div></div><span class="sql-lang">SQL — Task 11</span></div>
+        <div class="sql-body"><span class="kw">SELECT</span> *
+<span class="kw">FROM</span> Sales.Orders <span class="kw">AS</span> o
+<span class="kw">WHERE</span> <span class="hk">EXISTS</span> (
+    <span class="kw">SELECT</span> 1
+    <span class="kw">FROM</span> Sales.Customers <span class="kw">AS</span> c
+    <span class="kw">WHERE</span> Country = <span class="str">'Germany'</span>
+      <span class="kw">AND</span> o.CustomerID = c.CustomerID
+);</div>
+      </div>
+    </div>
+    <div class="tab-content" id="s09-task12">
+      <div class="sql-box">
+        <div class="sql-header"><div class="mac-dots"><div class="mac-dot mac-r"></div><div class="mac-dot mac-y"></div><div class="mac-dot mac-g"></div></div><span class="sql-lang">SQL — Task 12</span></div>
+        <div class="sql-body"><span class="kw">SELECT</span> *
+<span class="kw">FROM</span> Sales.Orders <span class="kw">AS</span> o
+<span class="kw">WHERE</span> <span class="hk">NOT EXISTS</span> (
+    <span class="kw">SELECT</span> 1
+    <span class="kw">FROM</span> Sales.Customers <span class="kw">AS</span> c
+    <span class="kw">WHERE</span> Country = <span class="str">'Germany'</span>
+      <span class="kw">AND</span> o.CustomerID = c.CustomerID
+);</div>
+      </div>
+    </div>
+
+    <div class="pipeline">
+      <div class="pipe-step" id="p09_1">① Outer Order</div>
+      <span class="adn" id="a09_1">→</span>
+      <div class="pipe-step" id="p09_2">② EXISTS Check</div>
+      <span class="adn" id="a09_2">→</span>
+      <div class="pipe-step" id="p09_3">③ TRUE/FALSE</div>
+      <span class="adn" id="a09_3">→</span>
+      <div class="pipe-step" id="p09_4">④ Result</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-exec" id="btn09" onclick="runS09()">▶ Execute</button>
+      <button class="btn-reset" onclick="resetS09()">↻ Reset</button>
+    </div>
+
+    <div class="stage" id="s09_1">
+      <div class="stage-title">① Outer query reads each order</div>
+      <div class="tbl-wrap"><div class="tbl-title">Sales.Orders — each row checked</div>
+        <table><thead><tr><th>OrderID</th><th>CustomerID</th><th>Sales</th></tr></thead>
+        <tbody id="tb09_1"></tbody></table>
+      </div>
+    </div>
+    <div class="stage" id="s09_2">
+      <div class="stage-title">② EXISTS probe: is there a German customer with this CustomerID?</div>
+      <div class="tbl-wrap"><div class="tbl-title">EXISTS evaluation per order</div>
+        <table><thead><tr><th>OrderID</th><th>CustomerID</th><th>EXISTS?</th><th>NOT EXISTS?</th></tr></thead>
+        <tbody id="tb09_2"></tbody></table>
+      </div>
+    </div>
+    <div class="stage" id="s09_3">
+      <div class="stage-title">③ Routing rows to EXISTS vs NOT EXISTS</div>
+      <div class="two-col">
+        <div class="res-good"><div class="res-label">✓ EXISTS — German customer orders</div>
+          <table><thead><tr><th>OrderID</th><th>CustomerID</th></tr></thead>
+          <tbody id="tb09_3a"></tbody></table>
+        </div>
+        <div class="res-bad"><div class="res-label">✗ NOT EXISTS — Non-German orders</div>
+          <table><thead><tr><th>OrderID</th><th>CustomerID</th></tr></thead>
+          <tbody id="tb09_3b"></tbody></table>
+        </div>
+      </div>
+    </div>
+    <div class="stage" id="s09_4">
+      <div class="stage-title">④ IN vs EXISTS comparison</div>
+      <div class="two-col">
+        <div class="res-info"><div class="res-label">IN — uses a list</div>
+          <div style="color:var(--muted);font-size:11px;line-height:1.7">• Subquery runs once<br>• Returns all matching values<br>• May fail with NULLs in list<br>• Better for small subquery results</div>
+        </div>
+        <div class="res-good"><div class="res-label">EXISTS — short-circuits</div>
+          <div style="color:var(--muted);font-size:11px;line-height:1.7">• Stops after first match<br>• NULL-safe (returns T/F only)<br>• Usually faster on large tables<br>• Always correlated</div>
+        </div>
+      </div>
+      <span class="impact imp-p">💡 EXISTS short-circuits. Use it over IN when the subquery could return NULLs.</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- SUMMARY TABLE -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="summary-card" id="summary">
+  <div class="card-inner">
+    <div class="card-title" style="font-family:var(--head)">📊 Summary Reference — SQL Subquery Types</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th class="summary-th">Type</th>
+          <th class="summary-th">Clause</th>
+          <th class="summary-th">Returns</th>
+          <th class="summary-th">Key Operator</th>
+          <th class="summary-th">Notes</th>
+        </tr></thead>
+        <tbody>
+          <tr><td class="vc">Scalar</td><td class="vo">SELECT, WHERE</td><td class="vy">1 × 1</td><td class="vg">=, &gt;, &lt;</td><td class="vm">Single value; used with comparison operators</td></tr>
+          <tr><td class="vc">Row</td><td class="vo">WHERE</td><td class="vy">n × 1</td><td class="vg">IN, NOT IN, ANY</td><td class="vm">List of values; use IN / ANY</td></tr>
+          <tr><td class="vc">Table</td><td class="vo">FROM, JOIN</td><td class="vy">n × m</td><td class="vg">AS alias</td><td class="vm">Derived table; must be aliased</td></tr>
+          <tr><td class="vp">FROM subquery</td><td class="vo">FROM</td><td class="vy">table</td><td class="vg">AS t</td><td class="vm">Inline view; pre-aggregate before outer query</td></tr>
+          <tr><td class="vp">SELECT subquery</td><td class="vo">SELECT list</td><td class="vy">scalar</td><td class="vg">AS col</td><td class="vm">Adds global/aggregate context column</td></tr>
+          <tr><td class="vp">JOIN subquery</td><td class="vo">LEFT/INNER JOIN</td><td class="vy">table</td><td class="vg">ON condition</td><td class="vm">Attach aggregates without losing rows</td></tr>
+          <tr><td class="vpk">Correlated</td><td class="vo">SELECT, WHERE</td><td class="vy">scalar/bool</td><td class="vg">outer.col ref</td><td class="vm">Re-runs per outer row; can be slow</td></tr>
+          <tr><td class="vg">EXISTS</td><td class="vo">WHERE</td><td class="vy">boolean</td><td class="vg">EXISTS / NOT EXISTS</td><td class="vm">Short-circuits; NULL-safe; always correlated</td></tr>
+          <tr><td class="vy">IN</td><td class="vo">WHERE</td><td class="vy">boolean</td><td class="vg">IN / NOT IN</td><td class="vm">Runs once; list match; watch for NULLs</td></tr>
+          <tr><td class="vb">ANY / ALL</td><td class="vo">WHERE</td><td class="vy">boolean</td><td class="vg">&gt; ANY / &gt; ALL</td><td class="vm">ANY = &gt;MIN; ALL = &gt;MAX</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">Built with <span>SQL Subquery Functions</span> · Interactive Visualization · <span>Pure HTML/CSS/JS</span></div>
+
+</div><!-- /wrap -->
+
+<script>
+// ═══════════════════════════════════════════════════
+// SPEED ENGINE
+// ═══════════════════════════════════════════════════
+let SM = 3;
+
+const SD = base => new Promise(r => setTimeout(r, Math.round(base * Math.pow(SM, 1.45))));
+const RD = base => new Promise(r => setTimeout(r, Math.round(base * Math.pow(SM, 1.4))));
+
+function setSpeed(s) {
+  SM = s;
+  [1,2,3,5,8].forEach(v => {
+    document.getElementById('sp'+v).className = 'sp-btn' + (v===s ? ' on' : '');
+  });
+  const stepMs = Math.round(200 * Math.pow(s, 1.45));
+  document.getElementById('customMs').value = stepMs;
+  document.getElementById('stepVal').textContent = (stepMs/1000).toFixed(1)+'s';
+  document.getElementById('rowVal').textContent = (Math.round(120 * Math.pow(s, 1.4))/1000).toFixed(1)+'s';
+}
+
+document.getElementById('customMs').addEventListener('input', function() {
+  let ms = Math.max(100, Math.min(10000, parseInt(this.value) || 1000));
+  SM = Math.pow(ms / 200, 1 / 1.45);
+  [1,2,3,5,8].forEach(v => document.getElementById('sp'+v).className = 'sp-btn');
+  const presetMs = {1:248, 2:530, 3:1000, 5:2378, 8:5278};
+  for (const [preset, preMs] of Object.entries(presetMs)) {
+    if (Math.abs(ms - preMs) < 50) document.getElementById('sp'+preset).className = 'sp-btn on';
+  }
+  document.getElementById('stepVal').textContent = (ms/1000).toFixed(1)+'s';
+  const rowMs = Math.round(120 * Math.pow(SM, 1.4));
+  document.getElementById('rowVal').textContent = (rowMs/1000).toFixed(1)+'s';
+});
+
+let pTimer = null;
+function startProg() {
+  const bar = document.getElementById('execBar');
+  bar.style.width = '0%';
+  document.getElementById('execStatus').style.color = 'var(--yellow)';
+  document.getElementById('execStatus').textContent = '⟳ Running...';
+  let p = 0;
+  pTimer = setInterval(() => { p = Math.min(p+1.5,90); bar.style.width=p+'%'; }, Math.round(50*Math.pow(SM,0.6)));
+}
+function endProg() {
+  clearInterval(pTimer);
+  document.getElementById('execBar').style.width = '100%';
+  document.getElementById('execStatus').style.color = 'var(--green)';
+  document.getElementById('execStatus').textContent = '✓ Done';
+  setTimeout(() => {
+    document.getElementById('execBar').style.width = '0%';
+    document.getElementById('execStatus').style.color = 'var(--muted)';
+    document.getElementById('execStatus').textContent = '● Ready';
+  }, 1800);
+}
+
+function sp(id,s) { const e=document.getElementById(id); if(e) e.className='pipe-step '+(s||''); }
+function show(id) { const e=document.getElementById(id); if(e){ e.classList.add('show'); setTimeout(()=>e.scrollIntoView({behavior:'smooth',block:'nearest'}),60); }}
+function hide(id) { const e=document.getElementById(id); if(e) e.classList.remove('show'); }
+function clr(id)  { const e=document.getElementById(id); if(e) e.innerHTML=''; }
+
+function mkTr(cells, cls='') {
+  return `<tr class="${cls}">${cells.map(c=>`<td>${c}</td>`).join('')}</tr>`;
+}
+async function appendRow(tbodyId, cells, cls='') {
+  const tb = document.getElementById(tbodyId);
+  if (!tb) return;
+  const tr = document.createElement('tr');
+  if(cls) tr.className = cls;
+  tr.innerHTML = cells.map(c=>`<td>${c}</td>`).join('');
+  tr.classList.add('hl-y');
+  tb.appendChild(tr);
+  await RD(120);
+  tr.classList.remove('hl-y');
+}
+
+// Tab switcher
+function switchTab(section, tab) {
+  const card = document.getElementById(section);
+  card.querySelectorAll('.tab').forEach((t,i) => t.classList.remove('active'));
+  card.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  const tabs = card.querySelectorAll('.tab');
+  const contents = card.querySelectorAll('.tab-content');
+  for(let i=0;i<tabs.length;i++) {
+    if(tabs[i].getAttribute('onclick').includes(tab)) {
+      tabs[i].classList.add('active');
+      contents[i].classList.add('active');
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// SECTION 01 — RESULT TYPES
+// ═══════════════════════════════════════════════════
+const orders = [
+  {id:'1001',date:'2024-01-05',cid:'C01',pid:'P01',sales:320,status:'Shipped'},
+  {id:'1002',date:'2024-01-12',cid:'C02',pid:'P02',sales:150,status:'Pending'},
+  {id:'1003',date:'2024-02-03',cid:'C03',pid:'P01',sales:480,status:'Shipped'},
+  {id:'1004',date:'2024-02-18',cid:'C01',pid:'P03',sales:210,status:'Cancelled'},
+  {id:'1005',date:'2024-03-07',cid:'C04',pid:'P02',sales:560,status:'Shipped'},
+  {id:'1006',date:'2024-03-22',cid:'C03',pid:'P03',sales:95,status:'Pending'},
+  {id:'1007',date:'2024-04-10',cid:'C04',pid:'P01',sales:740,status:'Shipped'},
+  {id:'1008',date:'2024-04-28',cid:'C02',pid:'P03',sales:305,status:'Cancelled'},
+];
+const products = [
+  {id:'P01',name:'Laptop',price:1200},
+  {id:'P02',name:'Mouse',price:45},
+  {id:'P03',name:'Keyboard',price:120},
+];
+const customers = [
+  {id:'C01',name:'Anna',country:'Germany'},
+  {id:'C02',name:'Ben',country:'USA'},
+  {id:'C03',name:'Carlos',country:'Germany'},
+  {id:'C04',name:'Diana',country:'France'},
+];
+const employees = [
+  {id:'E01',name:'Alice',gender:'F',salary:72000},
+  {id:'E02',name:'Bob',gender:'M',salary:65000},
+  {id:'E03',name:'Carol',gender:'F',salary:58000},
+  {id:'E04',name:'Dan',gender:'M',salary:80000},
+  {id:'E05',name:'Eve',gender:'F',salary:91000},
+  {id:'E06',name:'Frank',gender:'M',salary:55000},
+];
+
+const scArr = c => `<span class="vc">${c}</span>`;
+const soArr = c => `<span class="vo">${c}</span>`;
+const spArr = c => `<span class="vp">${c}</span>`;
+const svArr = c => `<span class="vy">${c}</span>`;
+const sgArr = c => `<span class="vg">${c}</span>`;
+const smArr = c => `<span class="vm">${c}</span>`;
+const spkArr = c => `<span class="vpk">${c}</span>`;
+const sbArr = c => `<span class="vb">${c}</span>`;
+
+function statusColor(s) {
+  if(s==='Shipped') return sgArr(s);
+  if(s==='Pending') return soArr(s);
+  if(s==='Cancelled') return spkArr(s);
+  return s;
+}
+
+async function runS01() {
+  document.getElementById('btn01').disabled = true;
+  startProg();
+  sp('p01_1','active');
+  show('s01_1');
+  clr('tb01_1'); clr('tb01_2');
+  for(const o of orders) {
+    await appendRow('tb01_1', [scArr(o.id), svArr(o.sales)]);
+    await RD(80);
+  }
+  await SD(200);
+  sp('p01_1','done'); document.getElementById('a01_1').className='adn ok';
+  sp('p01_2','active');
+  show('s01_2');
+  let sum=0;
+  for(let i=0;i<orders.length;i++) {
+    sum += orders[i].sales;
+    const avg = (sum/(i+1)).toFixed(1);
+    await appendRow('tb01_2', [smArr(i+1), svArr(sum), smArr(i+1), svArr(avg)]);
+    await RD(100);
+  }
+  await SD(300);
+  sp('p01_2','done'); document.getElementById('a01_2').className='adn ok';
+  sp('p01_3','active');
+  show('s01_3');
+  await SD(400);
+  sp('p01_3','done'); document.getElementById('a01_3').className='adn ok';
+  sp('p01_4','active');
+  show('s01_4');
+  await SD(200);
+  sp('p01_4','done');
+  endProg();
+}
+
+function resetS01() {
+  document.getElementById('btn01').disabled = false;
+  ['p01_1','p01_2','p01_3','p01_4'].forEach(i => sp(i,''));
+  ['a01_1','a01_2','a01_3'].forEach(i => { const e=document.getElementById(i); if(e) e.className='adn'; });
+  ['s01_1','s01_2','s01_3','s01_4'].forEach(hide);
+  ['tb01_1','tb01_2'].forEach(clr);
+}
+
+// ═══════════════════════════════════════════════════
+// SECTION 02 — FROM CLAUSE
+// ═══════════════════════════════════════════════════
+async function runS02() {
+  document.getElementById('btn02').disabled = true;
+  startProg();
+  sp('p02_1','active');
+  show('s02_1');
+  clr('tb02_1'); clr('tb02_3');
+  const avgPrice = Math.round(products.reduce((a,p)=>a+p.price,0)/products.length);
+  for(const p of products) {
+    await appendRow('tb02_1', [scArr(p.id), soArr(p.name), svArr(p.price), svArr(avgPrice)]);
+    await RD(150);
+  }
+  await SD(300);
+  sp('p02_1','done'); document.getElementById('a02_1').className='adn ok';
+  sp('p02_2','active');
+  show('s02_2');
+  await SD(400);
+  sp('p02_2','done'); document.getElementById('a02_2').className='adn ok';
+  sp('p02_3','active');
+  show('s02_3');
+  for(const p of products) {
+    const pass = p.price > avgPrice;
+    await appendRow('tb02_3', [scArr(p.id), svArr(p.price), svArr(avgPrice), pass ? sgArr('✓ YES') : spkArr('✗ NO')]);
+    await RD(150);
+  }
+  await SD(300);
+  sp('p02_3','done'); document.getElementById('a02_3').className='adn ok';
+  sp('p02_4','active');
+  show('s02_4');
+  await SD(200);
+  sp('p02_4','done');
+  endProg();
+}
+function resetS02() {
+  document.getElementById('btn02').disabled = false;
+  ['p02_1','p02_2','p02_3','p02_4'].forEach(i => sp(i,''));
+  ['a02_1','a02_2','a02_3'].forEach(i => { const e=document.getElementById(i); if(e) e.className='adn'; });
+  ['s02_1','s02_2','s02_3','s02_4'].forEach(hide);
+  ['tb02_1','tb02_3'].forEach(clr);
+}
+
+// ═══════════════════════════════════════════════════
+// SECTION 03 — SELECT SUBQUERY
+// ═══════════════════════════════════════════════════
+async function runS03() {
+  document.getElementById('btn03').disabled = true;
+  startProg();
+  sp('p03_1','active');
+  show('s03_1');
+  clr('tb03_1'); clr('tb03_3');
+  for(const p of products) {
+    await appendRow('tb03_1', [scArr(p.id), soArr(p.name), svArr(p.price)]);
+    await RD(150);
+  }
+  await SD(300);
+  sp('p03_1','done'); document.getElementById('a03_1').className='adn ok';
+  sp('p03_2','active');
+  show('s03_2');
+  await SD(500);
+  sp('p03_2','done'); document.getElementById('a03_2').className='adn ok';
+  sp('p03_3','active');
+  show('s03_3');
+  for(const p of products) {
+    await appendRow('tb03_3', [scArr(p.id), soArr(p.name), svArr(p.price), sgArr(8)]);
+    await RD(200);
+  }
+  await SD(300);
+  sp('p03_3','done'); document.getElementById('a03_3').className='adn ok';
+  sp('p03_4','active');
+  show('s03_4');
+  await SD(200);
+  sp('p03_4','done');
+  endProg();
+}
+function resetS03() {
+  document.getElementById('btn03').disabled = false;
+  ['p03_1','p03_2','p03_3','p03_4'].forEach(i => sp(i,''));
+  ['a03_1','a03_2','a03_3'].forEach(i => { const e=document.getElementById(i); if(e) e.className='adn'; });
+  ['s03_1','s03_2','s03_3','s03_4'].forEach(hide);
+  ['tb03_1','tb03_3'].forEach(clr);
+}
+
+// ═══════════════════════════════════════════════════
+// SECTION 04 — JOIN CLAUSE
+// ═══════════════════════════════════════════════════
+async function runS04() {
+  document.getElementById('btn04').disabled = true;
+  startProg();
+  sp('p04_1','active');
+  show('s04_1');
+  clr('tb04_1'); clr('tb04_2b'); clr('tb04_3');
+  const agg = {};
+  orders.forEach(o => { agg[o.cid] = (agg[o.cid]||0)+o.sales; });
+  for(const [cid,tot] of Object.entries(agg)) {
+    await appendRow('tb04_1', [scArr(cid), svArr(tot)]);
+    await RD(150);
+  }
+  await SD(300);
+  sp('p04_1','done'); document.getElementById('a04_1').className='adn ok';
+  sp('p04_2','active');
+  show('s04_2');
+  for(const [cid,tot] of Object.entries(agg)) {
+    await appendRow('tb04_2b', [scArr(cid), sgArr(tot)]);
+    await RD(100);
+  }
+  await SD(400);
+  sp('p04_2','done'); document.getElementById('a04_2').className='adn ok';
+  sp('p04_3','active');
+  show('s04_3');
+  for(const c of customers) {
+    const tot = agg[c.id];
+    const countryColor = c.country==='Germany' ? sgArr(c.country) : c.country==='USA' ? sbArr(c.country) : soArr(c.country);
+    await appendRow('tb04_3', [scArr(c.id), soArr(c.name), countryColor, tot ? sgArr(tot) : smArr('NULL')]);
+    await RD(200);
+  }
+  await SD(300);
+  sp('p04_3','done'); document.getElementById('a04_3').className='adn ok';
+  sp('p04_4','active');
+  show('s04_4');
+  await SD(200);
+  sp('p04_4','done');
+  endProg();
+}
+function resetS04() {
+  document.getElementById('btn04').disabled = false;
+  ['p04_1','p04_2','p04_3','p04_4'].forEach(i => sp(i,''));
+  ['a04_1','a04_2','a04_3'].forEach(i => { const e=document.getElementById(i); if(e) e.className='adn'; });
+  ['s04_1','s04_2','s04_3','s04_4'].forEach(hide);
+  ['tb04_1','tb04_2b','tb04_3'].forEach(clr);
+}
+
+// ═══════════════════════════════════════════════════
+// SECTION 05 — COMPARISON
+// ═══════════════════════════════════════════════════
+async function runS05() {
+  document.getElementById('btn05').disabled = true;
+  startProg();
+  const avgP = Math.round(products.reduce((a,p)=>a+p.price,0)/products.length);
+  sp('p05_1','active');
+  show('s05_1');
+  await SD(400);
+  sp('p05_1','done'); document.getElementById('a05_1').className='adn ok';
+  sp('p05_2','active');
+  show('s05_2');
+  clr('tb05_2'); clr('tb05_3');
+  for(const p of products) {
+    const pass = p.price > avgP;
+    await appendRow('tb05_2', [scArr(p.id), soArr(p.name), svArr(p.price), svArr(avgP), pass ? sgArr('✓ YES') : spkArr('✗ NO')]);
+    await RD(200);
+  }
+  await SD(300);
+  sp('p05_2','done'); document.getElementById('a05_2').className='adn ok';
+  sp('p05_3','active');
+  show('s05_3');
+  for(const p of products.filter(p=>p.price>avgP)) {
+    await appendRow('tb05_3', [scArr(p.id), sgArr(p.price), svArr(avgP)]);
+    await RD(150);
+  }
+  await SD(300);
+  sp('p05_3','done'); document.getElementById('a05_3').className='adn ok';
+  sp('p05_4','active');
+  show('s05_4');
+  await SD(200);
+  sp('p05_4','done');
+  endProg();
+}
+function resetS05() {
+  document.getElementById('btn05').disabled = false;
+  ['p05_1','p05_2','p05_3','p05_4'].forEach(i => sp(i,''));
+  ['a05_1','a05_2','a05_3'].forEach(i => { const e=document.getElementById(i); if(e) e.className='adn'; });
+  ['s05_1','s05_2','s05_3','s05_4'].forEach(hide);
+  ['tb05_2','tb05_3'].forEach(clr);
+}
+
+// ═══════════════════════════════════════════════════
+// SECTION 06 — IN OPERATOR
+// ═══════════════════════════════════════════════════
+const germanCIDs = customers.filter(c=>c.country==='Germany').map(c=>c.id);
+async function runS06() {
+  document.getElementById('btn06').disabled = true;
+  startProg();
+  sp('p06_1','active');
+  show('s06_1');
+  clr('tb06_1'); clr('tb06_3'); clr('tb06_4a'); clr('tb06_4b');
+  for(const c of customers.filter(c=>c.country==='Germany')) {
+    await appendRow('tb06_1', [scArr(c.id), soArr(c.name), sgArr(c.country)]);
+    await RD(200);
+  }
+  await SD(300);
+  sp('p06_1','done'); document.getElementById('a06_1').className='adn ok';
+  sp('p06_2','active');
+  show('s06_2');
+  await SD(400);
+  sp('p06_2','done'); document.getElementById('a06_2').className='adn ok';
+  sp('p06_3','active');
+  show('s06_3');
+  for(const o of orders) {
+    const inGer = germanCIDs.includes(o.cid);
+    await appendRow('tb06_3', [scArr(o.id), scArr(o.cid), svArr(o.sales), inGer ? sgArr('✓ IN') : spkArr('✗ NOT IN')]);
+    await RD(120);
+  }
+  await SD(300);
+  sp('p06_3','done'); document.getElementById('a06_3').className='adn ok';
+  sp('p06_4','active');
+  show('s06_4');
+  for(const o of orders.filter(o=>germanCIDs.includes(o.cid))) {
+    await appendRow('tb06_4a', [scArr(o.id), scArr(o.cid), sgArr(o.sales)]);
+    await RD(120);
+  }
+  for(const o of orders.filter(o=>!germanCIDs.includes(o.cid))) {
+    await appendRow('tb06_4b', [scArr(o.id), scArr(o.cid), spkArr(o.sales)]);
+    await RD(120);
+  }
+  await SD(200);
+  sp('p06_4','done');
+  endProg();
+}
+function resetS06() {
+  document.getElementById('btn06').disabled = false;
+  ['p06_1','p06_2','p06_3','p06_4'].forEach(i => sp(i,''));
+  ['a06_1','a06_2','a06_3'].forEach(i => { const e=document.getElementById(i); if(e) e.className='adn'; });
+  ['s06_1','s06_2','s06_3','s06_4'].forEach(hide);
+  ['tb06_1','tb06_3','tb06_4a','tb06_4b'].forEach(clr);
+}
+
+// ═══════════════════════════════════════════════════
+// SECTION 07 — ANY OPERATOR
+// ═══════════════════════════════════════════════════
+const males = employees.filter(e=>e.gender==='M');
+const females = employees.filter(e=>e.gender==='F');
+const minMaleSalary = Math.min(...males.map(e=>e.salary));
+async function runS07() {
+  document.getElementById('btn07').disabled = true;
+  startProg();
+  sp('p07_1','active');
+  show('s07_1');
+  clr('tb07_1'); clr('tb07_3'); clr('tb07_4');
+  for(const e of males) {
+    await appendRow('tb07_1', [scArr(e.id), soArr(e.name), svArr(e.salary.toLocaleString())]);
+    await RD(150);
+  }
+  await SD(300);
+  sp('p07_1','done'); document.getElementById('a07_1').className='adn ok';
+  sp('p07_2','active');
+  show('s07_2');
+  await SD(400);
+  sp('p07_2','done'); document.getElementById('a07_2').className='adn ok';
+  sp('p07_3','active');
+  show('s07_3');
+  for(const e of females) {
+    const pass = e.salary > minMaleSalary;
+    await appendRow('tb07_3', [scArr(e.id), soArr(e.name), svArr(e.salary.toLocaleString()), pass ? sgArr('✓ YES') : spkArr('✗ NO')]);
+    await RD(200);
+  }
+  await SD(300);
+  sp('p07_3','done'); document.getElementById('a07_3').className='adn ok';
+  sp('p07_4','active');
+  show('s07_4');
+  for(const e of females.filter(f=>f.salary>minMaleSalary)) {
+    await appendRow('tb07_4', [scArr(e.id), soArr(e.name), sgArr(e.salary.toLocaleString())]);
+    await RD(150);
+  }
+  await SD(200);
+  sp('p07_4','done');
+  endProg();
+}
+function resetS07() {
+  document.getElementById('btn07').disabled = false;
+  ['p07_1','p07_2','p07_3','p07_4'].forEach(i => sp(i,''));
+  ['a07_1','a07_2','a07_3'].forEach(i => { const e=document.getElementById(i); if(e) e.className='adn'; });
+  ['s07_1','s07_2','s07_3','s07_4'].forEach(hide);
+  ['tb07_1','tb07_3','tb07_4'].forEach(clr);
+}
+
+// ═══════════════════════════════════════════════════
+// SECTION 08 — CORRELATED
+// ═══════════════════════════════════════════════════
+async function runS08() {
+  document.getElementById('btn08').disabled = true;
+  startProg();
+  sp('p08_1','active');
+  show('s08_1');
+  clr('tb08_1'); clr('tb08_2'); clr('tb08_3');
+  const orderCount = {};
+  orders.forEach(o => { orderCount[o.cid] = (orderCount[o.cid]||0)+1; });
+  for(const c of customers) {
+    const tr = document.createElement('tr');
+    tr.className = 'hl-y';
+    tr.innerHTML = `<td>${scArr(c.id)}</td><td>${soArr(c.name)}</td><td>${c.country==='Germany'?sgArr(c.country):c.country==='USA'?sbArr(c.country):soArr(c.country)}</td><td>${smArr('...')}</td>`;
+    document.getElementById('tb08_1').appendChild(tr);
+    await RD(200);
+
+    // Show inner query execution
+    const cnt = orderCount[c.id]||0;
+    const innerTr = document.createElement('tr');
+    innerTr.className = 'hl-y';
+    innerTr.innerHTML = `<td>${soArr(c.name)}</td><td>${smArr(`COUNT(*) WHERE CustomerID = '${c.id}'`)}</td><td>${sgArr(cnt)}</td>`;
+    document.getElementById('tb08_2').appendChild(innerTr);
+    await RD(150);
+    innerTr.classList.remove('hl-y');
+
+    // Update the row in tb08_1 with count
+    tr.querySelector('td:last-child').innerHTML = sgArr(cnt);
+    tr.classList.remove('hl-y');
+    await SD(150);
+  }
+  await SD(300);
+  sp('p08_1','done'); document.getElementById('a08_1').className='adn ok';
+  sp('p08_2','done'); document.getElementById('a08_2').className='adn ok';
+  sp('p08_3','active');
+  show('s08_3');
+  for(const c of customers) {
+    const cnt = orderCount[c.id]||0;
+    const cc = c.country==='Germany'?sgArr(c.country):c.country==='USA'?sbArr(c.country):soArr(c.country);
+    await appendRow('tb08_3', [scArr(c.id), soArr(c.name), cc, sgArr(cnt)]);
+    await RD(200);
+  }
+  await SD(300);
+  sp('p08_3','done'); document.getElementById('a08_3').className='adn ok';
+  sp('p08_4','active');
+  show('s08_4');
+  await SD(200);
+  sp('p08_4','done');
+  endProg();
+}
+function resetS08() {
+  document.getElementById('btn08').disabled = false;
+  ['p08_1','p08_2','p08_3','p08_4'].forEach(i => sp(i,''));
+  ['a08_1','a08_2','a08_3'].forEach(i => { const e=document.getElementById(i); if(e) e.className='adn'; });
+  ['s08_1','s08_2','s08_3','s08_4'].forEach(hide);
+  ['tb08_1','tb08_2','tb08_3'].forEach(clr);
+}
+
+// ═══════════════════════════════════════════════════
+// SECTION 09 — EXISTS
+// ═══════════════════════════════════════════════════
+async function runS09() {
+  document.getElementById('btn09').disabled = true;
+  startProg();
+  sp('p09_1','active');
+  show('s09_1');
+  clr('tb09_1'); clr('tb09_2'); clr('tb09_3a'); clr('tb09_3b');
+  for(const o of orders) {
+    await appendRow('tb09_1', [scArr(o.id), scArr(o.cid), svArr(o.sales)]);
+    await RD(100);
+  }
+  await SD(300);
+  sp('p09_1','done'); document.getElementById('a09_1').className='adn ok';
+  sp('p09_2','active');
+  show('s09_2');
+  for(const o of orders) {
+    const exists = germanCIDs.includes(o.cid);
+    await appendRow('tb09_2', [scArr(o.id), scArr(o.cid), exists ? sgArr('TRUE') : spkArr('FALSE'), exists ? spkArr('FALSE') : sgArr('TRUE')]);
+    await RD(120);
+  }
+  await SD(300);
+  sp('p09_2','done'); document.getElementById('a09_2').className='adn ok';
+  sp('p09_3','active');
+  show('s09_3');
+  for(const o of orders.filter(o=>germanCIDs.includes(o.cid))) {
+    await appendRow('tb09_3a', [scArr(o.id), scArr(o.cid)]);
+    await RD(100);
+  }
+  for(const o of orders.filter(o=>!germanCIDs.includes(o.cid))) {
+    await appendRow('tb09_3b', [scArr(o.id), scArr(o.cid)]);
+    await RD(100);
+  }
+  await SD(300);
+  sp('p09_3','done'); document.getElementById('a09_3').className='adn ok';
+  sp('p09_4','active');
+  show('s09_4');
+  await SD(200);
+  sp('p09_4','done');
+  endProg();
+}
+function resetS09() {
+  document.getElementById('btn09').disabled = false;
+  ['p09_1','p09_2','p09_3','p09_4'].forEach(i => sp(i,''));
+  ['a09_1','a09_2','a09_3'].forEach(i => { const e=document.getElementById(i); if(e) e.className='adn'; });
+  ['s09_1','s09_2','s09_3','s09_4'].forEach(hide);
+  ['tb09_1','tb09_2','tb09_3a','tb09_3b'].forEach(clr);
+}
+</script>
+</body>
+</html>

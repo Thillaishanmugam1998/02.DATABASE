@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL Window Functions</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0d14;--bg2:#0f1320;--card:#111520;--border:#1e2535;--cyan:#00d4ff;--purple:#a855f7;--orange:#f97316;--green:#22d3a0;--pink:#f43f5e;--yellow:#fbbf24;--blue:#3b82f6;--text:#e2e8f0;--muted:#64748b;--mono:"JetBrains Mono",monospace;--sans:"Syne",sans-serif;}
+*{margin:0;padding:0;box-sizing:border-box;}html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body::before{content:"";position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.025) 1px,transparent 1px);background-size:44px 44px;pointer-events:none;z-index:0;}
+
+/* SPEED BAR */
+.speed-bar{position:sticky;top:0;z-index:200;background:rgba(10,13,20,.96);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);}
+.speed-inner{max-width:1180px;margin:0 auto;padding:10px 24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.sp-label{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;white-space:nowrap;}
+.sp-slots{display:flex;gap:6px;}
+.sp-btn{font-family:var(--mono);font-size:11px;font-weight:700;width:38px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--muted);cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;position:relative;}
+.sp-btn:hover{border-color:var(--cyan);color:var(--cyan);}
+.sp-btn.on{background:var(--cyan);color:var(--bg);border-color:var(--cyan);box-shadow:0 0 14px rgba(0,212,255,.4);}
+.sp-btn.on::after{content:"";position:absolute;inset:-3px;border-radius:10px;border:1px solid rgba(0,212,255,.3);animation:spRing .9s ease infinite;}
+@keyframes spRing{0%{transform:scale(1);opacity:.6;}100%{transform:scale(1.3);opacity:0;}}
+.sp-div{width:1px;height:26px;background:var(--border);}
+.sp-info{font-family:var(--mono);font-size:11px;color:var(--muted);padding:5px 12px;background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.15);border-radius:6px;white-space:nowrap;}
+.sp-info .sv{color:var(--yellow);font-weight:700;}
+.sp-status{font-family:var(--mono);font-size:11px;transition:color .3s;}
+.sp-prog{height:2px;background:var(--border);overflow:hidden;}
+.sp-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--cyan),var(--purple));transition:width .4s linear;border-radius:2px;}
+.sp-bar.run{box-shadow:0 0 8px var(--cyan);}
+
+.container{max-width:1180px;margin:0 auto;padding:0 24px;position:relative;z-index:1;}
+header{padding:52px 0 36px;text-align:center;border-bottom:1px solid var(--border);margin-bottom:44px;}
+.badge{display:inline-block;font-family:var(--mono);font-size:10px;color:var(--cyan);background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.2);padding:4px 14px;border-radius:20px;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:16px;}
+h1{font-size:clamp(28px,5vw,54px);font-weight:800;line-height:1.1;background:linear-gradient(135deg,#fff 0%,var(--cyan) 45%,var(--purple) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:10px;}
+.subtitle{color:var(--muted);font-size:14px;font-family:var(--mono);}
+.nav{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:44px;}
+.nav-pill{font-family:var(--mono);font-size:10px;font-weight:700;padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .2s;letter-spacing:.5px;text-decoration:none;}
+.nav-pill:hover{border-color:var(--cyan);color:var(--cyan);}
+.golden{background:linear-gradient(135deg,rgba(168,85,247,.08),rgba(0,212,255,.07));border:1px solid rgba(168,85,247,.25);border-radius:12px;padding:18px 24px;margin-bottom:44px;display:flex;align-items:center;gap:14px;font-family:var(--mono);font-size:13px;line-height:1.6;}
+.golden span{color:var(--cyan);font-weight:700;}
+.section{margin-bottom:56px;scroll-margin-top:60px;}
+.sec-hdr{display:flex;align-items:center;gap:12px;margin-bottom:20px;}
+.sec-num{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--bg);padding:4px 10px;border-radius:6px;letter-spacing:1px;flex-shrink:0;}
+.n1{background:var(--cyan);}.n2{background:var(--purple);}.n3{background:var(--orange);}.n4{background:var(--green);}.n5{background:var(--pink);}.n6{background:var(--yellow);color:#000;}.n7{background:var(--blue);}
+.sec-title{font-size:20px;font-weight:700;}
+.c1{color:var(--cyan);}.c2{color:var(--purple);}.c3{color:var(--orange);}.c4{color:var(--green);}.c5{color:var(--pink);}.c6{color:var(--yellow);}.c7{color:var(--blue);}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;position:relative;}
+.cb1::before,.cb2::before,.cb3::before,.cb4::before,.cb5::before,.cb6::before,.cb7::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;}
+.cb1::before{background:linear-gradient(90deg,var(--cyan),var(--purple));}.cb2::before{background:linear-gradient(90deg,var(--purple),var(--pink));}.cb3::before{background:linear-gradient(90deg,var(--orange),var(--yellow));}.cb4::before{background:linear-gradient(90deg,var(--green),var(--cyan));}.cb5::before{background:linear-gradient(90deg,var(--pink),var(--orange));}.cb6::before{background:linear-gradient(90deg,var(--yellow),var(--green));}.cb7::before{background:linear-gradient(90deg,var(--blue),var(--purple));}
+.card-inner{padding:28px;}
+.qbox{background:#080b12;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;}
+.qhdr{display:flex;align-items:center;justify-content:space-between;padding:9px 16px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02);}
+.qlang{font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;}
+.dots{display:flex;gap:5px;}.dot{width:8px;height:8px;border-radius:50%;}
+.dr{background:#f43f5e;}.dy{background:#fbbf24;}.dg{background:#22d3a0;}
+pre{font-family:var(--mono);font-size:12.5px;line-height:1.75;padding:18px 20px;overflow-x:auto;white-space:pre-wrap;}
+.kw{color:var(--purple);font-weight:700;}.fn{color:var(--cyan);}.cm{color:var(--muted);font-style:italic;}.hk{color:var(--yellow);font-weight:700;}
+.pipeline{display:flex;gap:0;margin-bottom:22px;border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.pipe-step{flex:1;padding:13px 8px;display:flex;flex-direction:column;align-items:center;gap:5px;background:var(--bg2);border-right:1px solid var(--border);transition:all .35s;position:relative;}
+.pipe-step:last-child{border-right:none;}
+.pipe-num{width:24px;height:24px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--muted);transition:all .35s;position:relative;z-index:1;}
+.pipe-label{font-family:var(--mono);font-size:9.5px;color:var(--muted);text-align:center;line-height:1.4;transition:all .35s;}
+.pipe-step.active{background:rgba(251,191,36,.07);}.pipe-step.active .pipe-num{background:var(--yellow);color:var(--bg);}.pipe-step.active .pipe-label{color:var(--yellow);}
+.pipe-step.done{background:rgba(34,211,160,.05);}.pipe-step.done .pipe-num{background:var(--green);color:var(--bg);}.pipe-step.done .pipe-label{color:var(--green);}
+@keyframes ring{0%{transform:scale(1);opacity:.7;}100%{transform:scale(2.2);opacity:0;}}
+.pipe-step.active::after{content:"";position:absolute;top:12px;width:24px;height:24px;border-radius:50%;border:2px solid var(--yellow);animation:ring .9s ease infinite;}
+.btn-row{display:flex;gap:10px;align-items:center;margin-bottom:18px;}
+.btn{font-family:var(--mono);font-size:12px;font-weight:700;padding:10px 20px;border-radius:8px;border:none;cursor:pointer;transition:all .2s;letter-spacing:.5px;display:flex;align-items:center;gap:7px;}
+.btn-exec{background:linear-gradient(135deg,var(--cyan),var(--purple));color:var(--bg);}
+.btn-exec:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,212,255,.3);}
+.btn-exec:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none;}
+.btn-reset{background:transparent;color:var(--muted);border:1px solid var(--border);}
+.btn-reset:hover{border-color:var(--muted);color:var(--text);}
+.stage{display:none;}.stage.show{display:block;animation:fadeUp .4s ease both;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+.stage-label{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.dpulse{width:7px;height:7px;border-radius:50%;background:var(--yellow);animation:blink .7s ease infinite;flex-shrink:0;}
+.dpulse.done{background:var(--green);animation:none;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.1;};}
+.adn{text-align:center;font-size:18px;margin:7px 0;color:var(--border);}.adn.lit{color:var(--yellow);}.adn.ok{color:var(--green);}
+.tbl-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.tbl-title{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;padding:8px 14px;border-bottom:1px solid var(--border);color:var(--muted);}
+table{width:100%;border-collapse:collapse;}
+th{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--cyan);background:rgba(0,212,255,.05);padding:9px 13px;text-align:left;border-bottom:1px solid var(--border);}
+td{font-family:var(--mono);font-size:12px;padding:8px 13px;border-bottom:1px solid rgba(30,37,53,.5);transition:background .2s;}
+tr:last-child td{border-bottom:none;}tr:hover td{background:rgba(0,212,255,.03);}
+tr.hl-y td{background:rgba(251,191,36,.12)!important;color:var(--yellow);}
+tr.hl-c td{background:rgba(0,212,255,.08)!important;}tr.hl-p td{background:rgba(168,85,247,.08)!important;}
+tr.hl-o td{background:rgba(249,115,22,.08)!important;}tr.hl-g td{background:rgba(34,211,160,.08)!important;}
+.vc{color:var(--cyan);}.vp{color:var(--purple);}.vo{color:var(--orange);}.vg{color:var(--green);font-weight:700;}.vy{color:var(--yellow);}.vm{color:var(--muted);}.vpk{color:var(--pink);}.vb{color:var(--blue);}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;}.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+@media(max-width:720px){.two-col,.three-col{grid-template-columns:1fr;}}
+.res-box{border-radius:10px;padding:12px 14px;font-family:var(--mono);font-size:12px;}
+.res-bad{background:rgba(244,63,94,.07);border:1px solid rgba(244,63,94,.3);color:var(--pink);}
+.res-good{background:rgba(34,211,160,.07);border:1px solid rgba(34,211,160,.3);color:var(--green);}
+.res-info{background:rgba(0,212,255,.07);border:1px solid rgba(0,212,255,.25);color:var(--cyan);}
+.res-title{font-weight:700;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:5px;}
+.impact{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;font-weight:700;padding:7px 14px;border-radius:20px;margin-top:10px;}
+.imp-c{background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.25);color:var(--cyan);}
+.imp-p{background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.25);color:var(--purple);}
+.imp-o{background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.25);color:var(--orange);}
+.imp-g{background:rgba(34,211,160,.08);border:1px solid rgba(34,211,160,.25);color:var(--green);}
+.imp-pk{background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.25);color:var(--pink);}
+.imp-y{background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);color:var(--yellow);}
+.imp-b{background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.25);color:var(--blue);}
+.explain{background:rgba(0,212,255,.04);border-left:3px solid var(--cyan);padding:11px 15px;border-radius:0 8px 8px 0;font-size:13px;color:var(--muted);line-height:1.65;margin-bottom:18px;}
+.explain strong{color:var(--text);}.explain.ep{border-color:var(--purple);background:rgba(168,85,247,.04);}
+.explain.eo{border-color:var(--orange);background:rgba(249,115,22,.04);}.explain.eg{border-color:var(--green);background:rgba(34,211,160,.04);}
+.explain.epk{border-color:var(--pink);background:rgba(244,63,94,.04);}.explain.ey{border-color:var(--yellow);background:rgba(251,191,36,.04);}
+.explain.eb{border-color:var(--blue);background:rgba(59,130,246,.04);}
+.tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;}
+.tab{font-family:var(--mono);font-size:11px;font-weight:700;padding:7px 14px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .2s;}
+.tab.act{border-color:var(--orange);color:var(--orange);background:rgba(249,115,22,.08);}
+.tab-content{display:none;}.tab-content.active{display:block;}
+.summary-card{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:48px;position:relative;}
+.summary-card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--cyan),var(--purple),var(--orange),var(--green));}
+.summary-title{font-size:18px;font-weight:700;margin-bottom:18px;display:flex;align-items:center;gap:10px;}
+footer{text-align:center;padding:28px;color:var(--muted);font-family:var(--mono);font-size:10px;border-top:1px solid var(--border);letter-spacing:1.5px;margin-top:20px;}
+</style>
+</head>
+<body>
+
+<!-- SPEED BAR -->
+<div class="speed-bar">
+  <div class="speed-inner">
+    <span class="sp-label">&#9889; Execution Speed</span>
+    <div class="sp-slots">
+      <button class="sp-btn" onclick="setSpeed(1)" id="sp1">1x</button>
+      <button class="sp-btn" onclick="setSpeed(2)" id="sp2">2x</button>
+      <button class="sp-btn on" onclick="setSpeed(3)" id="sp3">3x</button>
+      <button class="sp-btn" onclick="setSpeed(5)" id="sp5">5x</button>
+      <button class="sp-btn" onclick="setSpeed(8)" id="sp8">8x</button>
+    </div>
+    <div class="sp-div"></div>
+    <div class="sp-info">Step: <span class="sv" id="stepVal">1.0s</span> &nbsp;&#183;&nbsp; Row: <span class="sv" id="rowVal">0.5s</span></div>
+    <div class="sp-div"></div>
+    <span class="sp-status" id="execStatus" style="font-family:var(--mono);font-size:11px;color:var(--muted)">&#9679; Ready</span>
+  </div>
+  <div class="sp-prog"><div class="sp-bar" id="execBar"></div></div>
+</div>
+
+<div class="container">
+<header>
+  <div class="badge">SQL Window Functions</div>
+  <h1>SQL Window Functions<br>Complete Guide</h1>
+  <p class="subtitle">Click &#9654; Execute &#8212; watch data transform step by step &#183; Adjust speed above</p>
+</header>
+
+<nav class="nav">
+  <a class="nav-pill" href="#s1">01 Basics</a>
+  <a class="nav-pill" href="#s2">02 OVER</a>
+  <a class="nav-pill" href="#s3">03 PARTITION</a>
+  <a class="nav-pill" href="#s4">04 ORDER</a>
+  <a class="nav-pill" href="#s5">05 FRAME</a>
+  <a class="nav-pill" href="#s6">06 Rules</a>
+  <a class="nav-pill" href="#s7">07 GROUP BY</a>
+</nav>
+
+<div class="golden">
+  <span style="font-size:22px">&#9889;</span>
+  <div>
+    <span>WINDOW FUNCTION SYNTAX:</span> &nbsp;
+    <span style="color:var(--yellow)">function_name()</span>
+    <span style="color:var(--purple)"> OVER </span>
+    (<span style="color:var(--orange)">PARTITION BY</span> col
+    <span style="color:var(--green)"> ORDER BY</span> col
+    <span style="color:var(--pink)"> ROWS</span> frame)
+    &nbsp;&#183;&nbsp; <span>Keeps ALL rows</span> &nbsp;&#183;&nbsp; <span>No GROUP BY needed</span>
+  </div>
+</div>
+
+<div class="section" id="s1">
+  <div class="sec-hdr"><span class="sec-num n1">SECTION 01</span><span class="sec-title c1">Window Basics &#8212; The Problem</span></div>
+  <div class="card cb1"><div class="card-inner">
+    <div class="explain"><strong>Problem:</strong> How to calculate Total Sales AND still see each order? Regular aggregates collapse rows. Window functions compute <strong>without collapsing</strong>.</div>
+    <div class="tabs">
+      <button class="tab act" id="b1t1" onclick="switchBasicTab(1)">Task 1 &#8212; Total Sales</button>
+      <button class="tab" id="b1t2" onclick="switchBasicTab(2)">Task 2 &#8212; Sales per Product</button>
+    </div>
+    <div class="tab-content active" id="btab1">
+      <div class="qbox"><div class="qhdr"><span class="qlang">Normal Aggregate</span><div class="dots"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div></div>
+      <pre><span class="kw">SELECT</span>
+    <span class="fn">SUM</span>(Sales) <span class="kw">AS</span> Total_Sales
+<span class="kw">FROM</span> Sales.Orders;
+<span class="cm">-- Returns only 1 row -- all order detail LOST</span></pre></div>
+    </div>
+    <div class="tab-content" id="btab2">
+      <div class="qbox"><div class="qhdr"><span class="qlang">GROUP BY Aggregate</span><div class="dots"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div></div>
+      <pre><span class="kw">SELECT</span> ProductID, <span class="fn">SUM</span>(Sales) <span class="kw">AS</span> Total_Sales
+<span class="kw">FROM</span> Sales.Orders
+<span class="kw">GROUP BY</span> ProductID;
+<span class="cm">-- Returns 1 row per product -- OrderID, OrderDate LOST</span></pre></div>
+    </div>
+    <div class="pipeline">
+      <div class="pipe-step" id="b1p1"><div class="pipe-num">1</div><div class="pipe-label">SCAN<br>orders</div></div>
+      <div class="pipe-step" id="b1p2"><div class="pipe-num">2</div><div class="pipe-label">APPLY<br>aggregate</div></div>
+      <div class="pipe-step" id="b1p3"><div class="pipe-num">3</div><div class="pipe-label">COLLAPSE<br>rows</div></div>
+      <div class="pipe-step" id="b1p4"><div class="pipe-num">4</div><div class="pipe-label">OUTPUT<br>result</div></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-exec" id="b1btn" onclick="runBasics()">&#9654; Execute Query</button>
+      <button class="btn btn-reset" onclick="resetBasics()">&#8635; Reset</button>
+    </div>
+    <div class="stage" id="b1_s1">
+      <div class="stage-label"><div class="dpulse"></div>STEP 1 of 4 &#8212; Scanning Sales.Orders table</div>
+      <div class="tbl-wrap"><div class="tbl-title">Sales.Orders input</div>
+      <table><thead><tr><th>OrderID</th><th>OrderDate</th><th>ProductID</th><th>CustID</th><th>Sales</th><th>Status</th></tr></thead>
+      <tbody id="b1_scan"></tbody></table></div>
+    </div>
+    <div class="stage" id="b1_s2">
+      <div class="adn lit">&#8595;</div>
+      <div class="stage-label"><div class="dpulse"></div>STEP 2 of 4 &#8212; Applying aggregate</div>
+      <div class="two-col">
+        <div class="tbl-wrap"><div class="tbl-title" id="b1_agg_title">Summing ALL rows</div>
+        <table><thead><tr><th>Row</th><th>Sales</th><th>Running Sum</th></tr></thead><tbody id="b1_agg_body"></tbody></table></div>
+        <div class="tbl-wrap"><div class="tbl-title">What gets lost</div>
+        <table><thead><tr><th>Column</th><th>Status</th></tr></thead><tbody>
+          <tr><td>OrderID</td><td class="vpk">LOST</td></tr>
+          <tr><td>OrderDate</td><td class="vpk">LOST</td></tr>
+          <tr><td>ProductID</td><td id="b1_pid_st" class="vpk">LOST</td></tr>
+          <tr><td>Sales</td><td class="vy">summed</td></tr>
+        </tbody></table></div>
+      </div>
+    </div>
+    <div class="stage" id="b1_s3">
+      <div class="adn lit">&#8595;</div>
+      <div class="stage-label"><div class="dpulse"></div>STEP 3 of 4 &#8212; Rows collapsed</div>
+      <div class="tbl-wrap"><div class="tbl-title">Count: 8 &#8594; <span id="b1_row_res" class="vpk">1</span></div>
+      <table><thead><tr id="b1_out_hdr"></tr></thead><tbody id="b1_out_body"></tbody></table></div>
+    </div>
+    <div class="stage" id="b1_s4">
+      <div class="adn ok">&#8595;</div>
+      <div class="stage-label"><div class="dpulse done"></div>RESULT</div>
+      <div class="two-col">
+        <div class="res-box res-bad"><div class="res-title">&#10007; The limitation</div>You get the total BUT all order details are gone.</div>
+        <div class="res-box res-good"><div class="res-title">&#10003; Solution: Window Functions</div>OVER () computes the same aggregate while keeping every row intact.</div>
+      </div>
+      <div class="impact imp-c">Problem identified &#8594; Window functions are the answer</div>
+    </div>
+  </div></div>
+</div>
+
+<div class="section" id="s2">
+  <div class="sec-hdr"><span class="sec-num n2">SECTION 02</span><span class="sec-title c2">OVER Clause &#8212; Keep All Rows</span></div>
+  <div class="card cb2"><div class="card-inner">
+    <div class="explain ep"><strong>Task 3:</strong> Find total sales AND keep OrderID, OrderDate, ProductID, Sales per row. Empty <code style="color:var(--purple)">OVER ()</code> = entire result set.</div>
+    <div class="qbox"><div class="qhdr"><span class="qlang">OVER Clause</span><div class="dots"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div></div>
+    <pre><span class="kw">SELECT</span> OrderID, OrderDate, ProductID, Sales,
+    <span class="fn">SUM</span>(Sales) <span class="kw">OVER</span> () <span class="kw">AS</span> Total_Sales
+<span class="kw">FROM</span> Sales.Orders;</pre></div>
+    <div class="pipeline">
+      <div class="pipe-step" id="ov1p1"><div class="pipe-num">1</div><div class="pipe-label">SCAN<br>all rows</div></div>
+      <div class="pipe-step" id="ov1p2"><div class="pipe-num">2</div><div class="pipe-label">OVER ()<br>= full set</div></div>
+      <div class="pipe-step" id="ov1p3"><div class="pipe-num">3</div><div class="pipe-label">COMPUTE<br>SUM</div></div>
+      <div class="pipe-step" id="ov1p4"><div class="pipe-num">4</div><div class="pipe-label">STAMP on<br>every row</div></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-exec" id="ov1btn" onclick="runOver()">&#9654; Execute Query</button>
+      <button class="btn btn-reset" onclick="resetOver()">&#8635; Reset</button>
+    </div>
+    <div class="stage" id="ov_s1">
+      <div class="stage-label"><div class="dpulse"></div>STEP 1 of 4 &#8212; Scanning all 8 rows</div>
+      <div class="tbl-wrap"><div class="tbl-title">Sales.Orders &#8212; all rows survive</div>
+      <table><thead><tr><th>OrderID</th><th>OrderDate</th><th>ProductID</th><th>Sales</th></tr></thead>
+      <tbody id="ov_scan"></tbody></table></div>
+    </div>
+    <div class="stage" id="ov_s2">
+      <div class="adn lit">&#8595;</div>
+      <div class="stage-label"><div class="dpulse"></div>STEP 2 of 4 &#8212; OVER () spans entire result set</div>
+      <div class="tbl-wrap"><div class="tbl-title">Window = entire table</div>
+      <table><thead><tr><th>OrderID</th><th>Sales</th><th>In Window?</th></tr></thead>
+      <tbody id="ov_window"></tbody></table></div>
+    </div>
+    <div class="stage" id="ov_s3">
+      <div class="adn lit">&#8595;</div>
+      <div class="stage-label"><div class="dpulse"></div>STEP 3 of 4 &#8212; SUM computed over full window</div>
+      <div class="tbl-wrap"><div class="tbl-title">Window computation</div>
+      <table><thead><tr><th>Window</th><th>Rows</th><th>SUM</th></tr></thead>
+      <tbody><tr><td class="vc">OVER ()</td><td class="vy">All 8 rows</td><td class="vg">2,860</td></tr></tbody></table></div>
+    </div>
+    <div class="stage" id="ov_s4">
+      <div class="adn ok">&#8595;</div>
+      <div class="stage-label"><div class="dpulse done"></div>RESULT &#8212; Total_Sales stamped on every row</div>
+      <div class="tbl-wrap"><div class="tbl-title">&#9989; Output &#8212; ALL 8 rows</div>
+      <table><thead><tr><th>OrderID</th><th>OrderDate</th><th>ProductID</th><th>Sales</th><th class="vg">Total_Sales &#10022;</th></tr></thead>
+      <tbody id="ov_out"></tbody></table></div>
+      <div class="two-col" style="margin-top:12px;">
+        <div class="res-box res-bad"><div class="res-title">&#10007; vs Normal SUM</div>Returns 1 row. All order details vanish.</div>
+        <div class="res-box res-good"><div class="res-title">&#10003; OVER () WIN</div>8 rows kept. Each row sees its Sales AND company total.</div>
+      </div>
+      <div class="impact imp-p">8 rows in &#8594; 8 rows out &#183; Total_Sales added to every row</div>
+    </div>
+  </div></div>
+</div>
+
+<div class="section" id="s3">
+  <div class="sec-hdr"><span class="sec-num n3">SECTION 03</span><span class="sec-title c3">PARTITION BY &#8212; Group Windows</span></div>
+  <div class="card cb3"><div class="card-inner">
+    <div class="explain eo"><strong>Tasks 4 &amp; 5:</strong> PARTITION BY divides rows into groups like GROUP BY but <strong>keeps all rows</strong>. Multiple partitions in one query.</div>
+    <div class="tabs">
+      <button class="tab act" id="pt1" onclick="switchPartTab(1)">Task 4 &#8212; By Product</button>
+      <button class="tab" id="pt2" onclick="switchPartTab(2)">Task 5 &#8212; Product + Status</button>
+    </div>
+    <div class="tab-content active" id="ptab1">
+      <div class="qbox"><div class="qhdr"><span class="qlang">PARTITION BY ProductID</span><div class="dots"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div></div>
+      <pre><span class="kw">SELECT</span> OrderID, OrderDate, ProductID, Sales,
+    <span class="fn">SUM</span>(Sales) <span class="kw">OVER</span> () <span class="kw">AS</span> Total_Sales,
+    <span class="fn">SUM</span>(Sales) <span class="kw">OVER</span> (<span class="hk">PARTITION BY</span> ProductID) <span class="kw">AS</span> Sales_By_Product
+<span class="kw">FROM</span> Sales.Orders;</pre></div>
+    </div>
+    <div class="tab-content" id="ptab2">
+      <div class="qbox"><div class="qhdr"><span class="qlang">PARTITION BY ProductID, OrderStatus</span><div class="dots"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div></div>
+      <pre><span class="kw">SELECT</span> OrderID, ProductID, OrderStatus, Sales,
+    <span class="fn">SUM</span>(Sales) <span class="kw">OVER</span> () <span class="kw">AS</span> Total_Sales,
+    <span class="fn">SUM</span>(Sales) <span class="kw">OVER</span> (<span class="hk">PARTITION BY</span> ProductID) <span class="kw">AS</span> Sales_By_Product,
+    <span class="fn">SUM</span>(Sales) <span class="kw">OVER</span> (<span class="hk">PARTITION BY</span> ProductID, OrderStatus) <span class="kw">AS</span> Sales_By_P_Status
+<span class="kw">FROM</span> Sales.Orders;</pre></div>
+    </div>
+    <div class="pipeline">
+      <div class="pipe-step" id="pt1p1"><div class="pipe-num">1</div><div class="pipe-label">SCAN<br>all rows</div></div>
+      <div class="pipe-step" id="pt1p2"><div class="pipe-num">2</div><div class="pipe-label">CREATE<br>partitions</div></div>
+      <div class="pipe-step" id="pt1p3"><div class="pipe-num">3</div><div class="pipe-label">COMPUTE<br>per group</div></div>
+      <div class="pipe-step" id="pt1p4"><div class="pipe-num">4</div><div class="pipe-label">ATTACH<br>to each row</div></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-exec" id="pt1btn" onclick="runPartition()">&#9654; Execute Query</button>
+      <button class="btn btn-reset" onclick="resetPartition()">&#8635; Reset</button>
+    </div>
+    <div class="stage" id="pt_s1">
+      <div class="stage-label"><div class="dpulse"></div>STEP 1 of 4 &#8212; Scanning all rows</div>
+      <div class="tbl-wrap"><div class="tbl-title">Sales.Orders &#8212; full scan</div>
+      <table><thead><tr><th>OrderID</th><th>ProductID</th><th>Status</th><th>Sales</th></tr></thead>
+      <tbody id="pt_scan"></tbody></table></div>
+    </div>
+    <div class="stage" id="pt_s2">
+      <div class="adn lit">&#8595;</div>
+      <div class="stage-label"><div class="dpulse"></div>STEP 2 of 4 &#8212; Rows partitioned into groups</div>
+      <div id="pt_partition_display"></div>
+    </div>
+    <div class="stage" id="pt_s3">
+      <div class="adn lit">&#8595;</div>
+      <div class="stage-label"><div class="dpulse"></div>STEP 3 of 4 &#8212; Computing SUM per partition</div>
+      <div class="tbl-wrap"><div class="tbl-title">Partition calculations</div>
+      <table><thead><tr id="pt_calc_hdr"></tr></thead><tbody id="pt_calc_body"></tbody></table></div>
+    </div>
+    <div class="stage" id="pt_s4">
+      <div class="adn ok">&#8595;</div>
+      <div class="stage-label"><div class="dpulse done"></div>RESULT &#8212; All rows with partition values</div>
+      <div class="tbl-wrap"><div class="tbl-title" id="pt_out_title">&#9989; Output</div>
+      <table><thead><tr id="pt_out_hdr"></tr></thead><tbody id="pt_out_body"></tbody></table></div>
+      <div class="impact imp-o">8 rows in &#8594; 8 rows out &#183; Partition columns added</div>
+    </div>
+  </div></div>
+</div>
+
+<div class="section" id="s4">
+  <div class="sec-hdr"><span class="sec-num n4">SECTION 04</span><span class="sec-title c4">ORDER BY &#8212; Rank &amp; Running Totals</span></div>
+  <div class="card cb4"><div class="card-inner">
+    <div class="explain eg"><strong>Task 6:</strong> Rank each order by Sales highest to lowest. ORDER BY inside OVER sorts <strong>within the window</strong>.</div>
+    <div class="qbox"><div class="qhdr"><span class="qlang">RANK with ORDER BY</span><div class="dots"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div></div>
+    <pre><span class="kw">SELECT</span> OrderID, OrderDate, Sales,
+    <span class="fn">RANK</span>() <span class="kw">OVER</span> (<span class="hk">ORDER BY</span> Sales <span class="kw">DESC</span>) <span class="kw">AS</span> Rank_Sales
+<span class="kw">FROM</span> Sales.Orders;</pre></div>
+    <div class="pipeline">
+      <div class="pipe-step" id="ob1p1"><div class="pipe-num">1</div><div class="pipe-label">SCAN<br>all rows</div></div>
+      <div class="pipe-step" id="ob1p2"><div class="pipe-num">2</div><div class="pipe-label">SORT by<br>Sales DESC</div></div>
+      <div class="pipe-step" id="ob1p3"><div class="pipe-num">3</div><div class="pipe-label">ASSIGN<br>ranks</div></div>
+      <div class="pipe-step" id="ob1p4"><div class="pipe-num">4</div><div class="pipe-label">OUTPUT<br>all rows</div></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-exec" id="ob1btn" onclick="runOrderBy()">&#9654; Execute Query</button>
+      <button class="btn btn-reset" onclick="resetOrderBy()">&#8635; Reset</button>
+    </div>
+    <div class="stage" id="ob_s1">
+      <div class="stage-label"><div class="dpulse"></div>STEP 1 of 4 &#8212; Scanning all orders</div>
+      <div class="tbl-wrap"><div class="tbl-title">Sales.Orders &#8212; unsorted</div>
+      <table><thead><tr><th>OrderID</th><th>OrderDate</th><th>Sales</th></tr></thead>
+      <tbody id="ob_scan"></tbody></table></div>
+    </div>
+    <div class="stage" id="ob_s2">
+      <div class="adn lit">&#8595;</div>
+      <div class="stage-label"><div class="dpulse"></div>STEP 2 of 4 &#8212; Window sorts by Sales DESC</div>
+      <div class="tbl-wrap"><div class="tbl-title">Sorted within window</div>
+      <table><thead><tr><th>Pos</th><th>OrderID</th><th>Sales</th><th>Will rank...</th></tr></thead>
+      <tbody id="ob_sorted"></tbody></table></div>
+    </div>
+    <div class="stage" id="ob_s3">
+      <div class="adn lit">&#8595;</div>
+      <div class="stage-label"><div class="dpulse"></div>STEP 3 of 4 &#8212; RANK() assigns positions</div>
+      <div class="tbl-wrap"><div class="tbl-title">Rank assignment</div>
+      <table><thead><tr><th>Rank</th><th>OrderID</th><th>Sales</th><th>Note</th></tr></thead>
+      <tbody id="ob_ranks"></tbody></table></div>
+    </div>
+    <div class="stage" id="ob_s4">
+      <div class="adn ok">&#8595;</div>
+      <div class="stage-label"><div class="dpulse done"></div>RESULT</div>
+      <div class="tbl-wrap"><div class="tbl-title">&#9989; Output &#8212; ALL 8 rows &#183; Rank_Sales added</div>
+      <table><thead><tr><th>OrderID</th><th>OrderDate</th><th>Sales</th><th class="vg">Rank_Sales &#10022;</th></tr></thead>
+      <tbody id="ob_out"></tbody></table></div>
+      <div class="two-col" style="margin-top:12px;">
+        <div class="res-box res-info"><div class="res-title">RANK vs DENSE_RANK</div>RANK skips after ties (1,2,2,4). DENSE_RANK never skips (1,2,2,3). ROW_NUMBER always unique.</div>
+        <div class="res-box res-good"><div class="res-title">&#10003; Use case</div>Leaderboards, top-N filters, percentile analysis.</div>
+      </div>
+      <div class="impact imp-g">8 rows in &#8594; 8 rows out &#183; Rank_Sales added</div>
+    </div>
+  </div></div>
+</div>
+
+<div class="section" id="s5">
+  <div class="sec-hdr"><span class="sec-num n5">SECTION 05</span><span class="sec-title c5">FRAME Clause &#8212; Sliding Windows</span></div>
+  <div class="card cb5"><div class="card-inner">
+    <div class="explain epk"><strong>Tasks 7&#8211;11:</strong> FRAME controls <strong>which rows within a partition</strong> are included relative to the current row. A sliding window that moves row by row.</div>
+    <div class="tabs">
+      <button class="tab act" id="ft1" onclick="switchFrameTab(1)">CURRENT + 2 FOLLOWING</button>
+      <button class="tab" id="ft2" onclick="switchFrameTab(2)">2 PRECEDING + CURRENT</button>
+      <button class="tab" id="ft3" onclick="switchFrameTab(3)">UNBOUNDED PRECEDING</button>
+    </div>
+    <div class="tab-content active" id="ftab1">
+      <div class="qbox"><div class="qhdr"><span class="qlang">Task 7 &#8212; CURRENT ROW AND 2 FOLLOWING</span><div class="dots"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div></div>
+      <pre><span class="fn">SUM</span>(Sales) <span class="kw">OVER</span> (
+    <span class="kw">PARTITION BY</span> OrderStatus  <span class="kw">ORDER BY</span> OrderDate
+    <span class="hk">ROWS BETWEEN CURRENT ROW AND 2 FOLLOWING</span>
+) <span class="kw">AS</span> Total_Sales</pre></div>
+    </div>
+    <div class="tab-content" id="ftab2">
+      <div class="qbox"><div class="qhdr"><span class="qlang">Task 8 &#8212; 2 PRECEDING AND CURRENT ROW</span><div class="dots"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div></div>
+      <pre><span class="fn">SUM</span>(Sales) <span class="kw">OVER</span> (
+    <span class="kw">PARTITION BY</span> OrderStatus  <span class="kw">ORDER BY</span> OrderDate
+    <span class="hk">ROWS BETWEEN 2 PRECEDING AND CURRENT ROW</span>
+) <span class="kw">AS</span> Total_Sales</pre></div>
+    </div>
+    <div class="tab-content" id="ftab3">
+      <div class="qbox"><div class="qhdr"><span class="qlang">Task 10 &#8212; UNBOUNDED PRECEDING (cumulative)</span><div class="dots"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div></div>
+      <pre><span class="fn">SUM</span>(Sales) <span class="kw">OVER</span> (
+    <span class="kw">PARTITION BY</span> OrderStatus  <span class="kw">ORDER BY</span> OrderDate
+    <span class="hk">ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW</span>
+) <span class="kw">AS</span> Total_Sales</pre></div>
+    </div>
+    <div class="pipeline">
+      <div class="pipe-step" id="fr1p1"><div class="pipe-num">1</div><div class="pipe-label">PARTITION<br>by Status</div></div>
+      <div class="pipe-step" id="fr1p2"><div class="pipe-num">2</div><div class="pipe-label">ORDER<br>by Date</div></div>
+      <div class="pipe-step" id="fr1p3"><div class="pipe-num">3</div><div class="pipe-label">SLIDE<br>frame</div></div>
+      <div class="pipe-step" id="fr1p4"><div class="pipe-num">4</div><div class="pipe-label">OUTPUT<br>per row</div></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-exec" id="fr1btn" onclick="runFrame()">&#9654; Execute Query</button>
+      <button class="btn btn-reset" onclick="resetFrame()">&#8635; Reset</button>
+    </div>
+    <div class="stage" id="fr_s1">
+      <div class="stage-label"><div class="dpulse"></div>STEP 1 of 4 &#8212; Partitioned by OrderStatus</div>
+      <div class="two-col">
+        <div class="tbl-wrap"><div class="tbl-title" style="color:var(--cyan)">Shipped</div>
+        <table><thead><tr><th>OrderID</th><th>OrderDate</th><th>Sales</th></tr></thead><tbody>
+          <tr class="hl-c"><td>1001</td><td>2024-01-05</td><td>200</td></tr>
+          <tr class="hl-c"><td>1003</td><td>2024-01-20</td><td>450</td></tr>
+          <tr class="hl-c"><td>1005</td><td>2024-02-10</td><td>320</td></tr>
+          <tr class="hl-c"><td>1007</td><td>2024-03-01</td><td>180</td></tr>
+        </tbody></table></div>
+        <div class="tbl-wrap"><div class="tbl-title" style="color:var(--orange)">Pending</div>
+        <table><thead><tr><th>OrderID</th><th>OrderDate</th><th>Sales</th></tr></thead><tbody>
+          <tr class="hl-o"><td>1002</td><td>2024-01-12</td><td>150</td></tr>
+          <tr class="hl-o"><td>1004</td><td>2024-02-01</td><td>290</td></tr>
+          <tr class="hl-o"><td>1006</td><td>2024-02-20</td><td>410</td></tr>
+          <tr class="hl-o"><td>1008</td><td>2024-03-15</td><td>860</td></tr>
+        </tbody></table></div>
+      </div>
+    </div>
+    <div class="stage" id="fr_s2">
+      <div class="adn lit">&#8595;</div>
+      <div class="stage-label"><div class="dpulse"></div>STEP 2 of 4 &#8212; Frame window per row</div>
+      <div class="tbl-wrap"><div class="tbl-title" id="fr_viz_title">Frame visualization</div>
+      <table><thead><tr><th>Row</th><th>OrderID</th><th>Sales</th><th id="fr_viz_hdr">Frame includes</th><th>SUM</th></tr></thead>
+      <tbody id="fr_viz_body"></tbody></table></div>
+    </div>
+    <div class="stage" id="fr_s3">
+      <div class="adn lit">&#8595;</div>
+      <div class="stage-label"><div class="dpulse"></div>STEP 3 of 4 &#8212; Frame slides row by row</div>
+      <div class="tbl-wrap"><div class="tbl-title">Frame computation walkthrough</div>
+      <table><thead><tr><th>Current Row</th><th>Frame</th><th>Rows in Frame</th><th>SUM</th></tr></thead>
+      <tbody id="fr_calc_body"></tbody></table></div>
+    </div>
+    <div class="stage" id="fr_s4">
+      <div class="adn ok">&#8595;</div>
+      <div class="stage-label"><div class="dpulse done"></div>RESULT</div>
+      <div class="tbl-wrap"><div class="tbl-title">&#9989; Output &#8212; frame-computed Total_Sales</div>
+      <table><thead><tr><th>OrderID</th><th>OrderDate</th><th>Status</th><th>Sales</th><th class="vg" id="fr_out_hdr">Total_Sales &#10022;</th></tr></thead>
+      <tbody id="fr_out_body"></tbody></table></div>
+      <div class="impact imp-pk" id="fr_impact">Frame: CURRENT + 2 FOLLOWING</div>
+    </div>
+  </div></div>
+</div>
+
+<div class="section" id="s6">
+  <div class="sec-hdr"><span class="sec-num n6">SECTION 06</span><span class="sec-title c6">Window Function Rules</span></div>
+  <div class="card cb6"><div class="card-inner">
+    <div class="explain ey"><strong>Rules 1 &amp; 2:</strong> Two critical restrictions to avoid SQL errors.</div>
+    <div class="two-col">
+      <div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--yellow);font-weight:700;letter-spacing:1.5px;margin-bottom:10px;">RULE 1 &#8212; Clause restrictions</div>
+        <div class="qbox"><div class="qhdr"><span class="qlang">INVALID &#8212; WHERE clause</span><div class="dots"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div></div>
+        <pre><span class="kw">WHERE</span>
+    <span class="fn">SUM</span>(Sales) <span class="kw">OVER</span> (
+        <span class="kw">PARTITION BY</span> OrderStatus
+    ) &gt; 100;  <span class="cm">-- ERROR!</span></pre></div>
+        <div class="res-box res-bad" style="margin-top:10px;"><div class="res-title">Why it fails</div>Window functions run AFTER WHERE. Cannot filter on value not yet computed.</div>
+        <div class="qbox" style="margin-top:10px;"><div class="qhdr"><span class="qlang">FIX &#8212; Use CTE</span><div class="dots"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div></div>
+        <pre><span class="kw">WITH</span> cte <span class="kw">AS</span> (
+    <span class="kw">SELECT</span> *,
+        <span class="fn">SUM</span>(Sales) <span class="kw">OVER</span> (
+            <span class="kw">PARTITION BY</span> OrderStatus
+        ) <span class="kw">AS</span> Total_Sales
+    <span class="kw">FROM</span> Sales.Orders
+)
+<span class="kw">SELECT</span> * <span class="kw">FROM</span> cte
+<span class="kw">WHERE</span> Total_Sales &gt; 100;</pre></div>
+        <div class="res-box res-good" style="margin-top:10px;"><div class="res-title">Valid clauses</div><strong>SELECT</strong> and <strong>ORDER BY</strong> only.</div>
+      </div>
+      <div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--yellow);font-weight:700;letter-spacing:1.5px;margin-bottom:10px;">RULE 2 &#8212; No nesting</div>
+        <div class="qbox"><div class="qhdr"><span class="qlang">INVALID &#8212; Nested OVER()</span><div class="dots"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div></div>
+        <pre><span class="fn">SUM</span>(
+    <span class="fn">SUM</span>(Sales) <span class="kw">OVER</span> (...) <span class="cm">-- inner</span>
+) <span class="kw">OVER</span> (...)  <span class="cm">-- ERROR!</span></pre></div>
+        <div class="res-box res-bad" style="margin-top:10px;"><div class="res-title">Why it fails</div>A window function cannot be an argument of another window function.</div>
+        <div class="qbox" style="margin-top:10px;"><div class="qhdr"><span class="qlang">FIX &#8212; Chain CTEs</span><div class="dots"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div></div>
+        <pre><span class="kw">WITH</span> step1 <span class="kw">AS</span> (
+    <span class="kw">SELECT</span> *,
+        <span class="fn">SUM</span>(Sales) <span class="kw">OVER</span> (
+            <span class="kw">PARTITION BY</span> OrderStatus
+        ) <span class="kw">AS</span> Status_Total
+    <span class="kw">FROM</span> Sales.Orders
+)
+<span class="kw">SELECT</span> *,
+    <span class="fn">SUM</span>(Status_Total) <span class="kw">OVER</span> () <span class="kw">AS</span> Grand_Total
+<span class="kw">FROM</span> step1;</pre></div>
+        <div class="res-box res-good" style="margin-top:10px;"><div class="res-title">Correct</div>Chain CTEs. Each CTE adds one level of window computation.</div>
+      </div>
+    </div>
+    <div style="margin-top:18px;">
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Clause</th><th>Allowed?</th><th>Workaround</th></tr></thead>
+        <tbody>
+          <tr><td class="vc">SELECT</td><td class="vg">Yes</td><td class="vm">&#8212;</td></tr>
+          <tr><td class="vc">ORDER BY</td><td class="vg">Yes</td><td class="vm">&#8212;</td></tr>
+          <tr><td class="vpk">WHERE</td><td class="vpk">No</td><td>Wrap in CTE, then filter</td></tr>
+          <tr><td class="vpk">HAVING</td><td class="vpk">No</td><td>Wrap in CTE, use WHERE</td></tr>
+          <tr><td class="vpk">GROUP BY</td><td class="vpk">No</td><td>Window runs after GROUP BY</td></tr>
+          <tr><td class="vpk">Nested OVER()</td><td class="vpk">No</td><td>Chain CTEs layer by layer</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+    <div class="impact imp-y">SELECT and ORDER BY only &#183; No nesting &#183; Use CTEs</div>
+  </div></div>
+</div>
+
+<div class="section" id="s7">
+  <div class="sec-hdr"><span class="sec-num n7">SECTION 07</span><span class="sec-title c7">Window + GROUP BY Together</span></div>
+  <div class="card cb7"><div class="card-inner">
+    <div class="explain eb"><strong>Task 12:</strong> Rank customers by total sales. Window functions can operate <strong>on top of GROUP BY</strong> &#8212; GROUP BY runs first, then RANK() sees grouped rows.</div>
+    <div class="qbox"><div class="qhdr"><span class="qlang">RANK over GROUP BY</span><div class="dots"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div></div>
+    <pre><span class="kw">SELECT</span>
+    CustomerID,
+    <span class="fn">SUM</span>(Sales) <span class="kw">AS</span> Total_Sales,
+    <span class="fn">RANK</span>() <span class="kw">OVER</span> (<span class="hk">ORDER BY</span> <span class="fn">SUM</span>(Sales) <span class="kw">DESC</span>) <span class="kw">AS</span> Rank_Customers
+<span class="kw">FROM</span> Sales.Orders
+<span class="kw">GROUP BY</span> CustomerID;
+<span class="cm">-- GROUP BY first, then RANK() on grouped result</span></pre></div>
+    <div class="pipeline">
+      <div class="pipe-step" id="gb1p1"><div class="pipe-num">1</div><div class="pipe-label">SCAN<br>all rows</div></div>
+      <div class="pipe-step" id="gb1p2"><div class="pipe-num">2</div><div class="pipe-label">GROUP BY<br>CustomerID</div></div>
+      <div class="pipe-step" id="gb1p3"><div class="pipe-num">3</div><div class="pipe-label">RANK()<br>on groups</div></div>
+      <div class="pipe-step" id="gb1p4"><div class="pipe-num">4</div><div class="pipe-label">OUTPUT<br>ranked</div></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-exec" id="gb1btn" onclick="runGroupBy()">&#9654; Execute Query</button>
+      <button class="btn btn-reset" onclick="resetGroupBy()">&#8635; Reset</button>
+    </div>
+    <div class="stage" id="gbw_s1">
+      <div class="stage-label"><div class="dpulse"></div>STEP 1 of 4 &#8212; Scanning 8 orders</div>
+      <div class="tbl-wrap"><div class="tbl-title">Sales.Orders &#8212; raw</div>
+      <table><thead><tr><th>OrderID</th><th>CustomerID</th><th>Sales</th></tr></thead>
+      <tbody id="gbw_scan"></tbody></table></div>
+    </div>
+    <div class="stage" id="gbw_s2">
+      <div class="adn lit">&#8595;</div>
+      <div class="stage-label"><div class="dpulse"></div>STEP 2 of 4 &#8212; GROUP BY, 8 rows &#8594; 4 rows</div>
+      <div class="two-col">
+        <div class="tbl-wrap"><div class="tbl-title">After GROUP BY CustomerID</div>
+        <table><thead><tr><th>CustomerID</th><th>Total_Sales</th></tr></thead>
+        <tbody id="gbw_grouped"></tbody></table></div>
+        <div class="tbl-wrap"><div class="tbl-title">Row reduction</div>
+        <table><thead><tr><th>Stage</th><th>Rows</th></tr></thead><tbody>
+          <tr><td class="vm">Input</td><td class="vy">8 rows</td></tr>
+          <tr><td class="vm">After GROUP BY</td><td class="vpk">4 rows</td></tr>
+          <tr><td class="vm">After RANK()</td><td class="vg">4 rows</td></tr>
+        </tbody></table></div>
+      </div>
+    </div>
+    <div class="stage" id="gbw_s3">
+      <div class="adn lit">&#8595;</div>
+      <div class="stage-label"><div class="dpulse"></div>STEP 3 of 4 &#8212; RANK() applied to grouped rows</div>
+      <div class="tbl-wrap"><div class="tbl-title">Ranking grouped results</div>
+      <table><thead><tr><th>CustomerID</th><th>Total_Sales</th><th>Sort</th><th>Rank</th></tr></thead>
+      <tbody id="gbw_rank"></tbody></table></div>
+    </div>
+    <div class="stage" id="gbw_s4">
+      <div class="adn ok">&#8595;</div>
+      <div class="stage-label"><div class="dpulse done"></div>RESULT</div>
+      <div class="tbl-wrap"><div class="tbl-title">&#9989; Output &#8212; 4 rows &#183; Rank_Customers added</div>
+      <table><thead><tr><th>CustomerID</th><th>Total_Sales</th><th class="vg">Rank_Customers &#10022;</th></tr></thead>
+      <tbody id="gbw_out"></tbody></table></div>
+      <div class="two-col" style="margin-top:12px;">
+        <div class="res-box res-info"><div class="res-title">Execution order</div>GROUP BY &#8594; 4 summary rows &#8594; RANK() sees those 4 and ranks them.</div>
+        <div class="res-box res-good"><div class="res-title">Best use</div>Customer leaderboards, department rankings.</div>
+      </div>
+      <div class="impact imp-b">GROUP BY + RANK() &#183; 8 rows &#8594; 4 grouped &#8594; ranked</div>
+    </div>
+  </div></div>
+</div>
+
+<div class="summary-card">
+  <div class="card-inner" style="padding:28px;">
+    <div class="summary-title">Complete Reference</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Clause</th><th>Syntax</th><th>Purpose</th><th>Rows out</th></tr></thead>
+      <tbody>
+        <tr><td class="vc">OVER ()</td><td class="vc" style="font-size:11px;">SUM() OVER ()</td><td>Entire table as one window</td><td class="vg">All preserved</td></tr>
+        <tr><td class="vo">PARTITION BY</td><td class="vo" style="font-size:11px;">OVER (PARTITION BY col)</td><td>Sub-windows per group</td><td class="vg">All preserved</td></tr>
+        <tr><td class="vg">ORDER BY</td><td class="vg" style="font-size:11px;">OVER (ORDER BY col DESC)</td><td>Sort for RANK / running totals</td><td class="vg">All preserved</td></tr>
+        <tr><td class="vpk">FRAME</td><td class="vpk" style="font-size:11px;">ROWS BETWEEN ... AND ...</td><td>Sliding subset per current row</td><td class="vg">All preserved</td></tr>
+        <tr><td class="vy">RULE 1</td><td class="vy" style="font-size:11px;">SELECT / ORDER BY only</td><td>WHERE/HAVING not allowed &#8594; CTE</td><td class="vm">&#8212;</td></tr>
+        <tr><td class="vy">RULE 2</td><td class="vy" style="font-size:11px;">No nesting OVER()</td><td>Cannot nest &#8594; chain CTEs</td><td class="vm">&#8212;</td></tr>
+        <tr><td class="vb">+ GROUP BY</td><td class="vb" style="font-size:11px;">RANK() OVER(ORDER BY SUM())</td><td>Window on grouped result</td><td class="vpk">Reduced by GROUP BY</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</div>
+</div>
+<footer>SQL WINDOW FUNCTIONS &#183; OVER &#183; PARTITION BY &#183; ORDER BY &#183; FRAME &#183; RULES &#183; GROUP BY</footer>
+
+<script>
+// ===== SPEED CONTROL =====
+let SM = 3; // speed multiplier, default 3
+
+function setSpeed(s) {
+  SM = s;
+  [1,2,3,5,8].forEach(v => {
+    const el = document.getElementById('sp'+v);
+    if (el) el.className = 'sp-btn' + (v===s ? ' on' : '');
+  });
+  const stepMs = Math.round(200 * Math.pow(s, 1.45));
+  const rowMs  = Math.round(120 * Math.pow(s, 1.4));
+  document.getElementById('stepVal').textContent = (stepMs/1000).toFixed(1)+'s';
+  document.getElementById('rowVal').textContent  = (rowMs/1000).toFixed(1)+'s';
+}
+
+function SD(base) { // step delay
+  return new Promise(r => setTimeout(r, Math.round(base * Math.pow(SM, 1.45))));
+}
+function RD(base) { // row delay
+  return new Promise(r => setTimeout(r, Math.round(base * Math.pow(SM, 1.4))));
+}
+
+let pTimer = null;
+function startProg() {
+  const bar = document.getElementById('execBar');
+  const st  = document.getElementById('execStatus');
+  bar.style.width = '0%';
+  bar.classList.add('run');
+  st.style.color = 'var(--yellow)';
+  st.textContent = 'Running...';
+  let p = 0;
+  pTimer = setInterval(() => {
+    p = Math.min(p + 1.5, 90);
+    bar.style.width = p + '%';
+  }, Math.round(50 * Math.pow(SM, 0.6)));
+}
+function endProg() {
+  clearInterval(pTimer);
+  const bar = document.getElementById('execBar');
+  const st  = document.getElementById('execStatus');
+  bar.style.width = '100%';
+  bar.classList.remove('run');
+  st.style.color = 'var(--green)';
+  st.textContent = 'Done';
+  setTimeout(() => {
+    bar.style.width = '0%';
+    st.style.color = 'var(--muted)';
+    st.textContent = 'Ready';
+  }, 1800);
+}
+
+setSpeed(3); // init
+
+// ===== DATA =====
+const orders = [
+  {id:'1001',date:'2024-01-05',pid:'P01',cid:'C01',sales:200,status:'Shipped'},
+  {id:'1002',date:'2024-01-12',pid:'P02',cid:'C02',sales:150,status:'Pending'},
+  {id:'1003',date:'2024-01-20',pid:'P01',cid:'C03',sales:450,status:'Shipped'},
+  {id:'1004',date:'2024-02-01',pid:'P03',cid:'C01',sales:290,status:'Pending'},
+  {id:'1005',date:'2024-02-10',pid:'P02',cid:'C04',sales:320,status:'Shipped'},
+  {id:'1006',date:'2024-02-20',pid:'P01',cid:'C02',sales:410,status:'Pending'},
+  {id:'1007',date:'2024-03-01',pid:'P03',cid:'C03',sales:180,status:'Shipped'},
+  {id:'1008',date:'2024-03-15',pid:'P02',cid:'C04',sales:860,status:'Pending'},
+];
+const p01s=orders.filter(o=>o.pid==='P01').reduce((a,o)=>a+o.sales,0);
+const p02s=orders.filter(o=>o.pid==='P02').reduce((a,o)=>a+o.sales,0);
+const p03s=orders.filter(o=>o.pid==='P03').reduce((a,o)=>a+o.sales,0);
+const totS=orders.reduce((a,o)=>a+o.sales,0);
+
+function sp(id,s){const e=document.getElementById(id);if(e)e.className='pipe-step '+(s||'');}
+function show(id){const e=document.getElementById(id);if(e){e.classList.add('show');setTimeout(()=>e.scrollIntoView({behavior:'smooth',block:'nearest'}),60);}}
+function hide(id){const e=document.getElementById(id);if(e)e.classList.remove('show');}
+function clr(id){const e=document.getElementById(id);if(e)e.innerHTML='';}
+
+// ===== S1 BASICS =====
+let bTab=1;
+function switchBasicTab(n){bTab=n;[1,2].forEach(i=>{document.getElementById('btab'+i).className='tab-content'+(i===n?' active':'');document.getElementById('b1t'+i).className='tab'+(i===n?' act':'');});}
+
+async function runBasics(){
+  document.getElementById('b1btn').disabled=true; startProg();
+  sp('b1p1','active');
+  const sb=document.getElementById('b1_scan'); sb.innerHTML='';
+  for(const o of orders){const tr=document.createElement('tr');tr.innerHTML=`<td>${o.id}</td><td>${o.date}</td><td>${o.pid}</td><td>${o.cid}</td><td>${o.sales}</td><td>${o.status}</td>`;tr.classList.add('hl-y');sb.appendChild(tr);}
+  show('b1_s1'); await SD(150);
+  for(const tr of sb.querySelectorAll('tr')){tr.classList.remove('hl-y');await RD(100);}
+  await SD(300);
+  sp('b1p1','done');sp('b1p2','active');
+  const ab=document.getElementById('b1_agg_body'); ab.innerHTML='';
+  document.getElementById('b1_agg_title').textContent=bTab===1?'Summing ALL rows':'Summing per ProductID';
+  document.getElementById('b1_pid_st').textContent=bTab===1?'LOST':'Kept';
+  document.getElementById('b1_pid_st').className=bTab===1?'vpk':'vg';
+  if(bTab===1){let rs=0;for(const o of orders){rs+=o.sales;const tr=document.createElement('tr');tr.className='hl-y';tr.innerHTML=`<td>${o.id}</td><td class="vy">${o.sales}</td><td class="vc">${rs.toLocaleString()}</td>`;ab.appendChild(tr);await RD(100);tr.className='';}}
+  else{for(const r of [{p:'P01',s:1060},{p:'P02',s:1330},{p:'P03',s:470}]){const tr=document.createElement('tr');tr.className='hl-y';tr.innerHTML=`<td class="vo">${r.p}</td><td class="vy">${r.s}</td><td class="vc">${r.s}</td>`;ab.appendChild(tr);await RD(150);tr.className='';}}
+  show('b1_s2'); await SD(500);
+  sp('b1p2','done');sp('b1p3','active');
+  const oh=document.getElementById('b1_out_hdr'),ob=document.getElementById('b1_out_body');
+  document.getElementById('b1_row_res').textContent=bTab===1?'1':'3';
+  if(bTab===1){oh.innerHTML='<th>Total_Sales</th>';ob.innerHTML='<tr><td class="vg" style="font-size:17px;padding:13px">2,860</td></tr>';}
+  else{oh.innerHTML='<th>ProductID</th><th>Total_Sales</th>';ob.innerHTML='<tr><td class="vo">P01</td><td class="vg">1,060</td></tr><tr><td class="vo">P02</td><td class="vg">1,330</td></tr><tr><td class="vo">P03</td><td class="vg">470</td></tr>';}
+  show('b1_s3'); await SD(900);
+  sp('b1p3','done');sp('b1p4','active'); show('b1_s4'); await SD(200); sp('b1p4','done'); endProg();
+}
+function resetBasics(){document.getElementById('b1btn').disabled=false;['b1p1','b1p2','b1p3','b1p4'].forEach(i=>sp(i,''));['b1_s1','b1_s2','b1_s3','b1_s4'].forEach(hide);clr('b1_scan');clr('b1_agg_body');}
+
+// ===== S2 OVER =====
+async function runOver(){
+  document.getElementById('ov1btn').disabled=true; startProg();
+  sp('ov1p1','active');
+  const sb=document.getElementById('ov_scan'); sb.innerHTML='';
+  for(const o of orders){const tr=document.createElement('tr');tr.innerHTML=`<td>${o.id}</td><td>${o.date}</td><td>${o.pid}</td><td>${o.sales}</td>`;tr.classList.add('hl-y');sb.appendChild(tr);}
+  show('ov_s1'); await SD(150);
+  for(const tr of sb.querySelectorAll('tr')){tr.classList.remove('hl-y');await RD(100);} await SD(300);
+  sp('ov1p1','done');sp('ov1p2','active');
+  const wb=document.getElementById('ov_window'); wb.innerHTML='';
+  for(const o of orders){const tr=document.createElement('tr');tr.innerHTML=`<td>${o.id}</td><td>${o.sales}</td><td class="vg">In window</td>`;tr.classList.add('hl-c');wb.appendChild(tr);await RD(110);tr.classList.remove('hl-c');}
+  show('ov_s2'); await SD(500);
+  sp('ov1p2','done');sp('ov1p3','active'); show('ov_s3'); await SD(900);
+  sp('ov1p3','done');sp('ov1p4','active');
+  const outb=document.getElementById('ov_out'); outb.innerHTML='';
+  for(const o of orders){const tr=document.createElement('tr');tr.innerHTML=`<td>${o.id}</td><td>${o.date}</td><td>${o.pid}</td><td>${o.sales}</td><td class="vg">2,860</td>`;tr.classList.add('hl-y');outb.appendChild(tr);await RD(130);tr.classList.remove('hl-y');}
+  show('ov_s4'); await SD(200); sp('ov1p4','done'); endProg();
+}
+function resetOver(){document.getElementById('ov1btn').disabled=false;['ov1p1','ov1p2','ov1p3','ov1p4'].forEach(i=>sp(i,''));['ov_s1','ov_s2','ov_s3','ov_s4'].forEach(hide);clr('ov_scan');clr('ov_window');clr('ov_out');}
+
+// ===== S3 PARTITION =====
+let pTab=1;
+function switchPartTab(n){pTab=n;[1,2].forEach(i=>{document.getElementById('ptab'+i).className='tab-content'+(i===n?' active':'');document.getElementById('pt'+i).className='tab'+(i===n?' act':'');});}
+
+async function runPartition(){
+  document.getElementById('pt1btn').disabled=true; startProg();
+  const t=pTab;
+  sp('pt1p1','active');
+  const sb=document.getElementById('pt_scan'); sb.innerHTML='';
+  for(const o of orders){const pc=o.pid==='P01'?'vc':o.pid==='P02'?'vo':'vp';const tr=document.createElement('tr');tr.innerHTML=`<td>${o.id}</td><td class="${pc}">${o.pid}</td><td>${o.status}</td><td>${o.sales}</td>`;tr.classList.add('hl-y');sb.appendChild(tr);}
+  show('pt_s1'); await SD(150);
+  for(const tr of sb.querySelectorAll('tr')){tr.classList.remove('hl-y');await RD(100);} await SD(300);
+  sp('pt1p1','done');sp('pt1p2','active');
+  const pd=document.getElementById('pt_partition_display'); pd.innerHTML='';
+  const gs=[{pid:'P01',cls:'hl-c',color:'cyan',rows:orders.filter(o=>o.pid==='P01')},{pid:'P02',cls:'hl-o',color:'orange',rows:orders.filter(o=>o.pid==='P02')},{pid:'P03',cls:'hl-p',color:'purple',rows:orders.filter(o=>o.pid==='P03')}];
+  const grid=document.createElement('div'); grid.className='three-col'; pd.appendChild(grid);
+  for(const g of gs){const div=document.createElement('div');div.className='tbl-wrap';div.innerHTML=`<div class="tbl-title" style="color:var(--${g.color})">${g.pid}</div><table><thead><tr><th>OrderID</th><th>Sales</th></tr></thead><tbody>${g.rows.map(r=>`<tr class="${g.cls}"><td>${r.id}</td><td>${r.sales}</td></tr>`).join('')}</tbody></table>`;grid.appendChild(div);}
+  show('pt_s2'); await SD(1100);
+  sp('pt1p2','done');sp('pt1p3','active');
+  const ch=document.getElementById('pt_calc_hdr'),cb=document.getElementById('pt_calc_body'); cb.innerHTML='';
+  ch.innerHTML=t===1?'<th>Partition</th><th>Rows</th><th>SUM</th>':'<th>Partition</th><th>Status</th><th>SUM</th>';
+  const cr=t===1?[{a:'P01',b:'3 rows',c:p01s,ac:'vc'},{a:'P02',b:'3 rows',c:p02s,ac:'vo'},{a:'P03',b:'2 rows',c:p03s,ac:'vp'}]:[{a:'P01',b:'Shipped',c:650,ac:'vc'},{a:'P01',b:'Pending',c:410,ac:'vc'},{a:'P02',b:'Shipped',c:320,ac:'vo'},{a:'P02',b:'Pending',c:1010,ac:'vo'},{a:'P03',b:'Shipped',c:180,ac:'vp'},{a:'P03',b:'Pending',c:290,ac:'vp'}];
+  for(const r of cr){const tr=document.createElement('tr');tr.className='hl-y';tr.innerHTML=`<td class="${r.ac}">${r.a}</td><td>${r.b}</td><td class="vg">${r.c.toLocaleString()}</td>`;cb.appendChild(tr);await RD(220);tr.className='';}
+  show('pt_s3'); await SD(600);
+  sp('pt1p3','done');sp('pt1p4','active');
+  const oh=document.getElementById('pt_out_hdr'),ob=document.getElementById('pt_out_body'); ob.innerHTML='';
+  const psm={'P01':p01s,'P02':p02s,'P03':p03s};
+  const pssm={'P01Shipped':650,'P01Pending':410,'P02Shipped':320,'P02Pending':1010,'P03Shipped':180,'P03Pending':290};
+  if(t===1){document.getElementById('pt_out_title').textContent='Output - 8 rows - Sales_By_Product added';oh.innerHTML='<th>OrderID</th><th>ProductID</th><th>Sales</th><th class="vc">Total_Sales</th><th class="vg">Sales_By_Product</th>';for(const o of orders){const pc=o.pid==='P01'?'vc':o.pid==='P02'?'vo':'vp';const tr=document.createElement('tr');tr.innerHTML=`<td>${o.id}</td><td class="${pc}">${o.pid}</td><td>${o.sales}</td><td class="vc">${totS}</td><td class="vg">${psm[o.pid]}</td>`;tr.classList.add('hl-y');ob.appendChild(tr);await RD(130);tr.classList.remove('hl-y');}}
+  else{document.getElementById('pt_out_title').textContent='Output - 8 rows - 3 partition columns added';oh.innerHTML='<th>OrderID</th><th>PID</th><th>Status</th><th>Sales</th><th class="vc">Total</th><th class="vg">By_Product</th><th class="vg">By_P+Status</th>';for(const o of orders){const pc=o.pid==='P01'?'vc':o.pid==='P02'?'vo':'vp';const pss=pssm[o.pid+o.status]||0;const tr=document.createElement('tr');tr.innerHTML=`<td>${o.id}</td><td class="${pc}">${o.pid}</td><td>${o.status}</td><td>${o.sales}</td><td class="vc">${totS}</td><td class="vg">${psm[o.pid]}</td><td class="vg">${pss}</td>`;tr.classList.add('hl-y');ob.appendChild(tr);await RD(130);tr.classList.remove('hl-y');}}
+  show('pt_s4'); await SD(200); sp('pt1p4','done'); endProg();
+}
+function resetPartition(){document.getElementById('pt1btn').disabled=false;['pt1p1','pt1p2','pt1p3','pt1p4'].forEach(i=>sp(i,''));['pt_s1','pt_s2','pt_s3','pt_s4'].forEach(hide);clr('pt_scan');clr('pt_calc_body');clr('pt_out_body');document.getElementById('pt_partition_display').innerHTML='';}
+
+// ===== S4 ORDER BY =====
+async function runOrderBy(){
+  document.getElementById('ob1btn').disabled=true; startProg();
+  sp('ob1p1','active');
+  const sb=document.getElementById('ob_scan'); sb.innerHTML='';
+  for(const o of orders){const tr=document.createElement('tr');tr.innerHTML=`<td>${o.id}</td><td>${o.date}</td><td>${o.sales}</td>`;tr.classList.add('hl-y');sb.appendChild(tr);}
+  show('ob_s1'); await SD(150);
+  for(const tr of sb.querySelectorAll('tr')){tr.classList.remove('hl-y');await RD(100);} await SD(300);
+  sp('ob1p1','done');sp('ob1p2','active');
+  const sorted=[...orders].sort((a,b)=>b.sales-a.sales);
+  const sortb=document.getElementById('ob_sorted'); sortb.innerHTML='';
+  for(let i=0;i<sorted.length;i++){const o=sorted[i];const tr=document.createElement('tr');tr.className='hl-y';tr.innerHTML=`<td class="vy">#${i+1}</td><td>${o.id}</td><td class="vc">${o.sales}</td><td class="vm">rank ${i+1}</td>`;sortb.appendChild(tr);await RD(160);tr.className='';}
+  show('ob_s2'); await SD(500);
+  sp('ob1p2','done');sp('ob1p3','active');
+  const rb=document.getElementById('ob_ranks'); rb.innerHTML='';
+  const rc=['vy','vo','vc','vg','vp','vm','vm','vm'];
+  for(let i=0;i<sorted.length;i++){const o=sorted[i];const tr=document.createElement('tr');tr.className='hl-y';tr.innerHTML=`<td class="${rc[i]}">${i+1}</td><td>${o.id}</td><td class="vc">${o.sales}</td><td class="vm" style="font-size:11px">${sorted[i].sales===sorted[i-1]?.sales?'Tie':''}</td>`;rb.appendChild(tr);await RD(190);tr.className='';}
+  show('ob_s3'); await SD(600);
+  sp('ob1p3','done');sp('ob1p4','active');
+  const rm={}; sorted.forEach((o,i)=>rm[o.id]=i+1);
+  const ob=document.getElementById('ob_out'); ob.innerHTML='';
+  for(const o of orders){const tr=document.createElement('tr');const r=rm[o.id];const cc=r===1?'vy':r<=3?'vc':'vg';tr.innerHTML=`<td>${o.id}</td><td>${o.date}</td><td>${o.sales}</td><td class="${cc}">${r}</td>`;tr.classList.add('hl-y');ob.appendChild(tr);await RD(130);tr.classList.remove('hl-y');}
+  show('ob_s4'); await SD(200); sp('ob1p4','done'); endProg();
+}
+function resetOrderBy(){document.getElementById('ob1btn').disabled=false;['ob1p1','ob1p2','ob1p3','ob1p4'].forEach(i=>sp(i,''));['ob_s1','ob_s2','ob_s3','ob_s4'].forEach(hide);clr('ob_scan');clr('ob_sorted');clr('ob_ranks');clr('ob_out');}
+
+// ===== S5 FRAME =====
+let fTab=1;
+function switchFrameTab(n){fTab=n;[1,2,3].forEach(i=>{document.getElementById('ftab'+i).className='tab-content'+(i===n?' active':'');document.getElementById('ft'+i).className='tab'+(i===n?' act':'');});}
+const sr=[{id:'1001',date:'2024-01-05',sales:200,status:'Shipped'},{id:'1003',date:'2024-01-20',sales:450,status:'Shipped'},{id:'1005',date:'2024-02-10',sales:320,status:'Shipped'},{id:'1007',date:'2024-03-01',sales:180,status:'Shipped'}];
+const pr=[{id:'1002',date:'2024-01-12',sales:150,status:'Pending'},{id:'1004',date:'2024-02-01',sales:290,status:'Pending'},{id:'1006',date:'2024-02-20',sales:410,status:'Pending'},{id:'1008',date:'2024-03-15',sales:860,status:'Pending'}];
+function compFrame(rows,t){return rows.map((r,i)=>{let inc=[],sum=0;if(t===1){for(let j=i;j<=Math.min(i+2,rows.length-1);j++){inc.push(j);sum+=rows[j].sales;}}else if(t===2){for(let j=Math.max(0,i-2);j<=i;j++){inc.push(j);sum+=rows[j].sales;}}else{for(let j=0;j<=i;j++){inc.push(j);sum+=rows[j].sales;}}return{row:r,inc,sum};});}
+
+async function runFrame(){
+  document.getElementById('fr1btn').disabled=true; startProg();
+  const t=fTab;
+  sp('fr1p1','active'); show('fr_s1'); await SD(1100);
+  sp('fr1p1','done');sp('fr1p2','active');
+  const titles=['CURR to +2','-2 to CURR','START to CURR'];
+  document.getElementById('fr_viz_hdr').textContent=titles[t-1];
+  const vb=document.getElementById('fr_viz_body'); vb.innerHTML='';
+  const fr=compFrame(sr,t);
+  for(let i=0;i<sr.length;i++){const f=fr[i];const inc=f.inc.map(j=>sr[j].id).join(', ');const tr=document.createElement('tr');tr.className='hl-y';tr.innerHTML=`<td class="vm">Row ${i+1}</td><td>${f.row.id}</td><td class="vc">${f.row.sales}</td><td class="vy" style="font-size:11px">${inc}</td><td class="vg">${f.sum}</td>`;vb.appendChild(tr);await RD(260);tr.className='';}
+  show('fr_s2'); await SD(600);
+  sp('fr1p2','done');sp('fr1p3','active');
+  const cb=document.getElementById('fr_calc_body'); cb.innerHTML='';
+  for(let i=0;i<sr.length;i++){const f=fr[i];const rd=f.inc.map(j=>sr[j].sales).join('+');const tr=document.createElement('tr');tr.className='hl-y';tr.innerHTML=`<td>${sr[i].id} (r${i+1})</td><td class="vy">${titles[t-1]}</td><td style="font-size:11px">${rd}</td><td class="vg">${f.sum}</td>`;cb.appendChild(tr);await RD(300);tr.className='';}
+  show('fr_s3'); await SD(600);
+  sp('fr1p3','done');sp('fr1p4','active');
+  const all=[...sr,...pr].sort((a,b)=>a.id.localeCompare(b.id));
+  const rm={};
+  compFrame(sr,t).forEach(f=>rm[f.row.id]=f.sum);
+  compFrame(pr,t).forEach(f=>rm[f.row.id]=f.sum);
+  const impTxt=['CURRENT+2 FOLLOWING: forward-looking','2 PRECEDING+CURRENT: backward-looking','UNBOUNDED PRECEDING: cumulative running total'];
+  document.getElementById('fr_impact').textContent='Frame: '+impTxt[t-1];
+  document.getElementById('fr_out_hdr').textContent='Total_Sales ('+titles[t-1]+')';
+  const ob=document.getElementById('fr_out_body'); ob.innerHTML='';
+  for(const o of all){const tr=document.createElement('tr');tr.innerHTML=`<td>${o.id}</td><td>${o.date}</td><td>${o.status}</td><td>${o.sales}</td><td class="vg">${rm[o.id]}</td>`;tr.classList.add('hl-y');ob.appendChild(tr);await RD(140);tr.classList.remove('hl-y');}
+  show('fr_s4'); await SD(200); sp('fr1p4','done'); endProg();
+}
+function resetFrame(){document.getElementById('fr1btn').disabled=false;['fr1p1','fr1p2','fr1p3','fr1p4'].forEach(i=>sp(i,''));['fr_s1','fr_s2','fr_s3','fr_s4'].forEach(hide);clr('fr_viz_body');clr('fr_calc_body');clr('fr_out_body');}
+
+// ===== S7 GROUP BY =====
+async function runGroupBy(){
+  document.getElementById('gb1btn').disabled=true; startProg();
+  sp('gb1p1','active');
+  const cc={'C01':'vc','C02':'vp','C03':'vo','C04':'vg'};
+  const sb=document.getElementById('gbw_scan'); sb.innerHTML='';
+  for(const o of orders){const tr=document.createElement('tr');tr.innerHTML=`<td>${o.id}</td><td class="${cc[o.cid]||'vm'}">${o.cid}</td><td>${o.sales}</td>`;tr.classList.add('hl-y');sb.appendChild(tr);}
+  show('gbw_s1'); await SD(150);
+  for(const tr of sb.querySelectorAll('tr')){tr.classList.remove('hl-y');await RD(100);} await SD(300);
+  sp('gb1p1','done');sp('gb1p2','active');
+  const cm={'C01':0,'C02':0,'C03':0,'C04':0};
+  orders.forEach(o=>cm[o.cid]+=o.sales);
+  const gb=document.getElementById('gbw_grouped'); gb.innerHTML='';
+  for(const[cid,tot] of Object.entries(cm)){const tr=document.createElement('tr');tr.className='hl-y';tr.innerHTML=`<td class="${cc[cid]||'vm'}">${cid}</td><td class="vy">${tot.toLocaleString()}</td>`;gb.appendChild(tr);await RD(220);tr.className='';}
+  show('gbw_s2'); await SD(600);
+  sp('gb1p2','done');sp('gb1p3','active');
+  const sorted=Object.entries(cm).sort((a,b)=>b[1]-a[1]);
+  const rkb=document.getElementById('gbw_rank'); rkb.innerHTML='';
+  const rkc=['vy','vo','vc','vg'];
+  for(let i=0;i<sorted.length;i++){const[cid,tot]=sorted[i];const tr=document.createElement('tr');tr.className='hl-y';tr.innerHTML=`<td class="${cc[cid]||'vm'}">${cid}</td><td>${tot.toLocaleString()}</td><td class="vm">${i+1}${i===0?' (top)':''}</td><td class="${rkc[i]}">${i+1}</td>`;rkb.appendChild(tr);await RD(250);tr.className='';}
+  show('gbw_s3'); await SD(600);
+  sp('gb1p3','done');sp('gb1p4','active');
+  const rm2={}; sorted.forEach(([cid],i)=>rm2[cid]=i+1);
+  const ob=document.getElementById('gbw_out'); ob.innerHTML='';
+  for(const[cid,tot] of sorted){const tr=document.createElement('tr');const r=rm2[cid];const rc=r===1?'vy':r===2?'vo':'vg';tr.innerHTML=`<td class="${cc[cid]||'vm'}">${cid}</td><td>${tot.toLocaleString()}</td><td class="${rc}">${r}</td>`;tr.classList.add('hl-y');ob.appendChild(tr);await RD(220);tr.classList.remove('hl-y');}
+  show('gbw_s4'); await SD(200); sp('gb1p4','done'); endProg();
+}
+function resetGroupBy(){document.getElementById('gb1btn').disabled=false;['gb1p1','gb1p2','gb1p3','gb1p4'].forEach(i=>sp(i,''));['gbw_s1','gbw_s2','gbw_s3','gbw_s4'].forEach(hide);clr('gbw_scan');clr('gbw_grouped');clr('gbw_rank');clr('gbw_out');}
+</script>
+</body>
+</html>

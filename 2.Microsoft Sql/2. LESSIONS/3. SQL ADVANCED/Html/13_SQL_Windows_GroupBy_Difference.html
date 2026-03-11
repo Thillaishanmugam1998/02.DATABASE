@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL: Aggregate vs GROUP BY vs Window Functions</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0a0d14; --bg2:#0f1320; --card:#111520; --border:#1e2535;
+  --cyan:#00d4ff; --purple:#a855f7; --orange:#f97316;
+  --green:#22d3a0; --pink:#f43f5e; --yellow:#fbbf24;
+  --text:#e2e8f0; --muted:#64748b;
+  --mono:'JetBrains Mono',monospace; --sans:'Syne',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+.container{max-width:1160px;margin:0 auto;padding:0 24px;position:relative;z-index:1;}
+
+header{padding:48px 0 32px;text-align:center;border-bottom:1px solid var(--border);margin-bottom:40px;}
+.badge{display:inline-block;font-family:var(--mono);font-size:11px;color:var(--cyan);background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.2);padding:4px 14px;border-radius:20px;letter-spacing:2px;text-transform:uppercase;margin-bottom:14px;}
+h1{font-size:clamp(26px,5vw,50px);font-weight:800;line-height:1.1;background:linear-gradient(135deg,#fff 0%,var(--cyan) 50%,var(--purple) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:10px;}
+.subtitle{color:var(--muted);font-size:14px;}
+
+.golden{background:linear-gradient(135deg,rgba(168,85,247,.08),rgba(0,212,255,.08));border:1px solid rgba(168,85,247,.3);border-radius:12px;padding:18px 24px;margin-bottom:44px;display:flex;align-items:center;gap:14px;font-family:var(--mono);font-size:13px;}
+.golden span{color:var(--cyan);font-weight:700;}
+
+.section{margin-bottom:52px;}
+.sec-hdr{display:flex;align-items:center;gap:12px;margin-bottom:20px;}
+.sec-num{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--bg);padding:4px 10px;border-radius:6px;letter-spacing:1px;}
+.s1 .sec-num{background:var(--cyan);}
+.s2 .sec-num{background:var(--purple);}
+.s3 .sec-num{background:var(--orange);}
+.sec-title{font-size:20px;font-weight:700;}
+.s1 .sec-title{color:var(--cyan);}
+.s2 .sec-title{color:var(--purple);}
+.s3 .sec-title{color:var(--orange);}
+
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;position:relative;}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.s1 .card::before{background:linear-gradient(90deg,var(--cyan),var(--purple));}
+.s2 .card::before{background:linear-gradient(90deg,var(--purple),var(--pink));}
+.s3 .card::before{background:linear-gradient(90deg,var(--orange),var(--yellow));}
+.card-inner{padding:28px;}
+
+.qbox{background:#080b12;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;}
+.qhdr{display:flex;align-items:center;justify-content:space-between;padding:9px 16px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02);}
+.qlang{font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;}
+.dots{display:flex;gap:5px;}
+.dot{width:8px;height:8px;border-radius:50%;}
+.dr{background:#f43f5e;}.dy{background:#fbbf24;}.dg{background:#22d3a0;}
+pre{font-family:var(--mono);font-size:12.5px;line-height:1.75;padding:18px 20px;overflow-x:auto;white-space:pre-wrap;}
+.kw{color:var(--purple);font-weight:700;}.fn{color:var(--cyan);}.cm{color:var(--muted);font-style:italic;}
+
+/* ── Pipeline ── */
+.pipeline{display:flex;align-items:stretch;gap:0;margin-bottom:24px;border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.pipe-step{flex:1;padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--bg2);border-right:1px solid var(--border);transition:all .35s;position:relative;}
+.pipe-step:last-child{border-right:none;}
+.pipe-num{width:26px;height:26px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--muted);transition:all .35s;position:relative;z-index:1;}
+.pipe-label{font-family:var(--mono);font-size:10px;color:var(--muted);text-align:center;line-height:1.4;transition:all .35s;}
+.pipe-step.active{background:rgba(251,191,36,.07);}
+.pipe-step.active .pipe-num{background:var(--yellow);color:var(--bg);}
+.pipe-step.active .pipe-label{color:var(--yellow);}
+.pipe-step.done{background:rgba(34,211,160,.05);}
+.pipe-step.done .pipe-num{background:var(--green);color:var(--bg);}
+.pipe-step.done .pipe-label{color:var(--green);}
+@keyframes ring{0%{transform:scale(1);opacity:.7;}100%{transform:scale(2.2);opacity:0;}}
+.pipe-step.active::after{content:'';position:absolute;top:13px;width:26px;height:26px;border-radius:50%;border:2px solid var(--yellow);animation:ring .9s ease infinite;}
+
+/* ── Buttons ── */
+.btn-row{display:flex;gap:10px;align-items:center;margin-bottom:20px;}
+.btn{font-family:var(--mono);font-size:12px;font-weight:700;padding:10px 22px;border-radius:8px;border:none;cursor:pointer;transition:all .2s;letter-spacing:.5px;display:flex;align-items:center;gap:8px;}
+.btn-exec{background:linear-gradient(135deg,var(--cyan),var(--purple));color:var(--bg);}
+.btn-exec:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,212,255,.3);}
+.btn-exec:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none;}
+.btn-reset{background:transparent;color:var(--muted);border:1px solid var(--border);}
+.btn-reset:hover{border-color:var(--muted);color:var(--text);}
+
+/* ── Stages ── */
+.stage{display:none;}
+.stage.show{display:block;animation:fadeUp .4s ease both;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+
+.stage-label{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.dpulse{width:7px;height:7px;border-radius:50%;background:var(--yellow);animation:blink .7s ease infinite;flex-shrink:0;}
+.dpulse.done{background:var(--green);animation:none;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.15;};}
+
+.arrow-dn{text-align:center;font-size:20px;margin:8px 0;line-height:1;color:var(--border);}
+.arrow-dn.lit{color:var(--yellow);}
+.arrow-dn.ok{color:var(--green);}
+
+/* ── Tables ── */
+.tbl-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.tbl-title{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;padding:9px 14px;border-bottom:1px solid var(--border);color:var(--muted);}
+table{width:100%;border-collapse:collapse;}
+th{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--cyan);background:rgba(0,212,255,.05);padding:9px 14px;text-align:left;border-bottom:1px solid var(--border);}
+td{font-family:var(--mono);font-size:12px;padding:9px 14px;border-bottom:1px solid rgba(30,37,53,.5);transition:background .2s;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(0,212,255,.03);}
+tr.hl-y td{background:rgba(251,191,36,.12)!important;color:var(--yellow);}
+tr.hl-c td{background:rgba(0,212,255,.08)!important;}
+tr.hl-p td{background:rgba(168,85,247,.08)!important;}
+tr.hl-o td{background:rgba(249,115,22,.08)!important;}
+
+.vc{color:var(--cyan);} .vp{color:var(--purple);} .vo{color:var(--orange);}
+.vg{color:var(--green);font-weight:700;} .vy{color:var(--yellow);}
+.vm{color:var(--muted);} .vpk{color:var(--pink);}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+@media(max-width:680px){.two-col,.three-col{grid-template-columns:1fr;}}
+
+.res-box{border-radius:10px;padding:12px 14px;font-family:var(--mono);font-size:12px;}
+.res-bad{background:rgba(244,63,94,.07);border:1px solid rgba(244,63,94,.3);color:var(--pink);}
+.res-good{background:rgba(34,211,160,.07);border:1px solid rgba(34,211,160,.3);color:var(--green);}
+.res-title{font-weight:700;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:5px;}
+
+.impact{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;font-weight:700;padding:7px 14px;border-radius:20px;margin-top:10px;}
+.imp-c{background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.25);color:var(--cyan);}
+.imp-p{background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.25);color:var(--purple);}
+.imp-o{background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.25);color:var(--orange);}
+
+.explain{background:rgba(0,212,255,.04);border-left:3px solid var(--cyan);padding:11px 15px;border-radius:0 8px 8px 0;font-size:13px;color:var(--muted);line-height:1.65;margin-top:14px;}
+.explain strong{color:var(--text);}
+.explain.ep{border-color:var(--purple);}.explain.eo{border-color:var(--orange);}
+
+.tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;}
+.tab{font-family:var(--mono);font-size:11px;font-weight:700;padding:7px 16px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .2s;}
+.tab.act-o{border-color:var(--orange);color:var(--orange);background:rgba(249,115,22,.08);}
+.tab-content{display:none;}.tab-content.active{display:block;}
+
+.summary-card{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:48px;position:relative;}
+.summary-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--cyan),var(--purple),var(--orange));}
+.summary-title{font-size:18px;font-weight:700;margin-bottom:18px;display:flex;align-items:center;gap:10px;}
+footer{text-align:center;padding:28px;color:var(--muted);font-family:var(--mono);font-size:10px;border-top:1px solid var(--border);letter-spacing:1.5px;}
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <div class="badge">SQL Internals</div>
+  <h1>Aggregate vs GROUP BY<br>vs Window Functions</h1>
+  <p class="subtitle">Click ▶ Execute — watch data transform step by step through each stage</p>
+</header>
+
+<div class="golden">
+  <span style="font-size:22px">⚡</span>
+  <div><span>GOLDEN RULE</span> — GROUP BY <span>reduces rows</span> &nbsp;·&nbsp; WINDOW FUNCTIONS <span>do not</span> &nbsp;·&nbsp; Normal Aggregate returns <span>one single row</span></div>
+</div>
+
+
+<!-- ══ SECTION 1 — NORMAL AGGREGATE ══ -->
+<div class="section s1">
+  <div class="sec-hdr">
+    <span class="sec-num">SECTION 01</span>
+    <span class="sec-title">Normal Aggregate — AVG(Salary)</span>
+  </div>
+  <div class="card">
+    <div class="card-inner">
+
+      <div class="explain" style="margin-bottom:18px;">
+        <strong>Question:</strong> What is the average salary of <strong>ALL employees</strong>? — Collapses the entire table into one number.
+      </div>
+
+      <div class="qbox">
+        <div class="qhdr"><span class="qlang">SQL</span><div class="dots"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div></div>
+        <pre><span class="kw">SELECT</span>
+    <span class="fn">AVG</span>(Salary) <span class="kw">AS</span> CompanyAverageSalary
+<span class="kw">FROM</span> Employees;   <span class="cm">-- returns ONE row only</span></pre>
+      </div>
+
+      <div class="pipeline">
+        <div class="pipe-step" id="a1p1"><div class="pipe-num">1</div><div class="pipe-label">SCAN<br>all rows</div></div>
+        <div class="pipe-step" id="a1p2"><div class="pipe-num">2</div><div class="pipe-label">ACCUMULATE<br>salary SUM</div></div>
+        <div class="pipe-step" id="a1p3"><div class="pipe-num">3</div><div class="pipe-label">COUNT<br>total rows</div></div>
+        <div class="pipe-step" id="a1p4"><div class="pipe-num">4</div><div class="pipe-label">DIVIDE<br>→ result</div></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-exec" id="a1btn" onclick="runAgg()">▶ Execute Query</button>
+        <button class="btn btn-reset" onclick="resetAgg()">↻ Reset</button>
+      </div>
+
+      <!-- STEP 1 -->
+      <div class="stage" id="a1_s1">
+        <div class="stage-label"><div class="dpulse"></div>STEP 1 of 4 — Scanning all rows from Employees</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">📋 Employees — reading every row</div>
+          <table>
+            <thead><tr><th>EmployeeID</th><th>EmployeeName</th><th>Department</th><th>Salary</th></tr></thead>
+            <tbody id="a1_scan_body">
+              <tr><td>1</td><td>Alice</td><td>IT</td><td>60,000</td></tr>
+              <tr><td>2</td><td>Bob</td><td>IT</td><td>55,000</td></tr>
+              <tr><td>3</td><td>Charlie</td><td>HR</td><td>45,000</td></tr>
+              <tr><td>4</td><td>David</td><td>HR</td><td>40,000</td></tr>
+              <tr><td>5</td><td>Eva</td><td>Sales</td><td>70,000</td></tr>
+              <tr><td>6</td><td>Frank</td><td>Sales</td><td>65,000</td></tr>
+              <tr><td>7</td><td>Grace</td><td>IT</td><td>60,000</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- STEP 2 -->
+      <div class="stage" id="a1_s2">
+        <div class="arrow-dn lit">↓</div>
+        <div class="stage-label"><div class="dpulse"></div>STEP 2 of 4 — Extracting Salary column, building running SUM</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">💰 Accumulating SUM row by row</div>
+          <table>
+            <thead><tr><th>EmployeeName</th><th>Salary</th><th>Running Total</th></tr></thead>
+            <tbody id="a1_sum_body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- STEP 3 -->
+      <div class="stage" id="a1_s3">
+        <div class="arrow-dn lit">↓</div>
+        <div class="stage-label"><div class="dpulse"></div>STEP 3 of 4 — Final aggregation values computed</div>
+        <div class="two-col">
+          <div class="tbl-wrap">
+            <div class="tbl-title">🔢 Aggregation snapshot</div>
+            <table>
+              <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+              <tbody>
+                <tr><td class="vm">Total SUM</td><td class="vy">395,000</td></tr>
+                <tr><td class="vm">Row COUNT</td><td class="vy">7</td></tr>
+                <tr><td class="vm">Formula</td><td class="vc">395,000 ÷ 7</td></tr>
+                <tr><td class="vm">Result</td><td class="vg">≈ 56,428</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="tbl-wrap">
+            <div class="tbl-title">📉 Row count change</div>
+            <table>
+              <thead><tr><th>Stage</th><th>Rows</th></tr></thead>
+              <tbody>
+                <tr><td class="vm">Input</td><td class="vy">7 rows</td></tr>
+                <tr><td class="vm">After AVG()</td><td class="vpk">→ 1 row</td></tr>
+                <tr><td class="vm">Detail kept?</td><td class="vpk">❌ None</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 4 — RESULT -->
+      <div class="stage" id="a1_s4">
+        <div class="arrow-dn ok">↓</div>
+        <div class="stage-label"><div class="dpulse done"></div>RESULT — Final output table</div>
+        <div class="tbl-wrap" style="max-width:260px;">
+          <div class="tbl-title">✅ Output — 1 row returned</div>
+          <table>
+            <thead><tr><th>CompanyAverageSalary</th></tr></thead>
+            <tbody><tr><td class="vg" style="font-size:18px;padding:14px 16px;">56,428</td></tr></tbody>
+          </table>
+        </div>
+        <div class="two-col" style="margin-top:12px;">
+          <div class="res-box res-bad"><div class="res-title">✗ What you lose</div>All 7 employee rows, names, departments, individual salaries — everything collapsed into one number.</div>
+          <div class="res-box res-good"><div class="res-title">✓ What you get</div>One clean company-wide metric. Perfect for a KPI dashboard tile or executive report.</div>
+        </div>
+        <div class="impact imp-c">📊 7 rows → 1 row · No employee detail retained</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ SECTION 2 — GROUP BY ══ -->
+<div class="section s2">
+  <div class="sec-hdr">
+    <span class="sec-num">SECTION 02</span>
+    <span class="sec-title">GROUP BY — AVG per Department</span>
+  </div>
+  <div class="card">
+    <div class="card-inner">
+
+      <div class="explain ep" style="margin-bottom:18px;">
+        <strong>Question:</strong> What is the average salary <strong>per department</strong>? — Reduces rows to one per group.
+      </div>
+
+      <div class="qbox">
+        <div class="qhdr"><span class="qlang">SQL</span><div class="dots"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div></div>
+        <pre><span class="kw">SELECT</span>
+    Department,
+    <span class="fn">AVG</span>(Salary) <span class="kw">AS</span> DepartmentAverageSalary
+<span class="kw">FROM</span> Employees
+<span class="kw">GROUP BY</span> Department;   <span class="cm">-- 1 row per unique dept</span></pre>
+      </div>
+
+      <div class="pipeline">
+        <div class="pipe-step" id="gb1p1"><div class="pipe-num">1</div><div class="pipe-label">SCAN<br>all rows</div></div>
+        <div class="pipe-step" id="gb1p2"><div class="pipe-num">2</div><div class="pipe-label">SORT &amp; GROUP<br>by Dept</div></div>
+        <div class="pipe-step" id="gb1p3"><div class="pipe-num">3</div><div class="pipe-label">COMPUTE<br>AVG per group</div></div>
+        <div class="pipe-step" id="gb1p4"><div class="pipe-num">4</div><div class="pipe-label">EMIT<br>1 row/group</div></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-exec" id="gb1btn" onclick="runGroupBy()">▶ Execute Query</button>
+        <button class="btn btn-reset" onclick="resetGroupBy()">↻ Reset</button>
+      </div>
+
+      <!-- STEP 1 -->
+      <div class="stage" id="gb_s1">
+        <div class="stage-label"><div class="dpulse"></div>STEP 1 of 4 — Scanning all 7 rows, reading Department column</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">📋 Employees — full scan in progress</div>
+          <table>
+            <thead><tr><th>EmployeeID</th><th>EmployeeName</th><th>Department</th><th>Salary</th></tr></thead>
+            <tbody>
+              <tr class="hl-y"><td>1</td><td>Alice</td><td class="vc">IT</td><td>60,000</td></tr>
+              <tr class="hl-y"><td>2</td><td>Bob</td><td class="vc">IT</td><td>55,000</td></tr>
+              <tr class="hl-y"><td>3</td><td>Charlie</td><td class="vp">HR</td><td>45,000</td></tr>
+              <tr class="hl-y"><td>4</td><td>David</td><td class="vp">HR</td><td>40,000</td></tr>
+              <tr class="hl-y"><td>5</td><td>Eva</td><td class="vo">Sales</td><td>70,000</td></tr>
+              <tr class="hl-y"><td>6</td><td>Frank</td><td class="vo">Sales</td><td>65,000</td></tr>
+              <tr class="hl-y"><td>7</td><td>Grace</td><td class="vc">IT</td><td>60,000</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- STEP 2 -->
+      <div class="stage" id="gb_s2">
+        <div class="arrow-dn lit">↓</div>
+        <div class="stage-label"><div class="dpulse"></div>STEP 2 of 4 — Rows sorted and bucketed by Department</div>
+        <div class="three-col">
+          <div class="tbl-wrap">
+            <div class="tbl-title" style="color:var(--cyan)">🔵 IT bucket — 3 rows</div>
+            <table><thead><tr><th>Name</th><th>Salary</th></tr></thead><tbody>
+              <tr class="hl-c"><td>Alice</td><td>60,000</td></tr>
+              <tr class="hl-c"><td>Bob</td><td>55,000</td></tr>
+              <tr class="hl-c"><td>Grace</td><td>60,000</td></tr>
+            </tbody></table>
+          </div>
+          <div class="tbl-wrap">
+            <div class="tbl-title" style="color:var(--purple)">🟣 HR bucket — 2 rows</div>
+            <table><thead><tr><th>Name</th><th>Salary</th></tr></thead><tbody>
+              <tr class="hl-p"><td>Charlie</td><td>45,000</td></tr>
+              <tr class="hl-p"><td>David</td><td>40,000</td></tr>
+            </tbody></table>
+          </div>
+          <div class="tbl-wrap">
+            <div class="tbl-title" style="color:var(--orange)">🟠 Sales bucket — 2 rows</div>
+            <table><thead><tr><th>Name</th><th>Salary</th></tr></thead><tbody>
+              <tr class="hl-o"><td>Eva</td><td>70,000</td></tr>
+              <tr class="hl-o"><td>Frank</td><td>65,000</td></tr>
+            </tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 3 -->
+      <div class="stage" id="gb_s3">
+        <div class="arrow-dn lit">↓</div>
+        <div class="stage-label"><div class="dpulse"></div>STEP 3 of 4 — Computing AVG(Salary) inside each bucket</div>
+        <div class="three-col">
+          <div class="tbl-wrap">
+            <div class="tbl-title" style="color:var(--cyan)">IT — calculation</div>
+            <table><thead><tr><th>Step</th><th>Value</th></tr></thead><tbody>
+              <tr><td class="vm">SUM</td><td class="vy">175,000</td></tr>
+              <tr><td class="vm">COUNT</td><td class="vy">3</td></tr>
+              <tr><td class="vm">AVG</td><td class="vg">58,333</td></tr>
+            </tbody></table>
+          </div>
+          <div class="tbl-wrap">
+            <div class="tbl-title" style="color:var(--purple)">HR — calculation</div>
+            <table><thead><tr><th>Step</th><th>Value</th></tr></thead><tbody>
+              <tr><td class="vm">SUM</td><td class="vy">85,000</td></tr>
+              <tr><td class="vm">COUNT</td><td class="vy">2</td></tr>
+              <tr><td class="vm">AVG</td><td class="vg">42,500</td></tr>
+            </tbody></table>
+          </div>
+          <div class="tbl-wrap">
+            <div class="tbl-title" style="color:var(--orange)">Sales — calculation</div>
+            <table><thead><tr><th>Step</th><th>Value</th></tr></thead><tbody>
+              <tr><td class="vm">SUM</td><td class="vy">135,000</td></tr>
+              <tr><td class="vm">COUNT</td><td class="vy">2</td></tr>
+              <tr><td class="vm">AVG</td><td class="vg">67,500</td></tr>
+            </tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 4 — RESULT -->
+      <div class="stage" id="gb_s4">
+        <div class="arrow-dn ok">↓</div>
+        <div class="stage-label"><div class="dpulse done"></div>RESULT — 1 row emitted per group (names lost)</div>
+        <div class="two-col">
+          <div class="tbl-wrap">
+            <div class="tbl-title">✅ Output — 3 rows returned</div>
+            <table>
+              <thead><tr><th>Department</th><th>DeptAvgSalary</th></tr></thead>
+              <tbody>
+                <tr><td class="vc">IT</td><td class="vg">58,333</td></tr>
+                <tr><td class="vp">HR</td><td class="vg">42,500</td></tr>
+                <tr><td class="vo">Sales</td><td class="vg">67,500</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <div class="res-box res-bad"><div class="res-title">✗ What you lose</div>EmployeeName, individual Salary values. Alice, Bob, Grace all vanish — "IT" is all that remains.</div>
+            <div class="res-box res-good" style="margin-top:8px;"><div class="res-title">✓ What you get</div>One clean summary row per department. Ideal for reports, bar charts, leaderboards.</div>
+            <div class="impact imp-p">📦 7 rows → 3 rows · Employee names lost</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ SECTION 3 — WINDOW FUNCTION ══ -->
+<div class="section s3">
+  <div class="sec-hdr">
+    <span class="sec-num">SECTION 03</span>
+    <span class="sec-title">Window Function — OVER (PARTITION BY)</span>
+  </div>
+  <div class="card">
+    <div class="card-inner">
+
+      <div class="explain eo" style="margin-bottom:18px;">
+        <strong>Question:</strong> Show each employee with their department average — keeping <strong>all 7 rows intact</strong>.
+      </div>
+
+      <div class="tabs">
+        <button class="tab act-o" id="wt1" onclick="switchTab(1)">AVG Salary</button>
+        <button class="tab" id="wt2" onclick="switchTab(2)">SUM Salary</button>
+        <button class="tab" id="wt3" onclick="switchTab(3)">COUNT Team</button>
+      </div>
+
+      <div class="tab-content active" id="wtab1">
+        <div class="qbox"><div class="qhdr"><span class="qlang">Window AVG</span><div class="dots"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div></div>
+        <pre><span class="kw">SELECT</span> EmployeeName, Department, Salary,
+    <span class="fn">AVG</span>(Salary) <span class="kw">OVER</span> (<span class="kw">PARTITION BY</span> Department)
+        <span class="kw">AS</span> DepartmentAverageSalary
+<span class="kw">FROM</span> Employees;   <span class="cm">-- ALL 7 rows returned, with dept avg attached</span></pre></div>
+      </div>
+      <div class="tab-content" id="wtab2">
+        <div class="qbox"><div class="qhdr"><span class="qlang">Window SUM</span><div class="dots"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div></div>
+        <pre><span class="kw">SELECT</span> EmployeeName, Department, Salary,
+    <span class="fn">SUM</span>(Salary) <span class="kw">OVER</span> (<span class="kw">PARTITION BY</span> Department)
+        <span class="kw">AS</span> TotalSalaryPerDept
+<span class="kw">FROM</span> Employees;   <span class="cm">-- ALL 7 rows returned, with dept total attached</span></pre></div>
+      </div>
+      <div class="tab-content" id="wtab3">
+        <div class="qbox"><div class="qhdr"><span class="qlang">Window COUNT</span><div class="dots"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div></div>
+        <pre><span class="kw">SELECT</span> EmployeeName, Department,
+    <span class="fn">COUNT</span>(*) <span class="kw">OVER</span> (<span class="kw">PARTITION BY</span> Department)
+        <span class="kw">AS</span> EmployeesInDept
+<span class="kw">FROM</span> Employees;   <span class="cm">-- ALL 7 rows returned, with headcount attached</span></pre></div>
+      </div>
+
+      <div class="pipeline">
+        <div class="pipe-step" id="wf1p1"><div class="pipe-num">1</div><div class="pipe-label">SCAN<br>all rows</div></div>
+        <div class="pipe-step" id="wf1p2"><div class="pipe-num">2</div><div class="pipe-label">CREATE<br>partitions</div></div>
+        <div class="pipe-step" id="wf1p3"><div class="pipe-num">3</div><div class="pipe-label">COMPUTE<br>window val</div></div>
+        <div class="pipe-step" id="wf1p4"><div class="pipe-num">4</div><div class="pipe-label">ATTACH<br>to each row</div></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-exec" id="wf1btn" onclick="runWindow()">▶ Execute Query</button>
+        <button class="btn btn-reset" onclick="resetWindow()">↻ Reset</button>
+      </div>
+
+      <!-- STEP 1 -->
+      <div class="stage" id="wf_s1">
+        <div class="stage-label"><div class="dpulse"></div>STEP 1 of 4 — Scanning all 7 rows (unlike GROUP BY, ALL rows will survive)</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">📋 Employees — full scan (all rows will be preserved)</div>
+          <table>
+            <thead><tr><th>EmployeeID</th><th>EmployeeName</th><th>Department</th><th>Salary</th></tr></thead>
+            <tbody>
+              <tr class="hl-y"><td>1</td><td>Alice</td><td class="vc">IT</td><td>60,000</td></tr>
+              <tr class="hl-y"><td>2</td><td>Bob</td><td class="vc">IT</td><td>55,000</td></tr>
+              <tr class="hl-y"><td>3</td><td>Charlie</td><td class="vp">HR</td><td>45,000</td></tr>
+              <tr class="hl-y"><td>4</td><td>David</td><td class="vp">HR</td><td>40,000</td></tr>
+              <tr class="hl-y"><td>5</td><td>Eva</td><td class="vo">Sales</td><td>70,000</td></tr>
+              <tr class="hl-y"><td>6</td><td>Frank</td><td class="vo">Sales</td><td>65,000</td></tr>
+              <tr class="hl-y"><td>7</td><td>Grace</td><td class="vc">IT</td><td>60,000</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- STEP 2 -->
+      <div class="stage" id="wf_s2">
+        <div class="arrow-dn lit">↓</div>
+        <div class="stage-label"><div class="dpulse"></div>STEP 2 of 4 — Creating invisible window partitions (rows stay in result!)</div>
+        <div class="three-col">
+          <div class="tbl-wrap">
+            <div class="tbl-title" style="color:var(--cyan)">🔵 IT window</div>
+            <table><thead><tr><th>Name</th><th>Salary</th></tr></thead><tbody>
+              <tr class="hl-c"><td>Alice</td><td>60,000</td></tr>
+              <tr class="hl-c"><td>Bob</td><td>55,000</td></tr>
+              <tr class="hl-c"><td>Grace</td><td>60,000</td></tr>
+            </tbody></table>
+          </div>
+          <div class="tbl-wrap">
+            <div class="tbl-title" style="color:var(--purple)">🟣 HR window</div>
+            <table><thead><tr><th>Name</th><th>Salary</th></tr></thead><tbody>
+              <tr class="hl-p"><td>Charlie</td><td>45,000</td></tr>
+              <tr class="hl-p"><td>David</td><td>40,000</td></tr>
+            </tbody></table>
+          </div>
+          <div class="tbl-wrap">
+            <div class="tbl-title" style="color:var(--orange)">🟠 Sales window</div>
+            <table><thead><tr><th>Name</th><th>Salary</th></tr></thead><tbody>
+              <tr class="hl-o"><td>Eva</td><td>70,000</td></tr>
+              <tr class="hl-o"><td>Frank</td><td>65,000</td></tr>
+            </tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 3 -->
+      <div class="stage" id="wf_s3">
+        <div class="arrow-dn lit">↓</div>
+        <div class="stage-label"><div class="dpulse"></div>STEP 3 of 4 — Computing window value per partition</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">🔢 Window computation per partition</div>
+          <table>
+            <thead><tr><th>Partition</th><th>Rows</th><th id="wf_calc_hdr">Computation</th><th>Result</th></tr></thead>
+            <tbody id="wf_calc_body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- STEP 4 — RESULT -->
+      <div class="stage" id="wf_s4">
+        <div class="arrow-dn ok">↓</div>
+        <div class="stage-label"><div class="dpulse done"></div>RESULT — Window value attached back to every original row</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title" id="wf_out_title">✅ Output — ALL 7 rows · DeptAvgSalary column added</div>
+          <table>
+            <thead><tr><th>EmployeeName</th><th>Department</th><th>Salary</th><th id="wf_out_hdr" class="vg" style="color:var(--green)">DeptAvgSalary ✦</th></tr></thead>
+            <tbody id="wf_out_body"></tbody>
+          </table>
+        </div>
+        <div class="two-col" style="margin-top:12px;">
+          <div class="res-box res-bad"><div class="res-title">vs GROUP BY</div>GROUP BY collapses 7→3 rows. Alice, Bob, Grace vanish. You'd lose the ability to compare individual vs dept average.</div>
+          <div class="res-box res-good"><div class="res-title">✓ Window Function WIN</div>All 7 employees visible with their dept stat. Can compare Bob's 55k against IT avg of 58k — below average!</div>
+        </div>
+        <div class="impact imp-o">🪟 7 rows → 7 rows · All detail kept · Analytics column added</div>
+        <div class="explain eo" style="margin-top:14px;">
+          <strong>Key:</strong> <code>OVER (PARTITION BY Department)</code> creates an invisible window per dept, computes the aggregate, then <strong>stamps the result onto every original row</strong> without removing any.
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ SUMMARY ══ -->
+<div class="summary-card">
+  <div class="card-inner" style="padding:28px;">
+    <div class="summary-title">📊 Final Side-by-Side Comparison</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Feature</th><th style="color:var(--cyan)">Normal Aggregate</th><th style="color:var(--purple)">GROUP BY</th><th style="color:var(--orange)">Window Function</th></tr></thead>
+        <tbody>
+          <tr><td class="vm" style="font-size:11px;">ROWS RETURNED</td><td class="vc">Always 1</td><td class="vp">1 per group</td><td class="vo">All original rows</td></tr>
+          <tr><td class="vm" style="font-size:11px;">DETAIL KEPT</td><td class="vpk">❌ None</td><td class="vpk">❌ Lost</td><td class="vg">✅ Fully preserved</td></tr>
+          <tr><td class="vm" style="font-size:11px;">USE CASE</td><td>Company KPI tile</td><td>Dept report / chart</td><td>Row-level comparison</td></tr>
+          <tr><td class="vm" style="font-size:11px;">KEY SYNTAX</td><td class="vc">AVG(col)</td><td class="vp">GROUP BY col</td><td class="vo">OVER(PARTITION BY col)</td></tr>
+          <tr><td class="vm" style="font-size:11px;">EXAMPLE OUTPUT</td><td>56,428</td><td>IT:58,333 HR:42,500</td><td>Alice | IT | 60k | 58,333</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</div>
+<footer>SQL INTERNALS · AGGREGATE vs GROUP BY vs WINDOW FUNCTIONS · ZERO TO HERO</footer>
+
+<script>
+const delay = ms => new Promise(r => setTimeout(r, ms));
+
+function setPipe(id, state) {
+  const el = document.getElementById(id);
+  if (el) el.className = 'pipe-step ' + state;
+}
+
+function showStage(id) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.classList.add('show');
+    setTimeout(() => el.scrollIntoView({behavior:'smooth', block:'nearest'}), 50);
+  }
+}
+
+function hideStage(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('show');
+}
+
+// ── SECTION 1 — NORMAL AGGREGATE ──
+async function runAgg() {
+  document.getElementById('a1btn').disabled = true;
+
+  // Step 1 — scan
+  setPipe('a1p1','active');
+  showStage('a1_s1');
+  // Animate rows lighting up one by one
+  const scanRows = document.querySelectorAll('#a1_scan_body tr');
+  for (const row of scanRows) {
+    row.classList.add('hl-y');
+    await delay(160);
+  }
+  await delay(500);
+  for (const row of scanRows) row.classList.remove('hl-y');
+
+  // Step 2 — sum
+  setPipe('a1p1','done'); setPipe('a1p2','active');
+  showStage('a1_s2');
+  const salaries = [
+    ['Alice',60000], ['Bob',55000], ['Charlie',45000], ['David',40000],
+    ['Eva',70000], ['Frank',65000], ['Grace',60000]
+  ];
+  const tbody = document.getElementById('a1_sum_body');
+  tbody.innerHTML = '';
+  let running = 0;
+  for (const [name, sal] of salaries) {
+    running += sal;
+    const tr = document.createElement('tr');
+    tr.className = 'hl-y';
+    tr.innerHTML = `<td>${name}</td><td class="vy">${sal.toLocaleString()}</td><td class="vc">${running.toLocaleString()}</td>`;
+    tbody.appendChild(tr);
+    await delay(200);
+    tr.className = '';
+  }
+  await delay(600);
+
+  // Step 3 — count
+  setPipe('a1p2','done'); setPipe('a1p3','active');
+  showStage('a1_s3');
+  await delay(1200);
+
+  // Step 4 — result
+  setPipe('a1p3','done'); setPipe('a1p4','active');
+  showStage('a1_s4');
+  await delay(300);
+  setPipe('a1p4','done');
+}
+
+function resetAgg() {
+  document.getElementById('a1btn').disabled = false;
+  ['a1p1','a1p2','a1p3','a1p4'].forEach(id => setPipe(id,''));
+  ['a1_s1','a1_s2','a1_s3','a1_s4'].forEach(id => hideStage(id));
+  document.getElementById('a1_sum_body').innerHTML = '';
+  const scanRows = document.querySelectorAll('#a1_scan_body tr');
+  scanRows.forEach(r => r.classList.remove('hl-y'));
+}
+
+// ── SECTION 2 — GROUP BY ──
+async function runGroupBy() {
+  document.getElementById('gb1btn').disabled = true;
+
+  // Step 1
+  setPipe('gb1p1','active');
+  showStage('gb_s1');
+  await delay(1400);
+
+  // Step 2
+  setPipe('gb1p1','done'); setPipe('gb1p2','active');
+  showStage('gb_s2');
+  await delay(1400);
+
+  // Step 3
+  setPipe('gb1p2','done'); setPipe('gb1p3','active');
+  showStage('gb_s3');
+  await delay(1400);
+
+  // Step 4
+  setPipe('gb1p3','done'); setPipe('gb1p4','active');
+  showStage('gb_s4');
+  await delay(300);
+  setPipe('gb1p4','done');
+}
+
+function resetGroupBy() {
+  document.getElementById('gb1btn').disabled = false;
+  ['gb1p1','gb1p2','gb1p3','gb1p4'].forEach(id => setPipe(id,''));
+  ['gb_s1','gb_s2','gb_s3','gb_s4'].forEach(id => hideStage(id));
+}
+
+// ── SECTION 3 — WINDOW FUNCTION ──
+let activeTab = 1;
+
+const winConfig = {
+  1: {
+    calcHdr: 'Computation',
+    calcRows: [
+      {dept:'IT', dc:'vc', rows:'3 rows', formula:'175,000 ÷ 3', result:'58,333'},
+      {dept:'HR', dc:'vp', rows:'2 rows', formula:'85,000 ÷ 2', result:'42,500'},
+      {dept:'Sales', dc:'vo', rows:'2 rows', formula:'135,000 ÷ 2', result:'67,500'},
+    ],
+    outHdr: 'DeptAvgSalary ✦',
+    outTitle: '✅ Output — ALL 7 rows · DepartmentAverageSalary column added',
+    outRows: [
+      ['Alice','IT','vc','60,000','58,333'],['Bob','IT','vc','55,000','58,333'],
+      ['Grace','IT','vc','60,000','58,333'],['Charlie','HR','vp','45,000','42,500'],
+      ['David','HR','vp','40,000','42,500'],['Eva','Sales','vo','70,000','67,500'],
+      ['Frank','Sales','vo','65,000','67,500'],
+    ]
+  },
+  2: {
+    calcHdr: 'Computation',
+    calcRows: [
+      {dept:'IT', dc:'vc', rows:'3 rows', formula:'60k+55k+60k', result:'175,000'},
+      {dept:'HR', dc:'vp', rows:'2 rows', formula:'45k+40k', result:'85,000'},
+      {dept:'Sales', dc:'vo', rows:'2 rows', formula:'70k+65k', result:'135,000'},
+    ],
+    outHdr: 'TotalSalaryPerDept ✦',
+    outTitle: '✅ Output — ALL 7 rows · TotalSalaryPerDept column added',
+    outRows: [
+      ['Alice','IT','vc','60,000','175,000'],['Bob','IT','vc','55,000','175,000'],
+      ['Grace','IT','vc','60,000','175,000'],['Charlie','HR','vp','45,000','85,000'],
+      ['David','HR','vp','40,000','85,000'],['Eva','Sales','vo','70,000','135,000'],
+      ['Frank','Sales','vo','65,000','135,000'],
+    ]
+  },
+  3: {
+    calcHdr: 'Computation',
+    calcRows: [
+      {dept:'IT', dc:'vc', rows:'3 rows', formula:'COUNT(IT rows)', result:'3'},
+      {dept:'HR', dc:'vp', rows:'2 rows', formula:'COUNT(HR rows)', result:'2'},
+      {dept:'Sales', dc:'vo', rows:'2 rows', formula:'COUNT(Sales rows)', result:'2'},
+    ],
+    outHdr: 'EmployeesInDept ✦',
+    outTitle: '✅ Output — ALL 7 rows · EmployeesInDept column added',
+    outRows: [
+      ['Alice','IT','vc','60,000','3'],['Bob','IT','vc','55,000','3'],
+      ['Grace','IT','vc','60,000','3'],['Charlie','HR','vp','45,000','2'],
+      ['David','HR','vp','40,000','2'],['Eva','Sales','vo','70,000','2'],
+      ['Frank','Sales','vo','65,000','2'],
+    ]
+  }
+};
+
+function switchTab(n) {
+  activeTab = n;
+  [1,2,3].forEach(i => {
+    document.getElementById('wtab'+i).className = 'tab-content' + (i===n?' active':'');
+    document.getElementById('wt'+i).className = 'tab' + (i===n?' act-o':'');
+  });
+}
+
+async function runWindow() {
+  document.getElementById('wf1btn').disabled = true;
+  const cfg = winConfig[activeTab];
+
+  // Step 1 — scan
+  setPipe('wf1p1','active');
+  showStage('wf_s1');
+  await delay(1400);
+
+  // Step 2 — partition
+  setPipe('wf1p1','done'); setPipe('wf1p2','active');
+  showStage('wf_s2');
+  await delay(1400);
+
+  // Step 3 — compute
+  setPipe('wf1p2','done'); setPipe('wf1p3','active');
+  // Build calc table
+  document.getElementById('wf_calc_hdr').textContent = cfg.calcHdr;
+  const calcTbody = document.getElementById('wf_calc_body');
+  calcTbody.innerHTML = '';
+  for (const r of cfg.calcRows) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="${r.dc}">${r.dept}</td><td>${r.rows}</td><td class="vy">${r.formula}</td><td class="vg">${r.result}</td>`;
+    calcTbody.appendChild(tr);
+    await delay(350);
+  }
+  showStage('wf_s3');
+  await delay(800);
+
+  // Step 4 — attach
+  setPipe('wf1p3','done'); setPipe('wf1p4','active');
+  document.getElementById('wf_out_hdr').textContent = cfg.outHdr;
+  document.getElementById('wf_out_title').textContent = cfg.outTitle;
+  const outTbody = document.getElementById('wf_out_body');
+  outTbody.innerHTML = '';
+  for (const r of cfg.outRows) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${r[0]}</td><td class="${r[2]}">${r[1]}</td><td>${r[3]}</td><td class="vg">${r[4]}</td>`;
+    tr.classList.add('hl-y');
+    outTbody.appendChild(tr);
+    await delay(180);
+    tr.classList.remove('hl-y');
+  }
+  showStage('wf_s4');
+  await delay(300);
+  setPipe('wf1p4','done');
+}
+
+function resetWindow() {
+  document.getElementById('wf1btn').disabled = false;
+  ['wf1p1','wf1p2','wf1p3','wf1p4'].forEach(id => setPipe(id,''));
+  ['wf_s1','wf_s2','wf_s3','wf_s4'].forEach(id => hideStage(id));
+  document.getElementById('wf_calc_body').innerHTML = '';
+  document.getElementById('wf_out_body').innerHTML = '';
+}
+</script>
+</body>
+</html>

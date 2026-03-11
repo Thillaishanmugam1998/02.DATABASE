@@ -1,0 +1,1613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL Window Ranking Functions</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0a0d14; --bg2:#0f1320; --card:#111520; --border:#1e2535;
+  --cyan:#00d4ff; --purple:#a855f7; --orange:#f97316;
+  --green:#22d3a0; --pink:#f43f5e; --yellow:#fbbf24; --blue:#3b82f6;
+  --text:#e2e8f0; --muted:#64748b;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;min-height:100vh;overflow-x:hidden}
+.bg-grid{background-image:linear-gradient(rgba(0,212,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.025) 1px,transparent 1px);background-size:44px 44px;position:fixed;inset:0;pointer-events:none;z-index:0}
+.wrap{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:0 20px 80px}
+
+/* SPEED BAR */
+#speed-bar{position:sticky;top:0;z-index:200;background:rgba(10,13,20,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.sp-btns{display:flex;gap:6px}
+.sp-btn{background:transparent;border:1px solid var(--border);color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 12px;border-radius:5px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.sp-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.sp-btn.active{background:var(--cyan);color:#000;border-color:var(--cyan);font-weight:700;box-shadow:0 0 12px rgba(0,212,255,.5)}
+.sp-btn.active::after{content:"";position:absolute;inset:-2px;border-radius:7px;border:2px solid var(--cyan);animation:spRing .9s ease infinite;pointer-events:none}
+.sp-timing{font-size:11px;color:var(--muted);margin-left:4px}
+.sp-timing span{color:var(--cyan)}
+.sp-status{margin-left:auto;font-size:11px;font-weight:700}
+.sp-status.running{color:var(--yellow)}
+.sp-status.done{color:var(--green)}
+.sp-status.ready{color:var(--muted)}
+#prog-bar{position:absolute;bottom:0;left:0;height:2px;background:linear-gradient(90deg,var(--cyan),var(--purple));width:0%;transition:width .3s}
+
+/* HEADER */
+.header{padding:56px 0 32px;text-align:center}
+.badge{display:inline-block;border:1px solid var(--cyan);color:var(--cyan);font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:4px 14px;border-radius:20px;margin-bottom:20px;font-family:'JetBrains Mono',monospace}
+h1{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(28px,5vw,54px);background:linear-gradient(135deg,#fff 0%,var(--cyan) 50%,var(--purple) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1.1;margin-bottom:14px}
+.subtitle{color:var(--muted);font-size:13px;letter-spacing:1px}
+
+/* NAV */
+.nav-pills{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:40px;justify-content:center}
+.nav-pill{border:1px solid var(--border);color:var(--muted);font-size:11px;padding:5px 14px;border-radius:20px;cursor:pointer;text-decoration:none;font-family:'JetBrains Mono',monospace;transition:all .2s;background:transparent}
+.nav-pill:hover{border-color:var(--cyan);color:var(--cyan)}
+
+/* GOLDEN RULE */
+.golden-rule{background:linear-gradient(135deg,rgba(168,85,247,.12),rgba(0,212,255,.08));border:1px solid rgba(168,85,247,.3);border-radius:12px;padding:24px;margin-bottom:48px;font-family:'JetBrains Mono',monospace;font-size:13px;line-height:2}
+.golden-rule h3{font-family:'Syne',sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:14px}
+.kw{color:var(--purple);font-weight:700}
+.fn{color:var(--cyan)}
+.hk{color:var(--yellow);font-weight:700}
+.cm{color:var(--muted);font-style:italic}
+.ko{color:var(--orange)}
+.kg{color:var(--green)}
+.kp{color:var(--pink)}
+
+/* SECTION */
+.section{margin-bottom:64px;scroll-margin-top:60px}
+.sec-header{display:flex;align-items:center;gap:14px;margin-bottom:24px}
+.sec-num{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted);letter-spacing:2px;text-transform:uppercase}
+.sec-title{font-family:'Syne',sans-serif;font-weight:800;font-size:22px}
+.sec-card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.sec-card.s01{border-top:3px solid transparent;border-image:linear-gradient(90deg,var(--cyan),var(--purple)) 1}
+.sec-card.s02{border-top:3px solid transparent;border-image:linear-gradient(90deg,var(--purple),var(--pink)) 1}
+.sec-card.s03{border-top:3px solid transparent;border-image:linear-gradient(90deg,var(--orange),var(--yellow)) 1}
+.sec-card.s04{border-top:3px solid transparent;border-image:linear-gradient(90deg,var(--green),var(--cyan)) 1}
+.sec-card.s05{border-top:3px solid transparent;border-image:linear-gradient(90deg,var(--pink),var(--orange)) 1}
+.sec-card.s06{border-top:3px solid transparent;border-image:linear-gradient(90deg,var(--yellow),var(--green)) 1}
+.sec-card-inner{padding:24px}
+
+/* EXPLAIN */
+.explain{border-left:3px solid var(--cyan);background:rgba(0,212,255,.04);border-radius:0 8px 8px 0;padding:14px 18px;margin-bottom:20px;font-size:13px;color:var(--muted);line-height:1.7}
+.explain.ep{border-left-color:var(--purple);background:rgba(168,85,247,.04)}
+.explain.eo{border-left-color:var(--orange);background:rgba(249,115,22,.04)}
+.explain.eg{border-left-color:var(--green);background:rgba(34,211,160,.04)}
+.explain.epk{border-left-color:var(--pink);background:rgba(244,63,94,.04)}
+.explain.ey{border-left-color:var(--yellow);background:rgba(251,191,36,.04)}
+.explain strong{color:var(--text)}
+
+/* TABS */
+.tabs{display:flex;gap:0;margin-bottom:0;border-bottom:1px solid var(--border)}
+.tab{padding:9px 18px;font-size:11px;font-family:'JetBrains Mono',monospace;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;transition:all .2s;background:transparent;border-top:0;border-left:0;border-right:0}
+.tab.active{color:var(--orange);border-bottom-color:var(--orange);background:rgba(249,115,22,.07)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+/* SQL BOX */
+.sql-box{background:#080b12;border-radius:8px;overflow:hidden;margin-bottom:20px}
+.sql-header{background:rgba(255,255,255,.04);padding:8px 14px;display:flex;align-items:center;gap:8px}
+.mac-dot{width:11px;height:11px;border-radius:50%}
+.mac-r{background:#f43f5e}.mac-y{background:#fbbf24}.mac-g{background:#22d3a0}
+.sql-lang{margin-left:auto;font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+.sql-body{padding:16px 18px;font-size:12px;line-height:1.85;white-space:pre;overflow-x:auto}
+
+/* PIPELINE */
+.pipeline{display:flex;align-items:center;gap:0;margin-bottom:20px;flex-wrap:wrap}
+.pipe-step{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;min-width:80px}
+.pipe-dot{width:24px;height:24px;border-radius:50%;border:2px solid var(--border);background:var(--bg2);transition:all .35s;display:flex;align-items:center;justify-content:center;font-size:10px}
+.pipe-label{font-size:10px;color:var(--muted);text-align:center;line-height:1.3;letter-spacing:.5px}
+.pipe-step.active .pipe-dot{border-color:var(--yellow);background:rgba(251,191,36,.15);color:var(--yellow)}
+.pipe-step.active .pipe-label{color:var(--yellow)}
+.pipe-step.done .pipe-dot{border-color:var(--green);background:rgba(34,211,160,.15);color:var(--green)}
+.pipe-step.done .pipe-label{color:var(--green)}
+.pipe-step.active::after{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:24px;height:24px;border-radius:50%;border:2px solid var(--yellow);animation:ring .9s ease infinite;pointer-events:none}
+.pipe-conn{flex:1;height:2px;background:var(--border);max-width:40px;transition:background .35s}
+.pipe-conn.lit{background:var(--yellow)}
+.pipe-conn.ok{background:var(--green)}
+
+/* BUTTONS */
+.btn-row{display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap}
+.btn-exec{background:linear-gradient(135deg,var(--cyan),var(--purple));color:#fff;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;padding:9px 22px;border:none;border-radius:7px;cursor:pointer;transition:all .2s;letter-spacing:.5px}
+.btn-exec:disabled{opacity:.4;cursor:not-allowed}
+.btn-exec:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,212,255,.3)}
+.btn-reset{background:transparent;border:1px solid var(--border);color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:12px;padding:9px 18px;border-radius:7px;cursor:pointer;transition:all .2s}
+.btn-reset:hover{border-color:var(--muted);color:var(--text)}
+
+/* STAGES */
+.stage{display:none}
+.stage.show{display:block;animation:fadeUp .4s ease both}
+.stage-title{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;font-family:'JetBrains Mono',monospace}
+
+/* ARROW */
+.adn{width:2px;height:28px;background:var(--border);margin:0 auto 0;transition:background .35s}
+.adn.lit{background:var(--yellow)}
+.adn.ok{background:var(--green)}
+.adn-wrap{display:flex;flex-direction:column;align-items:center;margin:8px 0}
+.adn-arrow{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid var(--border);transition:border-top-color .35s}
+.adn-arrow.lit{border-top-color:var(--yellow)}
+.adn-arrow.ok{border-top-color:var(--green)}
+
+/* TABLE */
+.tbl-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:12px}
+.tbl-title{padding:8px 14px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace}
+table{width:100%;border-collapse:collapse}
+th{color:var(--cyan);background:rgba(0,212,255,.06);font-size:11px;font-weight:700;padding:7px 12px;text-align:left;font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border)}
+td{font-size:12px;padding:7px 12px;border-bottom:1px solid rgba(30,37,53,.6);font-family:'JetBrains Mono',monospace;transition:background .2s}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(0,212,255,.03)}
+
+/* ROW HIGHLIGHTS */
+.hl-y td{background:rgba(251,191,36,.12)!important}
+.hl-c td{background:rgba(0,212,255,.1)!important}
+.hl-o td{background:rgba(249,115,22,.1)!important}
+.hl-p td{background:rgba(168,85,247,.1)!important}
+.hl-g td{background:rgba(34,211,160,.1)!important}
+
+/* VALUE COLORS */
+.vc{color:var(--cyan)} .vo{color:var(--orange)} .vp{color:var(--purple)}
+.vg{color:var(--green);font-weight:700} .vy{color:var(--yellow)}
+.vm{color:var(--muted)} .vpk{color:var(--pink)} .vb{color:var(--blue)}
+
+/* LAYOUT */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+@media(max-width:720px){.two-col,.three-col{grid-template-columns:1fr}}
+
+/* RESULT BOXES */
+.res-bad{border:1px solid var(--pink);background:rgba(244,63,94,.07);border-radius:8px;padding:14px;margin-bottom:10px}
+.res-good{border:1px solid var(--green);background:rgba(34,211,160,.07);border-radius:8px;padding:14px;margin-bottom:10px}
+.res-info{border:1px solid var(--cyan);background:rgba(0,212,255,.07);border-radius:8px;padding:14px;margin-bottom:10px}
+.res-label{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;font-weight:700}
+.res-bad .res-label{color:var(--pink)} .res-good .res-label{color:var(--green)} .res-info .res-label{color:var(--cyan)}
+
+/* IMPACT BADGE */
+.impact{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:20px;font-size:12px;font-weight:700;margin-top:12px;font-family:'JetBrains Mono',monospace}
+.imp-c{background:rgba(0,212,255,.15);color:var(--cyan);border:1px solid rgba(0,212,255,.3)}
+.imp-p{background:rgba(168,85,247,.15);color:var(--purple);border:1px solid rgba(168,85,247,.3)}
+.imp-o{background:rgba(249,115,22,.15);color:var(--orange);border:1px solid rgba(249,115,22,.3)}
+.imp-g{background:rgba(34,211,160,.15);color:var(--green);border:1px solid rgba(34,211,160,.3)}
+.imp-pk{background:rgba(244,63,94,.15);color:var(--pink);border:1px solid rgba(244,63,94,.3)}
+.imp-y{background:rgba(251,191,36,.15);color:var(--yellow);border:1px solid rgba(251,191,36,.3)}
+.imp-b{background:rgba(59,130,246,.15);color:var(--blue);border:1px solid rgba(59,130,246,.3)}
+
+/* SUMMARY TABLE */
+.summary-card{background:var(--card);border:1px solid var(--border);border-radius:12px;border-top:3px solid transparent;border-image:linear-gradient(90deg,var(--cyan),var(--purple),var(--pink),var(--orange),var(--yellow),var(--green)) 1;overflow:hidden;margin-bottom:48px}
+.summary-title{padding:18px 24px;font-family:'Syne',sans-serif;font-size:16px;font-weight:800;border-bottom:1px solid var(--border)}
+.summary-card table{width:100%}
+
+/* FOOTER */
+footer{text-align:center;padding:32px;font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;border-top:1px solid var(--border)}
+
+/* KEYFRAMES */
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes ring{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.2);opacity:0}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.1}}
+@keyframes spRing{0%{transform:scale(1);opacity:.6}100%{transform:scale(1.3);opacity:0}}
+@keyframes progFill{from{width:0%}}
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+
+<!-- SPEED BAR -->
+<div id="speed-bar">
+  <div class="sp-btns">
+    <button class="sp-btn" onclick="setSpeed(1)">1×</button>
+    <button class="sp-btn" onclick="setSpeed(2)">2×</button>
+    <button class="sp-btn active" onclick="setSpeed(3)">3×</button>
+    <button class="sp-btn" onclick="setSpeed(5)">5×</button>
+    <button class="sp-btn" onclick="setSpeed(8)">8×</button>
+  </div>
+  <div class="sp-timing">Step: <span id="t-step">1.0s</span> · Row: <span id="t-row">0.5s</span></div>
+  <div class="sp-status ready" id="sp-status">● Ready</div>
+  <div id="prog-bar"></div>
+</div>
+
+<div class="wrap">
+
+<!-- HEADER -->
+<div class="header">
+  <div class="badge">SQL · Window Functions</div>
+  <h1>Window Ranking Functions</h1>
+  <div class="subtitle">// ROW_NUMBER · RANK · DENSE_RANK · NTILE · CUME_DIST · PERCENT_RANK</div>
+</div>
+
+<!-- NAV -->
+<div class="nav-pills">
+  <a class="nav-pill" href="#s01">01 · ROW_NUMBER</a>
+  <a class="nav-pill" href="#s02">02 · RANK</a>
+  <a class="nav-pill" href="#s03">03 · DENSE_RANK</a>
+  <a class="nav-pill" href="#s04">04 · Top-N / PARTITION</a>
+  <a class="nav-pill" href="#s05">05 · NTILE</a>
+  <a class="nav-pill" href="#s06">06 · CUME_DIST</a>
+  <a class="nav-pill" href="#s07">07 · PERCENT_RANK</a>
+</div>
+
+<!-- GOLDEN RULE -->
+<div class="golden-rule">
+  <h3>⬡ Golden Rule — Window Function Syntax</h3>
+  <span class="fn">FUNCTION_NAME</span>() <span class="kw">OVER</span> (<br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="ko">PARTITION BY</span> partition_col &nbsp;&nbsp;<span class="cm">-- optional: split into groups</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="kg">ORDER BY</span> sort_col <span class="kw">ASC</span>|<span class="kw">DESC</span> <span class="cm">-- defines ordering within window</span><br>
+  ) <span class="kw">AS</span> alias_name
+</div>
+
+<!-- ============================================================
+     SECTION 01 — ROW_NUMBER
+     ============================================================ -->
+<div class="section" id="s01">
+  <div class="sec-header">
+    <span class="sec-num">01</span>
+    <span class="sec-title" style="color:var(--cyan)">ROW_NUMBER()</span>
+  </div>
+  <div class="sec-card s01">
+    <div class="sec-card-inner">
+      <div class="explain">
+        <strong>ROW_NUMBER()</strong> assigns a <strong>unique sequential integer</strong> to each row within the window partition, starting from 1. No two rows ever share the same number — even ties get different values. Order of assignment depends entirely on the <strong>ORDER BY</strong> clause.
+      </div>
+
+      <div class="sql-box">
+        <div class="sql-header"><span class="mac-dot mac-r"></span><span class="mac-dot mac-y"></span><span class="mac-dot mac-g"></span><span class="sql-lang">SQL</span></div>
+        <div class="sql-body"><span class="kw">SELECT</span>
+    OrderID,
+    ProductID,
+    Sales,
+    <span class="hk">ROW_NUMBER</span>() <span class="kw">OVER</span> (<span class="kg">ORDER BY</span> Sales <span class="kw">DESC</span>) <span class="kw">AS</span> SalesRank
+<span class="kw">FROM</span> Sales.Orders;</div>
+      </div>
+
+      <div class="pipeline" id="pipe01">
+        <div class="pipe-step" id="p01s1"><div class="pipe-dot">📋</div><div class="pipe-label">TABLE<br>SCAN</div></div>
+        <div class="pipe-conn" id="pc01a"></div>
+        <div class="pipe-step" id="p01s2"><div class="pipe-dot">↕</div><div class="pipe-label">SORT<br>DESC</div></div>
+        <div class="pipe-conn" id="pc01b"></div>
+        <div class="pipe-step" id="p01s3"><div class="pipe-dot">#</div><div class="pipe-label">ASSIGN<br>NUMBERS</div></div>
+        <div class="pipe-conn" id="pc01c"></div>
+        <div class="pipe-step" id="p01s4"><div class="pipe-dot">✓</div><div class="pipe-label">OUTPUT<br>RESULT</div></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-exec" id="btn01" onclick="runS01()">▶ Execute</button>
+        <button class="btn-reset" onclick="resetS01()">↺ Reset</button>
+      </div>
+
+      <!-- Stage 1: Table Scan -->
+      <div class="stage" id="st01s1">
+        <div class="stage-title">Stage 1 — Table Scan</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">Sales.Orders (input)</div>
+          <table><thead><tr><th>OrderID</th><th>ProductID</th><th>Sales</th></tr></thead>
+          <tbody id="tb01s1"></tbody></table>
+        </div>
+      </div>
+      <div class="adn-wrap"><div class="adn" id="adn01a"></div><div class="adn-arrow" id="adna01a"></div></div>
+
+      <!-- Stage 2: Sort -->
+      <div class="stage" id="st01s2">
+        <div class="stage-title">Stage 2 — Sorted by Sales DESC</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">Rows sorted highest → lowest</div>
+          <table><thead><tr><th>OrderID</th><th>ProductID</th><th>Sales</th><th>Sort Position</th></tr></thead>
+          <tbody id="tb01s2"></tbody></table>
+        </div>
+      </div>
+      <div class="adn-wrap"><div class="adn" id="adn01b"></div><div class="adn-arrow" id="adna01b"></div></div>
+
+      <!-- Stage 3: Computation -->
+      <div class="stage" id="st01s3">
+        <div class="stage-title">Stage 3 — Assigning ROW_NUMBER</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">Counter increments: 1, 2, 3… (always unique)</div>
+          <table><thead><tr><th>OrderID</th><th>ProductID</th><th>Sales</th><th>ROW_NUMBER</th></tr></thead>
+          <tbody id="tb01s3"></tbody></table>
+        </div>
+      </div>
+      <div class="adn-wrap"><div class="adn" id="adn01c"></div><div class="adn-arrow" id="adna01c"></div></div>
+
+      <!-- Stage 4: Result -->
+      <div class="stage" id="st01s4">
+        <div class="stage-title">Stage 4 — Final Result</div>
+        <div class="res-info"><div class="res-label">Key Property</div>Every row gets a unique number. Ties broken arbitrarily — same Sales values get different ranks.</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">Output — Sales.Orders with ROW_NUMBER</div>
+          <table><thead><tr><th>OrderID</th><th>ProductID</th><th>Sales</th><th>SalesRank</th></tr></thead>
+          <tbody id="tb01s4"></tbody></table>
+        </div>
+        <div class="impact imp-c">✓ Always unique sequential integers — no gaps, no ties</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     SECTION 02 — RANK
+     ============================================================ -->
+<div class="section" id="s02">
+  <div class="sec-header">
+    <span class="sec-num">02</span>
+    <span class="sec-title" style="color:var(--purple)">RANK()</span>
+  </div>
+  <div class="sec-card s02">
+    <div class="sec-card-inner">
+      <div class="explain ep">
+        <strong>RANK()</strong> assigns the same rank to rows with identical ORDER BY values (ties), then <strong>skips the next numbers</strong>. If two rows share rank 2, the next row gets rank 4 — creating gaps. Think Olympic medals: two silvers means no bronze.
+      </div>
+
+      <div class="sql-box">
+        <div class="sql-header"><span class="mac-dot mac-r"></span><span class="mac-dot mac-y"></span><span class="mac-dot mac-g"></span><span class="sql-lang">SQL</span></div>
+        <div class="sql-body"><span class="kw">SELECT</span>
+    OrderID, ProductID, Sales,
+    <span class="fn">ROW_NUMBER</span>() <span class="kw">OVER</span> (<span class="kg">ORDER BY</span> Sales <span class="kw">DESC</span>) <span class="kw">AS</span> RowNum,
+    <span class="hk">RANK</span>()       <span class="kw">OVER</span> (<span class="kg">ORDER BY</span> Sales <span class="kw">DESC</span>) <span class="kw">AS</span> RankVal
+<span class="kw">FROM</span> Sales.Orders;</div>
+      </div>
+
+      <div class="pipeline" id="pipe02">
+        <div class="pipe-step" id="p02s1"><div class="pipe-dot">📋</div><div class="pipe-label">TABLE<br>SCAN</div></div>
+        <div class="pipe-conn" id="pc02a"></div>
+        <div class="pipe-step" id="p02s2"><div class="pipe-dot">↕</div><div class="pipe-label">SORT<br>DESC</div></div>
+        <div class="pipe-conn" id="pc02b"></div>
+        <div class="pipe-step" id="p02s3"><div class="pipe-dot">≡</div><div class="pipe-label">DETECT<br>TIES</div></div>
+        <div class="pipe-conn" id="pc02c"></div>
+        <div class="pipe-step" id="p02s4"><div class="pipe-dot">✓</div><div class="pipe-label">RANK &<br>GAP</div></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-exec" id="btn02" onclick="runS02()">▶ Execute</button>
+        <button class="btn-reset" onclick="resetS02()">↺ Reset</button>
+      </div>
+
+      <div class="stage" id="st02s1">
+        <div class="stage-title">Stage 1 — Table Scan</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">Sales.Orders (input)</div>
+          <table><thead><tr><th>OrderID</th><th>ProductID</th><th>Sales</th></tr></thead>
+          <tbody id="tb02s1"></tbody></table>
+        </div>
+      </div>
+      <div class="adn-wrap"><div class="adn" id="adn02a"></div><div class="adn-arrow" id="adna02a"></div></div>
+
+      <div class="stage" id="st02s2">
+        <div class="stage-title">Stage 2 — Sorted; Ties Detected</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">Same Sales value = same group (highlighted)</div>
+          <table><thead><tr><th>OrderID</th><th>ProductID</th><th>Sales</th><th>Tie?</th></tr></thead>
+          <tbody id="tb02s2"></tbody></table>
+        </div>
+      </div>
+      <div class="adn-wrap"><div class="adn" id="adn02b"></div><div class="adn-arrow" id="adna02b"></div></div>
+
+      <div class="stage" id="st02s3">
+        <div class="stage-title">Stage 3 — RANK Assigned (with gaps)</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">Tied rows share same rank; next rank skips ahead</div>
+          <table><thead><tr><th>OrderID</th><th>Sales</th><th>RowNum</th><th>RANK</th><th>Gap?</th></tr></thead>
+          <tbody id="tb02s3"></tbody></table>
+        </div>
+      </div>
+      <div class="adn-wrap"><div class="adn" id="adn02c"></div><div class="adn-arrow" id="adna02c"></div></div>
+
+      <div class="stage" id="st02s4">
+        <div class="stage-title">Stage 4 — Comparison: ROW_NUMBER vs RANK</div>
+        <div class="two-col">
+          <div class="res-bad"><div class="res-label">RANK — has gaps</div><small style="color:var(--muted)">…rank 2 tied → rank 4 next (skip 3)</small></div>
+          <div class="res-good"><div class="res-label">ROW_NUMBER — no gaps, no ties</div><small style="color:var(--muted)">…always 1,2,3,4,5 sequentially</small></div>
+        </div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">Final Output</div>
+          <table><thead><tr><th>OrderID</th><th>Sales</th><th>ROW_NUMBER</th><th>RANK</th></tr></thead>
+          <tbody id="tb02s4"></tbody></table>
+        </div>
+        <div class="impact imp-p">⚠ RANK skips numbers after ties — gaps appear in sequence</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     SECTION 03 — DENSE_RANK
+     ============================================================ -->
+<div class="section" id="s03">
+  <div class="sec-header">
+    <span class="sec-num">03</span>
+    <span class="sec-title" style="color:var(--orange)">DENSE_RANK()</span>
+  </div>
+  <div class="sec-card s03">
+    <div class="sec-card-inner">
+      <div class="explain eo">
+        <strong>DENSE_RANK()</strong> is like RANK but <strong>never skips numbers</strong>. Tied rows still share the same rank, but the next distinct value always gets the very next integer. No gaps — hence "dense". Perfect when you need contiguous rank levels.
+      </div>
+
+      <div class="sql-box">
+        <div class="sql-header"><span class="mac-dot mac-r"></span><span class="mac-dot mac-y"></span><span class="mac-dot mac-g"></span><span class="sql-lang">SQL</span></div>
+        <div class="sql-body"><span class="kw">SELECT</span>
+    OrderID, ProductID, Sales,
+    <span class="fn">ROW_NUMBER</span>()  <span class="kw">OVER</span> (<span class="kg">ORDER BY</span> Sales <span class="kw">DESC</span>) <span class="kw">AS</span> RowNum,
+    <span class="fn">RANK</span>()        <span class="kw">OVER</span> (<span class="kg">ORDER BY</span> Sales <span class="kw">DESC</span>) <span class="kw">AS</span> RankVal,
+    <span class="hk">DENSE_RANK</span>()  <span class="kw">OVER</span> (<span class="kg">ORDER BY</span> Sales <span class="kw">DESC</span>) <span class="kw">AS</span> DenseRankVal
+<span class="kw">FROM</span> Sales.Orders;</div>
+      </div>
+
+      <div class="pipeline" id="pipe03">
+        <div class="pipe-step" id="p03s1"><div class="pipe-dot">📋</div><div class="pipe-label">TABLE<br>SCAN</div></div>
+        <div class="pipe-conn" id="pc03a"></div>
+        <div class="pipe-step" id="p03s2"><div class="pipe-dot">↕</div><div class="pipe-label">SORT<br>DESC</div></div>
+        <div class="pipe-conn" id="pc03b"></div>
+        <div class="pipe-step" id="p03s3"><div class="pipe-dot">≡</div><div class="pipe-label">GROUP<br>TIES</div></div>
+        <div class="pipe-conn" id="pc03c"></div>
+        <div class="pipe-step" id="p03s4"><div class="pipe-dot">✓</div><div class="pipe-label">NO<br>GAPS</div></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-exec" id="btn03" onclick="runS03()">▶ Execute</button>
+        <button class="btn-reset" onclick="resetS03()">↺ Reset</button>
+      </div>
+
+      <div class="stage" id="st03s1">
+        <div class="stage-title">Stage 1 — Scanning All Rows</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">Sales.Orders</div>
+          <table><thead><tr><th>OrderID</th><th>ProductID</th><th>Sales</th></tr></thead>
+          <tbody id="tb03s1"></tbody></table>
+        </div>
+      </div>
+      <div class="adn-wrap"><div class="adn" id="adn03a"></div><div class="adn-arrow" id="adna03a"></div></div>
+
+      <div class="stage" id="st03s2">
+        <div class="stage-title">Stage 2 — Grouped by Distinct Value</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">Each unique Sales value = one dense rank level</div>
+          <table><thead><tr><th>Sales Value</th><th>Row Count</th><th>Dense Level</th></tr></thead>
+          <tbody id="tb03s2"></tbody></table>
+        </div>
+      </div>
+      <div class="adn-wrap"><div class="adn" id="adn03b"></div><div class="adn-arrow" id="adna03b"></div></div>
+
+      <div class="stage" id="st03s3">
+        <div class="stage-title">Stage 3 — Side-by-Side: RANK vs DENSE_RANK</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">Notice RANK skips, DENSE_RANK never does</div>
+          <table><thead><tr><th>OrderID</th><th>Sales</th><th>RANK</th><th>DENSE_RANK</th><th>Gap?</th></tr></thead>
+          <tbody id="tb03s3"></tbody></table>
+        </div>
+      </div>
+      <div class="adn-wrap"><div class="adn" id="adn03c"></div><div class="adn-arrow" id="adna03c"></div></div>
+
+      <div class="stage" id="st03s4">
+        <div class="stage-title">Stage 4 — Full Comparison</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">ROW_NUMBER · RANK · DENSE_RANK side by side</div>
+          <table><thead><tr><th>OrderID</th><th>Sales</th><th>ROW_NUM</th><th>RANK</th><th>DENSE_RANK</th></tr></thead>
+          <tbody id="tb03s4"></tbody></table>
+        </div>
+        <div class="impact imp-o">✓ DENSE_RANK = contiguous ranks, shared on ties, zero gaps</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     SECTION 04 — PARTITION BY (Top-N per Group)
+     ============================================================ -->
+<div class="section" id="s04">
+  <div class="sec-header">
+    <span class="sec-num">04</span>
+    <span class="sec-title" style="color:var(--green)">PARTITION BY — Top-N per Group</span>
+  </div>
+  <div class="sec-card s04">
+    <div class="sec-card-inner">
+      <div class="explain eg">
+        <strong>PARTITION BY</strong> restarts the ranking counter for each group. Combined with ROW_NUMBER, this lets you find the <strong>top-N rows per category</strong> — e.g. highest sale per product — without a self-join. Wrap in a subquery and filter <code style="color:var(--cyan)">WHERE rn = 1</code>.
+      </div>
+
+      <div class="sql-box">
+        <div class="sql-header"><span class="mac-dot mac-r"></span><span class="mac-dot mac-y"></span><span class="mac-dot mac-g"></span><span class="sql-lang">SQL</span></div>
+        <div class="sql-body"><span class="cm">-- Top-1 Sale per ProductID</span>
+<span class="kw">SELECT</span> *
+<span class="kw">FROM</span> (
+    <span class="kw">SELECT</span>
+        OrderID, ProductID, Sales,
+        <span class="fn">ROW_NUMBER</span>() <span class="kw">OVER</span> (
+            <span class="hk">PARTITION BY</span> ProductID
+            <span class="kg">ORDER BY</span> Sales <span class="kw">DESC</span>
+        ) <span class="kw">AS</span> RankByProduct
+    <span class="kw">FROM</span> Sales.Orders
+) <span class="kw">AS</span> TopProductSales
+<span class="kw">WHERE</span> RankByProduct = 1;</div>
+      </div>
+
+      <div class="pipeline" id="pipe04">
+        <div class="pipe-step" id="p04s1"><div class="pipe-dot">📋</div><div class="pipe-label">TABLE<br>SCAN</div></div>
+        <div class="pipe-conn" id="pc04a"></div>
+        <div class="pipe-step" id="p04s2"><div class="pipe-dot">⊡</div><div class="pipe-label">PARTITION<br>SPLIT</div></div>
+        <div class="pipe-conn" id="pc04b"></div>
+        <div class="pipe-step" id="p04s3"><div class="pipe-dot">#</div><div class="pipe-label">RANK PER<br>GROUP</div></div>
+        <div class="pipe-conn" id="pc04c"></div>
+        <div class="pipe-step" id="p04s4"><div class="pipe-dot">▼</div><div class="pipe-label">FILTER<br>rn=1</div></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-exec" id="btn04" onclick="runS04()">▶ Execute</button>
+        <button class="btn-reset" onclick="resetS04()">↺ Reset</button>
+      </div>
+
+      <div class="stage" id="st04s1">
+        <div class="stage-title">Stage 1 — Input Table</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">Sales.Orders — all rows</div>
+          <table><thead><tr><th>OrderID</th><th>ProductID</th><th>Sales</th></tr></thead>
+          <tbody id="tb04s1"></tbody></table>
+        </div>
+      </div>
+      <div class="adn-wrap"><div class="adn" id="adn04a"></div><div class="adn-arrow" id="adna04a"></div></div>
+
+      <div class="stage" id="st04s2">
+        <div class="stage-title">Stage 2 — Partitioned by ProductID</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">Window restarts per product — each color = one partition</div>
+          <table><thead><tr><th>OrderID</th><th>ProductID</th><th>Sales</th><th>Partition</th></tr></thead>
+          <tbody id="tb04s2"></tbody></table>
+        </div>
+      </div>
+      <div class="adn-wrap"><div class="adn" id="adn04b"></div><div class="adn-arrow" id="adna04b"></div></div>
+
+      <div class="stage" id="st04s3">
+        <div class="stage-title">Stage 3 — ROW_NUMBER Restarts per Partition</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">rn=1 = highest sale in that product group</div>
+          <table><thead><tr><th>OrderID</th><th>ProductID</th><th>Sales</th><th>rn</th></tr></thead>
+          <tbody id="tb04s3"></tbody></table>
+        </div>
+      </div>
+      <div class="adn-wrap"><div class="adn" id="adn04c"></div><div class="adn-arrow" id="adna04c"></div></div>
+
+      <div class="stage" id="st04s4">
+        <div class="stage-title">Stage 4 — WHERE rn = 1 → Top Sale per Product</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">Only rn=1 rows kept — best sale per ProductID</div>
+          <table><thead><tr><th>OrderID</th><th>ProductID</th><th>Sales</th><th>rn</th></tr></thead>
+          <tbody id="tb04s4"></tbody></table>
+        </div>
+        <div class="impact imp-g">✓ PARTITION BY resets counter per group — enables Top-N analysis</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     SECTION 05 — NTILE
+     ============================================================ -->
+<div class="section" id="s05">
+  <div class="sec-header">
+    <span class="sec-num">05</span>
+    <span class="sec-title" style="color:var(--pink)">NTILE(n)</span>
+  </div>
+  <div class="sec-card s05">
+    <div class="sec-card-inner">
+      <div class="explain epk">
+        <strong>NTILE(n)</strong> divides rows into <strong>n equally-sized buckets</strong>. Bucket size = total rows ÷ n (excess rows go to earlier buckets). Use it for segmentation: High/Medium/Low, quartiles, deciles. The <code style="color:var(--cyan)">PARTITION BY</code> clause splits into separate tile sets per group.
+      </div>
+
+      <div class="sql-box">
+        <div class="sql-header"><span class="mac-dot mac-r"></span><span class="mac-dot mac-y"></span><span class="mac-dot mac-g"></span><span class="sql-lang">SQL</span></div>
+        <div class="sql-body"><span class="cm">-- Segment orders into High / Medium / Low sales</span>
+<span class="kw">SELECT</span> OrderID, Sales, Buckets,
+    <span class="kw">CASE</span>
+        <span class="kw">WHEN</span> Buckets = 1 <span class="kw">THEN</span> <span class="vg">'High'</span>
+        <span class="kw">WHEN</span> Buckets = 2 <span class="kw">THEN</span> <span class="vy">'Medium'</span>
+        <span class="kw">WHEN</span> Buckets = 3 <span class="kw">THEN</span> <span class="vpk">'Low'</span>
+    <span class="kw">END AS</span> SalesSegment
+<span class="kw">FROM</span> (
+    <span class="kw">SELECT</span> OrderID, Sales,
+        <span class="hk">NTILE</span>(3) <span class="kw">OVER</span> (<span class="kg">ORDER BY</span> Sales <span class="kw">DESC</span>) <span class="kw">AS</span> Buckets
+    <span class="kw">FROM</span> Sales.Orders
+) <span class="kw">AS</span> SalesBuckets;</div>
+      </div>
+
+      <div class="pipeline" id="pipe05">
+        <div class="pipe-step" id="p05s1"><div class="pipe-dot">📋</div><div class="pipe-label">TABLE<br>SCAN</div></div>
+        <div class="pipe-conn" id="pc05a"></div>
+        <div class="pipe-step" id="p05s2"><div class="pipe-dot">÷</div><div class="pipe-label">CALC<br>BUCKET</div></div>
+        <div class="pipe-conn" id="pc05b"></div>
+        <div class="pipe-step" id="p05s3"><div class="pipe-dot">⬡</div><div class="pipe-label">ASSIGN<br>TILES</div></div>
+        <div class="pipe-conn" id="pc05c"></div>
+        <div class="pipe-step" id="p05s4"><div class="pipe-dot">✓</div><div class="pipe-label">LABEL<br>SEGMENT</div></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-exec" id="btn05" onclick="runS05()">▶ Execute</button>
+        <button class="btn-reset" onclick="resetS05()">↺ Reset</button>
+      </div>
+
+      <div class="stage" id="st05s1">
+        <div class="stage-title">Stage 1 — Input + Total Rows</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">Sales.Orders — 9 rows total</div>
+          <table><thead><tr><th>OrderID</th><th>Sales</th></tr></thead>
+          <tbody id="tb05s1"></tbody></table>
+        </div>
+      </div>
+      <div class="adn-wrap"><div class="adn" id="adn05a"></div><div class="adn-arrow" id="adna05a"></div></div>
+
+      <div class="stage" id="st05s2">
+        <div class="stage-title">Stage 2 — Bucket Size Calculation</div>
+        <div class="res-info"><div class="res-label">Formula: NTILE(3) on 9 rows</div>9 rows ÷ 3 buckets = <strong>3 rows per bucket</strong>. If rows don't divide evenly, earlier buckets get +1 row.</div>
+        <div class="three-col" id="bucket-vis">
+          <div class="tbl-wrap"><div class="tbl-title" style="color:var(--green)">Bucket 1 (High)</div><div style="padding:10px;font-size:12px;color:var(--muted)">3 rows (highest sales)</div></div>
+          <div class="tbl-wrap"><div class="tbl-title" style="color:var(--yellow)">Bucket 2 (Medium)</div><div style="padding:10px;font-size:12px;color:var(--muted)">3 rows (mid sales)</div></div>
+          <div class="tbl-wrap"><div class="tbl-title" style="color:var(--pink)">Bucket 3 (Low)</div><div style="padding:10px;font-size:12px;color:var(--muted)">3 rows (lowest sales)</div></div>
+        </div>
+      </div>
+      <div class="adn-wrap"><div class="adn" id="adn05b"></div><div class="adn-arrow" id="adna05b"></div></div>
+
+      <div class="stage" id="st05s3">
+        <div class="stage-title">Stage 3 — Rows Assigned to Buckets</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">NTILE(3) assigned — color = bucket</div>
+          <table><thead><tr><th>OrderID</th><th>Sales</th><th>NTILE(3)</th></tr></thead>
+          <tbody id="tb05s3"></tbody></table>
+        </div>
+      </div>
+      <div class="adn-wrap"><div class="adn" id="adn05c"></div><div class="adn-arrow" id="adna05c"></div></div>
+
+      <div class="stage" id="st05s4">
+        <div class="stage-title">Stage 4 — Labeled Segments</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">Final segmentation output</div>
+          <table><thead><tr><th>OrderID</th><th>Sales</th><th>Bucket</th><th>SalesSegment</th></tr></thead>
+          <tbody id="tb05s4"></tbody></table>
+        </div>
+        <div class="impact imp-pk">✓ NTILE splits rows into equal groups — ideal for percentile segmentation</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     SECTION 06 — CUME_DIST
+     ============================================================ -->
+<div class="section" id="s06">
+  <div class="sec-header">
+    <span class="sec-num">06</span>
+    <span class="sec-title" style="color:var(--yellow)">CUME_DIST()</span>
+  </div>
+  <div class="sec-card s06">
+    <div class="sec-card-inner">
+      <div class="explain ey">
+        <strong>CUME_DIST()</strong> returns the <strong>cumulative distribution</strong>: what fraction of rows have values ≤ the current row. Formula: <em>last position of same value ÷ total rows</em>. Returns a value between 0 (exclusive) and 1 (inclusive). Use it to find top/bottom percentile items.
+      </div>
+
+      <div class="sql-box">
+        <div class="sql-header"><span class="mac-dot mac-r"></span><span class="mac-dot mac-y"></span><span class="mac-dot mac-g"></span><span class="sql-lang">SQL</span></div>
+        <div class="sql-body"><span class="cm">-- Products in the top 40% by price</span>
+<span class="kw">SELECT</span> Product, Price, DistRank,
+    <span class="fn">CONCAT</span>(DistRank * 100, <span class="vg">'%'</span>) <span class="kw">AS</span> DistRankPerc
+<span class="kw">FROM</span> (
+    <span class="kw">SELECT</span> Product, Price,
+        <span class="hk">CUME_DIST</span>() <span class="kw">OVER</span> (<span class="kg">ORDER BY</span> Price <span class="kw">DESC</span>) <span class="kw">AS</span> DistRank
+    <span class="kw">FROM</span> Sales.Products
+) <span class="kw">AS</span> PriceDistribution
+<span class="kw">WHERE</span> DistRank &lt;= 0.4;</div>
+      </div>
+
+      <div class="pipeline" id="pipe06">
+        <div class="pipe-step" id="p06s1"><div class="pipe-dot">📋</div><div class="pipe-label">TABLE<br>SCAN</div></div>
+        <div class="pipe-conn" id="pc06a"></div>
+        <div class="pipe-step" id="p06s2"><div class="pipe-dot">↕</div><div class="pipe-label">SORT<br>DESC</div></div>
+        <div class="pipe-conn" id="pc06b"></div>
+        <div class="pipe-step" id="p06s3"><div class="pipe-dot">%</div><div class="pipe-label">CALC<br>RATIO</div></div>
+        <div class="pipe-conn" id="pc06c"></div>
+        <div class="pipe-step" id="p06s4"><div class="pipe-dot">▼</div><div class="pipe-label">FILTER<br>≤ 40%</div></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-exec" id="btn06" onclick="runS06()">▶ Execute</button>
+        <button class="btn-reset" onclick="resetS06()">↺ Reset</button>
+      </div>
+
+      <div class="stage" id="st06s1">
+        <div class="stage-title">Stage 1 — Products Table Scan</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">Sales.Products</div>
+          <table><thead><tr><th>Product</th><th>Price</th></tr></thead>
+          <tbody id="tb06s1"></tbody></table>
+        </div>
+      </div>
+      <div class="adn-wrap"><div class="adn" id="adn06a"></div><div class="adn-arrow" id="adna06a"></div></div>
+
+      <div class="stage" id="st06s2">
+        <div class="stage-title">Stage 2 — Sorted by Price DESC + Position</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">Position = last occurrence of same price ÷ 5 total rows</div>
+          <table><thead><tr><th>Product</th><th>Price</th><th>Position</th><th>Total</th></tr></thead>
+          <tbody id="tb06s2"></tbody></table>
+        </div>
+      </div>
+      <div class="adn-wrap"><div class="adn" id="adn06b"></div><div class="adn-arrow" id="adna06b"></div></div>
+
+      <div class="stage" id="st06s3">
+        <div class="stage-title">Stage 3 — CUME_DIST Computed per Row</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">CUME_DIST = position / total rows</div>
+          <table><thead><tr><th>Product</th><th>Price</th><th>Calculation</th><th>CUME_DIST</th></tr></thead>
+          <tbody id="tb06s3"></tbody></table>
+        </div>
+      </div>
+      <div class="adn-wrap"><div class="adn" id="adn06c"></div><div class="adn-arrow" id="adna06c"></div></div>
+
+      <div class="stage" id="st06s4">
+        <div class="stage-title">Stage 4 — Filter: CUME_DIST ≤ 0.4 (top 40%)</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">Only products in top 40% of prices retained</div>
+          <table><thead><tr><th>Product</th><th>Price</th><th>CUME_DIST</th><th>DistRankPerc</th><th>In Top 40%?</th></tr></thead>
+          <tbody id="tb06s4"></tbody></table>
+        </div>
+        <div class="impact imp-y">✓ CUME_DIST identifies percentile position — filter with WHERE for top/bottom N%</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     SECTION 07 — PERCENT_RANK
+     ============================================================ -->
+<div class="section" id="s07">
+  <div class="sec-header">
+    <span class="sec-num">07</span>
+    <span class="sec-title" style="color:var(--blue)">PERCENT_RANK()</span>
+  </div>
+  <div class="sec-card" style="border-top:3px solid transparent;border-image:linear-gradient(90deg,var(--blue),var(--purple)) 1;background:var(--card);border-left:1px solid var(--border);border-right:1px solid var(--border);border-bottom:1px solid var(--border);border-radius:0 0 12px 12px;">
+    <div class="sec-card-inner">
+      <div class="explain" style="border-left-color:var(--blue);background:rgba(59,130,246,.04)">
+        <strong>PERCENT_RANK()</strong> returns the relative rank as a percentage: <em>(rank - 1) / (total rows - 1)</em>. The first row always returns <strong>0</strong>, the last always returns <strong>1</strong>. It uses the <em>first occurrence</em> of a tied value (unlike CUME_DIST which uses the last).
+      </div>
+
+      <div class="sql-box">
+        <div class="sql-header"><span class="mac-dot mac-r"></span><span class="mac-dot mac-y"></span><span class="mac-dot mac-g"></span><span class="sql-lang">SQL</span></div>
+        <div class="sql-body"><span class="cm">-- PERCENT_RANK vs CUME_DIST comparison</span>
+<span class="kw">SELECT</span> Product, Price,
+    <span class="fn">CUME_DIST</span>()    <span class="kw">OVER</span> (<span class="kg">ORDER BY</span> Price <span class="kw">DESC</span>) <span class="kw">AS</span> CumeDist,
+    <span class="hk">PERCENT_RANK</span>() <span class="kw">OVER</span> (<span class="kg">ORDER BY</span> Price <span class="kw">DESC</span>) <span class="kw">AS</span> PctRank
+<span class="kw">FROM</span> Sales.Products;</div>
+      </div>
+
+      <div class="pipeline" id="pipe07">
+        <div class="pipe-step" id="p07s1"><div class="pipe-dot">📋</div><div class="pipe-label">TABLE<br>SCAN</div></div>
+        <div class="pipe-conn" id="pc07a"></div>
+        <div class="pipe-step" id="p07s2"><div class="pipe-dot">↕</div><div class="pipe-label">SORT<br>DESC</div></div>
+        <div class="pipe-conn" id="pc07b"></div>
+        <div class="pipe-step" id="p07s3"><div class="pipe-dot">%</div><div class="pipe-label">RANK-1/<br>N-1</div></div>
+        <div class="pipe-conn" id="pc07c"></div>
+        <div class="pipe-step" id="p07s4"><div class="pipe-dot">⇄</div><div class="pipe-label">COMPARE<br>BOTH</div></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-exec" id="btn07" onclick="runS07()">▶ Execute</button>
+        <button class="btn-reset" onclick="resetS07()">↺ Reset</button>
+      </div>
+
+      <div class="stage" id="st07s1">
+        <div class="stage-title">Stage 1 — Products Table Scan</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">Sales.Products</div>
+          <table><thead><tr><th>Product</th><th>Price</th></tr></thead>
+          <tbody id="tb07s1"></tbody></table>
+        </div>
+      </div>
+      <div class="adn-wrap"><div class="adn" id="adn07a"></div><div class="adn-arrow" id="adna07a"></div></div>
+
+      <div class="stage" id="st07s2">
+        <div class="stage-title">Stage 2 — Formula Breakdown</div>
+        <div class="two-col">
+          <div class="res-info"><div class="res-label">CUME_DIST formula</div><strong>last_position / total_rows</strong><br><small style="color:var(--muted)">Uses last occurrence of tied value</small></div>
+          <div class="res-good"><div class="res-label">PERCENT_RANK formula</div><strong>(rank - 1) / (total_rows - 1)</strong><br><small style="color:var(--muted)">Uses first occurrence; first row = 0</small></div>
+        </div>
+      </div>
+      <div class="adn-wrap"><div class="adn" id="adn07b"></div><div class="adn-arrow" id="adna07b"></div></div>
+
+      <div class="stage" id="st07s3">
+        <div class="stage-title">Stage 3 — PERCENT_RANK Calculated</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">Formula: (rank - 1) / (5 - 1) = (rank - 1) / 4</div>
+          <table><thead><tr><th>Product</th><th>Price</th><th>Rank</th><th>Calculation</th><th>PCT_RANK</th></tr></thead>
+          <tbody id="tb07s3"></tbody></table>
+        </div>
+      </div>
+      <div class="adn-wrap"><div class="adn" id="adn07c"></div><div class="adn-arrow" id="adna07c"></div></div>
+
+      <div class="stage" id="st07s4">
+        <div class="stage-title">Stage 4 — CUME_DIST vs PERCENT_RANK</div>
+        <div class="tbl-wrap">
+          <div class="tbl-title">Side-by-side comparison — note the difference at ties</div>
+          <table><thead><tr><th>Product</th><th>Price</th><th>CUME_DIST</th><th>PERCENT_RANK</th><th>Difference</th></tr></thead>
+          <tbody id="tb07s4"></tbody></table>
+        </div>
+        <div class="impact imp-b">✓ PERCENT_RANK starts at 0; CUME_DIST starts at 1/n — key distinction for ties</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SUMMARY TABLE -->
+<div class="summary-card" id="summary">
+  <div class="summary-title">📊 Summary — All Window Ranking Functions</div>
+  <div style="padding:0 0 0 0;overflow-x:auto">
+  <table>
+    <thead>
+      <tr>
+        <th>Function</th><th>Ties</th><th>Gaps</th><th>Range</th><th>Use Case</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="vc">ROW_NUMBER()</span></td><td><span class="vpk">Unique (arbitrary)</span></td><td><span class="vg">Never</span></td><td><span class="vm">1 → N</span></td><td>Dedup, pagination, Top-N</td></tr>
+      <tr><td><span class="vp">RANK()</span></td><td><span class="vg">Same rank</span></td><td><span class="vpk">Yes (skips)</span></td><td><span class="vm">1 → N</span></td><td>Competition rankings, Olympics</td></tr>
+      <tr><td><span class="vo">DENSE_RANK()</span></td><td><span class="vg">Same rank</span></td><td><span class="vg">Never</span></td><td><span class="vm">1 → distinct</span></td><td>Contiguous ranks, tier levels</td></tr>
+      <tr><td><span class="vg">NTILE(n)</span></td><td><span class="vm">Split evenly</span></td><td><span class="vg">Never</span></td><td><span class="vm">1 → n</span></td><td>Quartiles, deciles, segmentation</td></tr>
+      <tr><td><span class="vy">CUME_DIST()</span></td><td><span class="vm">Last position</span></td><td><span class="vm">N/A</span></td><td><span class="vm">(0,1]</span></td><td>Percentile filter, top X%</td></tr>
+      <tr><td><span class="vb">PERCENT_RANK()</span></td><td><span class="vm">First position</span></td><td><span class="vm">N/A</span></td><td><span class="vm">[0,1]</span></td><td>Relative rank, starts at 0</td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<footer>// SQL Window Ranking Functions · Interactive Reference · Built with pure HTML+CSS+JS</footer>
+
+</div><!-- /wrap -->
+
+<script>
+// ═══════════════════════════════════════════════
+//  SPEED CONTROL
+// ═══════════════════════════════════════════════
+let SM = 3;
+const stepBase = 1500, rowBase = 500;
+
+function setSpeed(s) {
+  SM = s;
+  document.querySelectorAll('.sp-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  const sd = (stepBase / Math.pow(SM, 1.45) / 1000).toFixed(1);
+  const rd = (rowBase / Math.pow(SM, 1.4) / 1000).toFixed(1);
+  document.getElementById('t-step').textContent = sd + 's';
+  document.getElementById('t-row').textContent = rd + 's';
+}
+
+const SD = base => new Promise(r => setTimeout(r, Math.round(base * Math.pow(SM, -1.45) * 1000)));
+const RD = base => new Promise(r => setTimeout(r, Math.round(base * Math.pow(SM, -1.4) * 1000)));
+
+// Re-define with correct formula
+function SD2(ms) { return new Promise(r => setTimeout(r, Math.round(ms / Math.pow(SM, 1.45)))); }
+function RD2(ms) { return new Promise(r => setTimeout(r, Math.round(ms / Math.pow(SM, 1.4)))); }
+
+let progInt = null;
+let progVal = 0;
+function startProg() {
+  progVal = 0;
+  document.getElementById('sp-status').className = 'sp-status running';
+  document.getElementById('sp-status').textContent = '⟳ Running...';
+  progInt = setInterval(() => {
+    progVal = Math.min(progVal + 0.5, 90);
+    document.getElementById('prog-bar').style.width = progVal + '%';
+  }, 100);
+}
+function endProg() {
+  clearInterval(progInt);
+  document.getElementById('prog-bar').style.width = '100%';
+  document.getElementById('sp-status').className = 'sp-status done';
+  document.getElementById('sp-status').textContent = '✓ Done';
+  setTimeout(() => {
+    document.getElementById('prog-bar').style.width = '0%';
+    document.getElementById('sp-status').className = 'sp-status ready';
+    document.getElementById('sp-status').textContent = '● Ready';
+  }, 2000);
+}
+
+// ═══════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════
+function sp(id, s) {
+  const el = document.getElementById(id);
+  if (el) el.className = 'pipe-step ' + (s || '');
+}
+function pconn(id, s) {
+  const el = document.getElementById(id);
+  if (el) { el.className = 'pipe-conn ' + (s || ''); }
+}
+function show(id) {
+  const el = document.getElementById(id);
+  if (el) { el.classList.add('show'); el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+}
+function hide(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('show');
+}
+function clr(id) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = '';
+}
+function adn(id, s) {
+  const el = document.getElementById(id);
+  if (el) el.className = 'adn ' + (s || '');
+  const ea = document.getElementById('a' + id);
+  if (ea) ea.className = 'adn-arrow ' + (s || '');
+}
+function mkRow(cells, hlClass) {
+  const tr = document.createElement('tr');
+  if (hlClass) tr.className = hlClass;
+  cells.forEach(c => {
+    const td = document.createElement('td');
+    td.innerHTML = c;
+    tr.appendChild(td);
+  });
+  return tr;
+}
+async function addRows(tbodyId, rows, delay, hlClass) {
+  const tb = document.getElementById(tbodyId);
+  for (const row of rows) {
+    const tr = mkRow(row, hlClass || 'hl-y');
+    tb.appendChild(tr);
+    await RD2(delay || 120);
+    tr.classList.remove('hl-y');
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════════════
+const orders = [
+  { id: 'O-1001', pid: '<span class="vc">P-10</span>', sales: 350 },
+  { id: 'O-1002', pid: '<span class="vo">P-20</span>', sales: 890 },
+  { id: 'O-1003', pid: '<span class="vc">P-10</span>', sales: 550 },
+  { id: 'O-1004', pid: '<span class="vp">P-30</span>', sales: 210 },
+  { id: 'O-1005', pid: '<span class="vo">P-20</span>', sales: 890 },
+  { id: 'O-1006', pid: '<span class="vc">P-10</span>', sales: 720 },
+  { id: 'O-1007', pid: '<span class="vp">P-30</span>', sales: 140 },
+  { id: 'O-1008', pid: '<span class="vo">P-20</span>', sales: 430 },
+  { id: 'O-1009', pid: '<span class="vc">P-10</span>', sales: 610 },
+];
+
+const products = [
+  { name: 'Laptop Pro', price: 1299 },
+  { name: 'Wireless Mouse', price: 45 },
+  { name: 'Mechanical KB', price: 189 },
+  { name: 'Monitor 4K', price: 799 },
+  { name: 'USB-C Hub', price: 89 },
+];
+
+// Sorted by Sales DESC
+const ordersSorted = [...orders].sort((a, b) => b.sales - a.sales);
+// [890 O1002, 890 O1005, 720 O1006, 610 O1009, 550 O1003, 430 O1008, 350 O1001, 210 O1004, 140 O1007]
+
+// ═══════════════════════════════════════════════
+//  SECTION 01 — ROW_NUMBER
+// ═══════════════════════════════════════════════
+async function runS01() {
+  document.getElementById('btn01').disabled = true;
+  startProg();
+
+  sp('p01s1', 'active');
+  show('st01s1');
+  await SD2(300);
+  for (const o of orders) {
+    const tb = document.getElementById('tb01s1');
+    const tr = mkRow([o.id, o.pid, '<span class="vy">' + o.sales + '</span>'], 'hl-y');
+    tb.appendChild(tr);
+    await RD2(130);
+    tr.classList.remove('hl-y');
+  }
+  await SD2(400);
+
+  sp('p01s1', 'done'); pconn('pc01a', 'ok'); sp('p01s2', 'active');
+  adn('adn01a', 'ok');
+  show('st01s2');
+  await SD2(300);
+  for (let i = 0; i < ordersSorted.length; i++) {
+    const o = ordersSorted[i];
+    const tb = document.getElementById('tb01s2');
+    const tr = mkRow([o.id, o.pid, '<span class="vg">' + o.sales + '</span>', '<span class="vm">' + (i + 1) + '</span>'], 'hl-y');
+    tb.appendChild(tr);
+    await RD2(110);
+    tr.classList.remove('hl-y');
+  }
+  await SD2(400);
+
+  sp('p01s2', 'done'); pconn('pc01b', 'ok'); sp('p01s3', 'active');
+  adn('adn01b', 'ok');
+  show('st01s3');
+  await SD2(300);
+  for (let i = 0; i < ordersSorted.length; i++) {
+    const o = ordersSorted[i];
+    const tb = document.getElementById('tb01s3');
+    const tr = mkRow([o.id, o.pid, o.sales, '<span class="vg">' + (i + 1) + '</span>'], 'hl-y');
+    tb.appendChild(tr);
+    await RD2(120);
+    tr.classList.remove('hl-y');
+  }
+  await SD2(400);
+
+  sp('p01s3', 'done'); pconn('pc01c', 'ok'); sp('p01s4', 'active');
+  adn('adn01c', 'ok');
+  show('st01s4');
+  await SD2(300);
+  for (let i = 0; i < ordersSorted.length; i++) {
+    const o = ordersSorted[i];
+    const tb = document.getElementById('tb01s4');
+    const tr = mkRow([o.id, o.pid, o.sales, '<span class="vg">' + (i + 1) + '</span>'], 'hl-y');
+    tb.appendChild(tr);
+    await RD2(100);
+    tr.classList.remove('hl-y');
+  }
+  sp('p01s4', 'done');
+  endProg();
+}
+function resetS01() {
+  document.getElementById('btn01').disabled = false;
+  ['p01s1','p01s2','p01s3','p01s4'].forEach(i => sp(i, ''));
+  ['pc01a','pc01b','pc01c'].forEach(i => pconn(i, ''));
+  ['st01s1','st01s2','st01s3','st01s4'].forEach(hide);
+  ['tb01s1','tb01s2','tb01s3','tb01s4'].forEach(clr);
+  ['adn01a','adn01b','adn01c'].forEach(i => adn(i, ''));
+}
+
+// ═══════════════════════════════════════════════
+//  SECTION 02 — RANK
+// ═══════════════════════════════════════════════
+const rankData = ordersSorted.map((o, i) => {
+  // RANK: same value = same rank, skip
+  const salesVal = o.sales;
+  const firstIdx = ordersSorted.findIndex(x => x.sales === salesVal);
+  return { ...o, rownum: i + 1, rank: firstIdx + 1 };
+});
+
+async function runS02() {
+  document.getElementById('btn02').disabled = true;
+  startProg();
+
+  sp('p02s1', 'active');
+  show('st02s1');
+  await SD2(300);
+  for (const o of orders) {
+    const tb = document.getElementById('tb02s1');
+    const tr = mkRow([o.id, o.pid, '<span class="vy">' + o.sales + '</span>'], 'hl-y');
+    tb.appendChild(tr);
+    await RD2(130);
+    tr.classList.remove('hl-y');
+  }
+  await SD2(400);
+
+  sp('p02s1', 'done'); pconn('pc02a', 'ok'); sp('p02s2', 'active');
+  adn('adn02a', 'ok');
+  show('st02s2');
+  await SD2(300);
+  for (let i = 0; i < rankData.length; i++) {
+    const o = rankData[i];
+    const isTied = rankData.some((r, j) => j !== i && r.sales === o.sales);
+    const tb = document.getElementById('tb02s2');
+    const hl = isTied ? (o.sales === 890 ? 'hl-c' : 'hl-o') : '';
+    const tr = mkRow([
+      o.id, o.pid,
+      '<span class="' + (isTied ? 'vg' : 'vy') + '">' + o.sales + '</span>',
+      isTied ? '<span class="vpk">⚠ TIE</span>' : '<span class="vm">—</span>'
+    ], hl);
+    tb.appendChild(tr);
+    await RD2(140);
+  }
+  await SD2(500);
+
+  sp('p02s2', 'done'); pconn('pc02b', 'ok'); sp('p02s3', 'active');
+  adn('adn02b', 'ok');
+  show('st02s3');
+  await SD2(300);
+  for (let i = 0; i < rankData.length; i++) {
+    const o = rankData[i];
+    const isGap = i > 0 && o.rank > rankData[i - 1].rank + 1;
+    const tb = document.getElementById('tb02s3');
+    const tr = mkRow([
+      o.id,
+      '<span class="vy">' + o.sales + '</span>',
+      '<span class="vm">' + o.rownum + '</span>',
+      '<span class="' + (o.rank !== o.rownum ? 'vp' : 'vg') + '">' + o.rank + '</span>',
+      isGap ? '<span class="vpk">GAP (skip ' + (o.rank - rankData[i-1].rank - 1) + ')</span>' : '<span class="vm">—</span>'
+    ], 'hl-y');
+    tb.appendChild(tr);
+    await RD2(150);
+    tb.lastChild.classList.remove('hl-y');
+  }
+  await SD2(500);
+
+  sp('p02s3', 'done'); pconn('pc02c', 'ok'); sp('p02s4', 'active');
+  adn('adn02c', 'ok');
+  show('st02s4');
+  await SD2(300);
+  for (const o of rankData) {
+    const tb = document.getElementById('tb02s4');
+    const tr = mkRow([
+      o.id,
+      o.sales,
+      '<span class="vc">' + o.rownum + '</span>',
+      '<span class="vp">' + o.rank + '</span>'
+    ], 'hl-y');
+    tb.appendChild(tr);
+    await RD2(110);
+    tr.classList.remove('hl-y');
+  }
+  sp('p02s4', 'done');
+  endProg();
+}
+function resetS02() {
+  document.getElementById('btn02').disabled = false;
+  ['p02s1','p02s2','p02s3','p02s4'].forEach(i => sp(i, ''));
+  ['pc02a','pc02b','pc02c'].forEach(i => pconn(i, ''));
+  ['st02s1','st02s2','st02s3','st02s4'].forEach(hide);
+  ['tb02s1','tb02s2','tb02s3','tb02s4'].forEach(clr);
+  ['adn02a','adn02b','adn02c'].forEach(i => adn(i, ''));
+}
+
+// ═══════════════════════════════════════════════
+//  SECTION 03 — DENSE_RANK
+// ═══════════════════════════════════════════════
+function calcDenseRank(sorted) {
+  let dr = 1;
+  let prevSales = null;
+  return sorted.map((o, i) => {
+    if (prevSales !== null && o.sales !== prevSales) dr++;
+    const result = { ...o, rownum: i + 1, rank: rankData[i].rank, dense: dr };
+    prevSales = o.sales;
+    return result;
+  });
+}
+const drData = calcDenseRank(ordersSorted);
+
+async function runS03() {
+  document.getElementById('btn03').disabled = true;
+  startProg();
+
+  sp('p03s1', 'active');
+  show('st03s1');
+  await SD2(300);
+  for (const o of orders) {
+    const tb = document.getElementById('tb03s1');
+    const tr = mkRow([o.id, o.pid, '<span class="vy">' + o.sales + '</span>'], 'hl-y');
+    tb.appendChild(tr);
+    await RD2(130);
+    tr.classList.remove('hl-y');
+  }
+  await SD2(400);
+
+  sp('p03s1', 'done'); pconn('pc03a', 'ok'); sp('p03s2', 'active');
+  adn('adn03a', 'ok');
+  show('st03s2');
+  await SD2(300);
+  const distinctVals = [...new Set(ordersSorted.map(o => o.sales))];
+  let dLevel = 1;
+  for (const val of distinctVals) {
+    const cnt = ordersSorted.filter(o => o.sales === val).length;
+    const tb = document.getElementById('tb03s2');
+    const colors = ['vg', 'vy', 'vpk', 'vc', 'vo'];
+    const tr = mkRow([
+      '<span class="' + colors[dLevel-1] + '">' + val + '</span>',
+      cnt + ' row' + (cnt > 1 ? 's' : ''),
+      '<span class="vp">' + dLevel + '</span>'
+    ], 'hl-y');
+    tb.appendChild(tr);
+    await RD2(200);
+    tr.classList.remove('hl-y');
+    dLevel++;
+  }
+  await SD2(500);
+
+  sp('p03s2', 'done'); pconn('pc03b', 'ok'); sp('p03s3', 'active');
+  adn('adn03b', 'ok');
+  show('st03s3');
+  await SD2(300);
+  for (const o of drData) {
+    const tb = document.getElementById('tb03s3');
+    const hasGap = o.rank !== o.dense;
+    const tr = mkRow([
+      o.id,
+      '<span class="vy">' + o.sales + '</span>',
+      '<span class="vp">' + o.rank + '</span>',
+      '<span class="vg">' + o.dense + '</span>',
+      hasGap ? '<span class="vpk">← GAP skipped</span>' : '<span class="vm">same</span>'
+    ], 'hl-y');
+    tb.appendChild(tr);
+    await RD2(150);
+    tr.classList.remove('hl-y');
+  }
+  await SD2(500);
+
+  sp('p03s3', 'done'); pconn('pc03c', 'ok'); sp('p03s4', 'active');
+  adn('adn03c', 'ok');
+  show('st03s4');
+  await SD2(300);
+  for (const o of drData) {
+    const tb = document.getElementById('tb03s4');
+    const tr = mkRow([
+      o.id, o.sales,
+      '<span class="vc">' + o.rownum + '</span>',
+      '<span class="vp">' + o.rank + '</span>',
+      '<span class="vg">' + o.dense + '</span>'
+    ], 'hl-y');
+    tb.appendChild(tr);
+    await RD2(110);
+    tr.classList.remove('hl-y');
+  }
+  sp('p03s4', 'done');
+  endProg();
+}
+function resetS03() {
+  document.getElementById('btn03').disabled = false;
+  ['p03s1','p03s2','p03s3','p03s4'].forEach(i => sp(i, ''));
+  ['pc03a','pc03b','pc03c'].forEach(i => pconn(i, ''));
+  ['st03s1','st03s2','st03s3','st03s4'].forEach(hide);
+  ['tb03s1','tb03s2','tb03s3','tb03s4'].forEach(clr);
+  ['adn03a','adn03b','adn03c'].forEach(i => adn(i, ''));
+}
+
+// ═══════════════════════════════════════════════
+//  SECTION 04 — PARTITION BY / Top-N
+// ═══════════════════════════════════════════════
+const partColors = { 'P-10': 'hl-c', 'P-20': 'hl-o', 'P-30': 'hl-p' };
+const partVc = { 'P-10': 'vc', 'P-20': 'vo', 'P-30': 'vp' };
+
+function getPartRN(orders) {
+  const partitioned = {};
+  orders.forEach(o => {
+    const pid = o.pid.replace(/<[^>]+>/g, '');
+    if (!partitioned[pid]) partitioned[pid] = [];
+    partitioned[pid].push(o);
+  });
+  Object.keys(partitioned).forEach(k => partitioned[k].sort((a, b) => b.sales - a.sales));
+  const result = [];
+  orders.forEach(o => {
+    const pid = o.pid.replace(/<[^>]+>/g, '');
+    const sorted = partitioned[pid];
+    const rn = sorted.findIndex(x => x.id === o.id) + 1;
+    result.push({ ...o, rn, pidRaw: pid });
+  });
+  return result;
+}
+const partData = getPartRN(orders);
+
+async function runS04() {
+  document.getElementById('btn04').disabled = true;
+  startProg();
+
+  sp('p04s1', 'active');
+  show('st04s1');
+  await SD2(300);
+  for (const o of orders) {
+    const tb = document.getElementById('tb04s1');
+    const tr = mkRow([o.id, o.pid, '<span class="vy">' + o.sales + '</span>'], 'hl-y');
+    tb.appendChild(tr);
+    await RD2(130);
+    tr.classList.remove('hl-y');
+  }
+  await SD2(400);
+
+  sp('p04s1', 'done'); pconn('pc04a', 'ok'); sp('p04s2', 'active');
+  adn('adn04a', 'ok');
+  show('st04s2');
+  await SD2(300);
+  for (const o of partData) {
+    const tb = document.getElementById('tb04s2');
+    const hl = partColors[o.pidRaw] || '';
+    const tr = mkRow([
+      o.id, o.pid,
+      '<span class="vy">' + o.sales + '</span>',
+      '<span class="' + (partVc[o.pidRaw] || 'vm') + '">' + o.pidRaw + '</span>'
+    ], hl);
+    tb.appendChild(tr);
+    await RD2(140);
+  }
+  await SD2(500);
+
+  sp('p04s2', 'done'); pconn('pc04b', 'ok'); sp('p04s3', 'active');
+  adn('adn04b', 'ok');
+  show('st04s3');
+  await SD2(300);
+  // Sort by partition then by rn
+  const partSorted = [...partData].sort((a, b) => a.pidRaw.localeCompare(b.pidRaw) || a.rn - b.rn);
+  for (const o of partSorted) {
+    const tb = document.getElementById('tb04s3');
+    const hl = partColors[o.pidRaw] || '';
+    const tr = mkRow([
+      o.id, o.pid,
+      o.sales,
+      o.rn === 1 ? '<span class="vg">' + o.rn + ' ← TOP</span>' : '<span class="vm">' + o.rn + '</span>'
+    ], hl);
+    tb.appendChild(tr);
+    await RD2(150);
+  }
+  await SD2(500);
+
+  sp('p04s3', 'done'); pconn('pc04c', 'ok'); sp('p04s4', 'active');
+  adn('adn04c', 'ok');
+  show('st04s4');
+  await SD2(300);
+  const topRows = partSorted.filter(o => o.rn === 1);
+  for (const o of topRows) {
+    const tb = document.getElementById('tb04s4');
+    const hl = partColors[o.pidRaw] || '';
+    const tr = mkRow([
+      o.id, o.pid,
+      '<span class="vg">' + o.sales + '</span>',
+      '<span class="vg">' + o.rn + '</span>'
+    ], hl);
+    tb.appendChild(tr);
+    await RD2(200);
+    tr.classList.remove(hl);
+  }
+  sp('p04s4', 'done');
+  endProg();
+}
+function resetS04() {
+  document.getElementById('btn04').disabled = false;
+  ['p04s1','p04s2','p04s3','p04s4'].forEach(i => sp(i, ''));
+  ['pc04a','pc04b','pc04c'].forEach(i => pconn(i, ''));
+  ['st04s1','st04s2','st04s3','st04s4'].forEach(hide);
+  ['tb04s1','tb04s2','tb04s3','tb04s4'].forEach(clr);
+  ['adn04a','adn04b','adn04c'].forEach(i => adn(i, ''));
+}
+
+// ═══════════════════════════════════════════════
+//  SECTION 05 — NTILE
+// ═══════════════════════════════════════════════
+const ntileOrders = [...orders].sort((a, b) => b.sales - a.sales);
+const ntileData = ntileOrders.map((o, i) => {
+  const bucket = i < 3 ? 1 : i < 6 ? 2 : 3;
+  const label = bucket === 1 ? 'High' : bucket === 2 ? 'Medium' : 'Low';
+  return { ...o, bucket, label };
+});
+
+async function runS05() {
+  document.getElementById('btn05').disabled = true;
+  startProg();
+
+  sp('p05s1', 'active');
+  show('st05s1');
+  await SD2(300);
+  for (const o of orders) {
+    const tb = document.getElementById('tb05s1');
+    const tr = mkRow([o.id, '<span class="vy">' + o.sales + '</span>'], 'hl-y');
+    tb.appendChild(tr);
+    await RD2(120);
+    tr.classList.remove('hl-y');
+  }
+  await SD2(400);
+
+  sp('p05s1', 'done'); pconn('pc05a', 'ok'); sp('p05s2', 'active');
+  adn('adn05a', 'ok');
+  show('st05s2');
+  await SD2(600);
+
+  sp('p05s2', 'done'); pconn('pc05b', 'ok'); sp('p05s3', 'active');
+  adn('adn05b', 'ok');
+  show('st05s3');
+  await SD2(300);
+  const bucketHl = { 1: 'hl-g', 2: 'hl-y', 3: 'hl-p' };
+  const bucketVc = { 1: 'vg', 2: 'vy', 3: 'vpk' };
+  for (const o of ntileData) {
+    const tb = document.getElementById('tb05s3');
+    const tr = mkRow([
+      o.id,
+      o.sales,
+      '<span class="' + bucketVc[o.bucket] + '">' + o.bucket + '</span>'
+    ], bucketHl[o.bucket]);
+    tb.appendChild(tr);
+    await RD2(150);
+    tr.classList.remove(bucketHl[o.bucket]);
+  }
+  await SD2(500);
+
+  sp('p05s3', 'done'); pconn('pc05c', 'ok'); sp('p05s4', 'active');
+  adn('adn05c', 'ok');
+  show('st05s4');
+  await SD2(300);
+  for (const o of ntileData) {
+    const tb = document.getElementById('tb05s4');
+    const labelColor = o.bucket === 1 ? 'vg' : o.bucket === 2 ? 'vy' : 'vpk';
+    const tr = mkRow([
+      o.id, o.sales,
+      '<span class="' + bucketVc[o.bucket] + '">' + o.bucket + '</span>',
+      '<span class="' + labelColor + '">' + o.label + '</span>'
+    ], 'hl-y');
+    tb.appendChild(tr);
+    await RD2(130);
+    tr.classList.remove('hl-y');
+  }
+  sp('p05s4', 'done');
+  endProg();
+}
+function resetS05() {
+  document.getElementById('btn05').disabled = false;
+  ['p05s1','p05s2','p05s3','p05s4'].forEach(i => sp(i, ''));
+  ['pc05a','pc05b','pc05c'].forEach(i => pconn(i, ''));
+  ['st05s1','st05s2','st05s3','st05s4'].forEach(hide);
+  ['tb05s1','tb05s3','tb05s4'].forEach(clr);
+  ['adn05a','adn05b','adn05c'].forEach(i => adn(i, ''));
+}
+
+// ═══════════════════════════════════════════════
+//  SECTION 06 — CUME_DIST
+// ═══════════════════════════════════════════════
+const prodSorted = [...products].sort((a, b) => b.price - a.price);
+// CUME_DIST = last position of same value / total
+const cumeData = prodSorted.map((p, i) => {
+  const lastPos = prodSorted.filter(x => x.price >= p.price).length;
+  const cd = lastPos / prodSorted.length;
+  return { ...p, pos: i + 1, lastPos, cd: cd.toFixed(2) };
+});
+
+async function runS06() {
+  document.getElementById('btn06').disabled = true;
+  startProg();
+
+  sp('p06s1', 'active');
+  show('st06s1');
+  await SD2(300);
+  for (const p of products) {
+    const tb = document.getElementById('tb06s1');
+    const tr = mkRow([p.name, '<span class="vy">$' + p.price + '</span>'], 'hl-y');
+    tb.appendChild(tr);
+    await RD2(130);
+    tr.classList.remove('hl-y');
+  }
+  await SD2(400);
+
+  sp('p06s1', 'done'); pconn('pc06a', 'ok'); sp('p06s2', 'active');
+  adn('adn06a', 'ok');
+  show('st06s2');
+  await SD2(300);
+  for (const p of cumeData) {
+    const tb = document.getElementById('tb06s2');
+    const tr = mkRow([p.name, '$' + p.price, '<span class="vc">' + p.lastPos + '</span>', '<span class="vm">5</span>'], 'hl-y');
+    tb.appendChild(tr);
+    await RD2(160);
+    tr.classList.remove('hl-y');
+  }
+  await SD2(500);
+
+  sp('p06s2', 'done'); pconn('pc06b', 'ok'); sp('p06s3', 'active');
+  adn('adn06b', 'ok');
+  show('st06s3');
+  await SD2(300);
+  for (const p of cumeData) {
+    const tb = document.getElementById('tb06s3');
+    const tr = mkRow([
+      p.name, '$' + p.price,
+      '<span class="vm">' + p.lastPos + ' / 5</span>',
+      '<span class="vy">' + p.cd + '</span>'
+    ], 'hl-y');
+    tb.appendChild(tr);
+    await RD2(160);
+    tr.classList.remove('hl-y');
+  }
+  await SD2(500);
+
+  sp('p06s3', 'done'); pconn('pc06c', 'ok'); sp('p06s4', 'active');
+  adn('adn06c', 'ok');
+  show('st06s4');
+  await SD2(300);
+  for (const p of cumeData) {
+    const inTop = parseFloat(p.cd) <= 0.4;
+    const tb = document.getElementById('tb06s4');
+    const tr = mkRow([
+      p.name, '$' + p.price,
+      '<span class="' + (inTop ? 'vg' : 'vm') + '">' + p.cd + '</span>',
+      '<span class="' + (inTop ? 'vg' : 'vm') + '">' + (parseFloat(p.cd) * 100).toFixed(0) + '%</span>',
+      inTop ? '<span class="vg">✓ YES</span>' : '<span class="vpk">✗ NO</span>'
+    ], inTop ? 'hl-g' : '');
+    tb.appendChild(tr);
+    await RD2(180);
+    if (inTop) tr.classList.remove('hl-g');
+  }
+  sp('p06s4', 'done');
+  endProg();
+}
+function resetS06() {
+  document.getElementById('btn06').disabled = false;
+  ['p06s1','p06s2','p06s3','p06s4'].forEach(i => sp(i, ''));
+  ['pc06a','pc06b','pc06c'].forEach(i => pconn(i, ''));
+  ['st06s1','st06s2','st06s3','st06s4'].forEach(hide);
+  ['tb06s1','tb06s2','tb06s3','tb06s4'].forEach(clr);
+  ['adn06a','adn06b','adn06c'].forEach(i => adn(i, ''));
+}
+
+// ═══════════════════════════════════════════════
+//  SECTION 07 — PERCENT_RANK
+// ═══════════════════════════════════════════════
+// PERCENT_RANK = (rank - 1) / (N - 1) using RANK (first occurrence for ties)
+const pctData = prodSorted.map((p, i) => {
+  const rankVal = i + 1; // no ties in product prices
+  const pct = (rankVal - 1) / (prodSorted.length - 1);
+  const cd = cumeData[i].cd;
+  return { ...p, rankVal, pct: pct.toFixed(2), cd };
+});
+
+async function runS07() {
+  document.getElementById('btn07').disabled = true;
+  startProg();
+
+  sp('p07s1', 'active');
+  show('st07s1');
+  await SD2(300);
+  for (const p of products) {
+    const tb = document.getElementById('tb07s1');
+    const tr = mkRow([p.name, '<span class="vy">$' + p.price + '</span>'], 'hl-y');
+    tb.appendChild(tr);
+    await RD2(130);
+    tr.classList.remove('hl-y');
+  }
+  await SD2(400);
+
+  sp('p07s1', 'done'); pconn('pc07a', 'ok'); sp('p07s2', 'active');
+  adn('adn07a', 'ok');
+  show('st07s2');
+  await SD2(700);
+
+  sp('p07s2', 'done'); pconn('pc07b', 'ok'); sp('p07s3', 'active');
+  adn('adn07b', 'ok');
+  show('st07s3');
+  await SD2(300);
+  for (const p of pctData) {
+    const tb = document.getElementById('tb07s3');
+    const tr = mkRow([
+      p.name, '$' + p.price,
+      '<span class="vm">' + p.rankVal + '</span>',
+      '<span class="vm">(' + p.rankVal + '-1)/(5-1)</span>',
+      '<span class="vb">' + p.pct + '</span>'
+    ], 'hl-y');
+    tb.appendChild(tr);
+    await RD2(160);
+    tr.classList.remove('hl-y');
+  }
+  await SD2(500);
+
+  sp('p07s3', 'done'); pconn('pc07c', 'ok'); sp('p07s4', 'active');
+  adn('adn07c', 'ok');
+  show('st07s4');
+  await SD2(300);
+  for (const p of pctData) {
+    const tb = document.getElementById('tb07s4');
+    const diff = (parseFloat(p.cd) - parseFloat(p.pct)).toFixed(2);
+    const tr = mkRow([
+      p.name, '$' + p.price,
+      '<span class="vy">' + p.cd + '</span>',
+      '<span class="vb">' + p.pct + '</span>',
+      '<span class="vm">Δ ' + diff + '</span>'
+    ], 'hl-y');
+    tb.appendChild(tr);
+    await RD2(170);
+    tr.classList.remove('hl-y');
+  }
+  sp('p07s4', 'done');
+  endProg();
+}
+function resetS07() {
+  document.getElementById('btn07').disabled = false;
+  ['p07s1','p07s2','p07s3','p07s4'].forEach(i => sp(i, ''));
+  ['pc07a','pc07b','pc07c'].forEach(i => pconn(i, ''));
+  ['st07s1','st07s2','st07s3','st07s4'].forEach(hide);
+  ['tb07s1','tb07s3','tb07s4'].forEach(clr);
+  ['adn07a','adn07b','adn07c'].forEach(i => adn(i, ''));
+}
+
+// Initial speed display
+setSpeed(3);
+// Fix setSpeed event
+function setSpeed(s) {
+  SM = s;
+  document.querySelectorAll('.sp-btn').forEach(b => b.classList.remove('active'));
+  const btns = document.querySelectorAll('.sp-btn');
+  const labels = ['1','2','3','5','8'];
+  btns.forEach((b, i) => { if (parseInt(labels[i]) === s) b.classList.add('active'); });
+  const sd = (1500 / Math.pow(SM, 1.45) / 1000).toFixed(1);
+  const rd = (500 / Math.pow(SM, 1.4) / 1000).toFixed(1);
+  document.getElementById('t-step').textContent = sd + 's';
+  document.getElementById('t-row').textContent = rd + 's';
+}
+setSpeed(3);
+</script>
+</body>
+</html>

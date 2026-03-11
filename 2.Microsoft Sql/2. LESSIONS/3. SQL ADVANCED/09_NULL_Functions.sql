@@ -71,6 +71,9 @@ ORDER BY CASE WHEN Score IS NULL THEN 1 ELSE 0 END, Score;
 /* TASK 4: 
    Find the sales price for each order by dividing sales by quantity.
    Uses NULLIF to avoid division by zero.
+   Null if - compare 2 values if true both return null else return orgianl value 
+   select nullif(100,100) = NULL
+   select nullif(100,60) = 100
 */
 SELECT
     OrderID,

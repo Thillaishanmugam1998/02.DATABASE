@@ -1,0 +1,2070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL CTEs — Interactive Visualization</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Syne:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #0a0d14;
+            --bg2: #0f1320;
+            --card: #111520;
+            --border: #1e2535;
+            --cyan: #00d4ff;
+            --purple: #a855f7;
+            --orange: #f97316;
+            --green: #22d3a0;
+            --pink: #f43f5e;
+            --yellow: #fbbf24;
+            --blue: #3b82f6;
+            --text: #e2e8f0;
+            --muted: #64748b;
+            --mono: 'JetBrains Mono', monospace;
+            --heading: 'Syne', sans-serif;
+        }
+
+        html, body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--mono);
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: linear-gradient(rgba(0,212,255,.025) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(0,212,255,.025) 1px, transparent 1px);
+            background-size: 44px 44px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        main {
+            position: relative;
+            z-index: 2;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* ========== SPEED BAR ========== */
+        .speed-bar {
+            position: sticky;
+            top: 0;
+            z-index: 200;
+            background: rgba(10, 13, 20, 0.92);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 20px;
+            margin: 0 -20px;
+            padding-left: 40px;
+            padding-right: 40px;
+        }
+
+        .speed-bar-content {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            font-size: 11px;
+            color: var(--text);
+            flex-wrap: wrap;
+        }
+
+        .sb-label {
+            color: var(--muted);
+            font-weight: 600;
+        }
+
+        .sb-preset {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .sp-btn {
+            padding: 4px 10px;
+            background: rgba(0,212,255,.08);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            color: var(--text);
+            cursor: pointer;
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 600;
+            transition: all .2s;
+        }
+
+        .sp-btn:hover {
+            border-color: var(--cyan);
+        }
+
+        .sp-btn.on {
+            background: var(--cyan);
+            color: var(--bg);
+            border-color: var(--cyan);
+            box-shadow: 0 0 12px rgba(0,212,255,.4);
+        }
+
+        .sp-btn.on::before {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            border-radius: 5px;
+            border: 2px solid var(--cyan);
+            pointer-events: none;
+        }
+
+        .sp-divider {
+            width: 1px;
+            height: 18px;
+            background: var(--border);
+        }
+
+        .sb-custom {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sp-custom-input {
+            width: 80px;
+            padding: 5px 8px;
+            background: #080b12;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-family: var(--mono);
+            font-size: 12px;
+            text-align: center;
+            transition: all .2s;
+        }
+
+        .sp-custom-input:focus {
+            outline: none;
+            border-color: var(--cyan);
+            box-shadow: 0 0 8px rgba(0,212,255,.25);
+        }
+
+        .sp-unit {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        .sb-info {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .sb-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--muted);
+        }
+
+        .sb-status::before {
+            content: '●';
+            color: var(--muted);
+            font-size: 8px;
+        }
+
+        .exec-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--cyan), var(--purple));
+            width: 0%;
+            transition: width .1s linear;
+        }
+
+        .exec-bar.run {
+            animation: none;
+        }
+
+        /* ========== HEADER ========== */
+        .header {
+            text-align: center;
+            padding: 60px 20px 30px;
+        }
+
+        .badge {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--cyan), var(--purple));
+            color: var(--bg);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            letter-spacing: 1px;
+        }
+
+        .header h1 {
+            font-family: var(--heading);
+            font-size: 48px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--cyan), var(--purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 12px;
+            line-height: 1.2;
+        }
+
+        .header p {
+            color: var(--muted);
+            font-size: 13px;
+            font-family: var(--mono);
+        }
+
+        /* ========== NAV PILLS ========== */
+        .nav-pills {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 30px 0 40px;
+            flex-wrap: wrap;
+        }
+
+        .nav-pill {
+            padding: 8px 16px;
+            background: rgba(0,212,255,.08);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            color: var(--text);
+            cursor: pointer;
+            font-size: 12px;
+            font-family: var(--mono);
+            transition: all .2s;
+            text-decoration: none;
+        }
+
+        .nav-pill:hover {
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        /* ========== GOLDEN RULE BANNER ========== */
+        .banner {
+            background: linear-gradient(135deg, rgba(0,212,255,.1), rgba(168,85,247,.1));
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 40px;
+            border-left: 4px solid var(--cyan);
+        }
+
+        .banner h2 {
+            font-family: var(--heading);
+            font-size: 14px;
+            color: var(--cyan);
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        .banner p {
+            font-size: 13px;
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .banner strong {
+            color: var(--purple);
+        }
+
+        /* ========== DATASET PREVIEW ========== */
+        .dataset-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            margin-bottom: 50px;
+            overflow: hidden;
+            border-top: 3px solid var(--cyan);
+        }
+
+        .dataset-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--cyan), var(--purple), var(--orange), var(--green));
+        }
+
+        .dataset-header {
+            border-bottom: 1px solid var(--border);
+            padding: 16px 20px;
+        }
+
+        .dataset-header h2 {
+            font-family: var(--heading);
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 4px;
+        }
+
+        .dataset-header p {
+            font-size: 11px;
+            color: var(--muted);
+            font-family: var(--mono);
+        }
+
+        .tbl-wrap {
+            background: var(--bg2);
+            overflow-x: auto;
+        }
+
+        .tbl-wrap table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        table th {
+            background: rgba(0,212,255,.05);
+            color: var(--cyan);
+            padding: 9px 13px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border);
+            font-family: var(--mono);
+        }
+
+        table td {
+            padding: 8px 13px;
+            border-bottom: 1px solid rgba(30,37,53,.5);
+            font-size: 12px;
+            font-family: var(--mono);
+        }
+
+        table tbody tr:nth-child(odd) {
+            background: rgba(0,212,255,.02);
+        }
+
+        table tbody tr:hover td {
+            background: rgba(0,212,255,.05);
+        }
+
+        table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .preview-row {
+            animation: fadeUp .4s ease both;
+        }
+
+        .preview-row:nth-child(1) { animation-delay: 0.05s; }
+        .preview-row:nth-child(2) { animation-delay: 0.10s; }
+        .preview-row:nth-child(3) { animation-delay: 0.15s; }
+        .preview-row:nth-child(4) { animation-delay: 0.20s; }
+        .preview-row:nth-child(5) { animation-delay: 0.25s; }
+        .preview-row:nth-child(6) { animation-delay: 0.30s; }
+        .preview-row:nth-child(7) { animation-delay: 0.35s; }
+        .preview-row:nth-child(8) { animation-delay: 0.40s; }
+
+        .col-badge {
+            display: inline-block;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+
+        .col-badge.cyan { background: var(--cyan); }
+        .col-badge.purple { background: var(--purple); }
+        .col-badge.orange { background: var(--orange); }
+        .col-badge.yellow { background: var(--yellow); }
+        .col-badge.green { background: var(--green); }
+
+        .dataset-stats {
+            display: flex;
+            gap: 16px;
+            padding: 16px 20px;
+            border-top: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+
+        .stat-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: rgba(0,212,255,.08);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 11px;
+            color: var(--text);
+        }
+
+        /* ========== VALUE COLORS ========== */
+        .vc { color: var(--cyan); }
+        .vo { color: var(--orange); }
+        .vp { color: var(--purple); }
+        .vg { color: var(--green); font-weight: 600; }
+        .vy { color: var(--yellow); }
+        .vm { color: var(--muted); font-style: italic; }
+        .vpk { color: var(--pink); }
+        .vb { color: var(--blue); }
+
+        /* ========== ROW HIGHLIGHTS ========== */
+        tr.hl-y { background: rgba(251,191,36,.15) !important; }
+        tr.hl-c { background: rgba(0,212,255,.08) !important; }
+        tr.hl-o { background: rgba(249,115,22,.08) !important; }
+        tr.hl-p { background: rgba(168,85,247,.08) !important; }
+        tr.hl-g { background: rgba(34,211,160,.08) !important; }
+
+        /* ========== SECTIONS ========== */
+        .section {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            margin-bottom: 30px;
+            padding: 24px;
+            border-top: 3px solid;
+            scroll-margin-top: 80px;
+        }
+
+        .section:nth-child(6n+1) { border-top-color: var(--cyan); }
+        .section:nth-child(6n+2) { border-top-color: var(--purple); }
+        .section:nth-child(6n+3) { border-top-color: var(--orange); }
+        .section:nth-child(6n+4) { border-top-color: var(--green); }
+        .section:nth-child(6n+5) { border-top-color: var(--pink); }
+        .section:nth-child(6n) { border-top-color: var(--yellow); }
+
+        .section h2 {
+            font-family: var(--heading);
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-num {
+            display: inline-block;
+            width: 28px;
+            height: 28px;
+            background: rgba(0,212,255,.1);
+            border: 1px solid var(--cyan);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: var(--cyan);
+            font-weight: 600;
+        }
+
+        .section:nth-child(6n+1) .section-num { border-color: var(--cyan); background: rgba(0,212,255,.1); color: var(--cyan); }
+        .section:nth-child(6n+2) .section-num { border-color: var(--purple); background: rgba(168,85,247,.1); color: var(--purple); }
+        .section:nth-child(6n+3) .section-num { border-color: var(--orange); background: rgba(249,115,22,.1); color: var(--orange); }
+        .section:nth-child(6n+4) .section-num { border-color: var(--green); background: rgba(34,211,160,.1); color: var(--green); }
+        .section:nth-child(6n+5) .section-num { border-color: var(--pink); background: rgba(244,63,94,.1); color: var(--pink); }
+        .section:nth-child(6n) .section-num { border-color: var(--yellow); background: rgba(251,191,36,.1); color: var(--yellow); }
+
+        /* ========== EXPLAIN BLOCK ========== */
+        .explain {
+            background: rgba(0,212,255,.04);
+            border-left: 3px solid var(--cyan);
+            padding: 14px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            font-size: 13px;
+            line-height: 1.6;
+            color: var(--text);
+        }
+
+        .section:nth-child(6n+2) .explain { background: rgba(168,85,247,.04); border-left-color: var(--purple); }
+        .section:nth-child(6n+3) .explain { background: rgba(249,115,22,.04); border-left-color: var(--orange); }
+        .section:nth-child(6n+4) .explain { background: rgba(34,211,160,.04); border-left-color: var(--green); }
+        .section:nth-child(6n+5) .explain { background: rgba(244,63,94,.04); border-left-color: var(--pink); }
+        .section:nth-child(6n) .explain { background: rgba(251,191,36,.04); border-left-color: var(--yellow); }
+
+        .explain strong {
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        /* ========== SQL QUERY BOX ========== */
+        .sql-box {
+            background: #080b12;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            font-family: var(--mono);
+        }
+
+        .sql-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            background: rgba(0,0,0,.4);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .mac-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .mac-dot.red { background: #ff5f56; }
+        .mac-dot.yellow { background: #ffbd2e; }
+        .mac-dot.green { background: #27c93f; }
+
+        .sql-lang {
+            margin-left: auto;
+            font-size: 10px;
+            color: var(--muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .sql-code {
+            padding: 14px;
+            font-size: 12px;
+            line-height: 1.6;
+            color: var(--text);
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .kw { color: var(--purple); font-weight: 600; }
+        .fn { color: var(--cyan); }
+        .hk { color: var(--yellow); font-weight: 600; }
+        .cm { color: var(--muted); font-style: italic; }
+        .str { color: var(--green); }
+
+        /* ========== PIPELINE STEPS ========== */
+        .pipeline {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 20px 0;
+            gap: 12px;
+        }
+
+        .pipe-step {
+            flex: 1;
+            height: 32px;
+            background: rgba(0,212,255,.08);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--muted);
+            position: relative;
+            transition: all .3s;
+        }
+
+        .pipe-step.active {
+            background: rgba(251,191,36,.15);
+            border-color: var(--yellow);
+            color: var(--yellow);
+        }
+
+        .pipe-step.active::after {
+            content: '';
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid var(--yellow);
+            animation: ring .9s ease infinite;
+        }
+
+        .pipe-step.done {
+            background: rgba(34,211,160,.15);
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        /* ========== BUTTONS ========== */
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 10px 18px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            font-family: var(--mono);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .2s;
+        }
+
+        .btn-exec {
+            background: linear-gradient(135deg, var(--cyan), var(--purple));
+            color: var(--bg);
+            border: none;
+        }
+
+        .btn-exec:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0,212,255,.2);
+        }
+
+        .btn-exec:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-reset {
+            background: transparent;
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-reset:hover {
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        /* ========== STAGES ========== */
+        .stage {
+            display: none;
+            margin-bottom: 20px;
+        }
+
+        .stage.show {
+            display: block;
+            animation: fadeUp .4s ease both;
+        }
+
+        .stage-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--muted);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* ========== RESULT BOXES ========== */
+        .res-bad, .res-good, .res-info {
+            padding: 16px;
+            border-radius: 8px;
+            border-left: 3px solid;
+            margin-bottom: 12px;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .res-bad {
+            background: rgba(244,63,94,.08);
+            border-left-color: var(--pink);
+            color: var(--text);
+        }
+
+        .res-good {
+            background: rgba(34,211,160,.08);
+            border-left-color: var(--green);
+            color: var(--text);
+        }
+
+        .res-info {
+            background: rgba(0,212,255,.08);
+            border-left-color: var(--cyan);
+            color: var(--text);
+        }
+
+        .res-label {
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        /* ========== IMPACT BADGE ========== */
+        .impact {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        .impact.imp-c { background: rgba(0,212,255,.15); color: var(--cyan); border: 1px solid var(--cyan); }
+        .impact.imp-p { background: rgba(168,85,247,.15); color: var(--purple); border: 1px solid var(--purple); }
+        .impact.imp-o { background: rgba(249,115,22,.15); color: var(--orange); border: 1px solid var(--orange); }
+        .impact.imp-g { background: rgba(34,211,160,.15); color: var(--green); border: 1px solid var(--green); }
+        .impact.imp-pk { background: rgba(244,63,94,.15); color: var(--pink); border: 1px solid var(--pink); }
+        .impact.imp-y { background: rgba(251,191,36,.15); color: var(--yellow); border: 1px solid var(--yellow); }
+
+        /* ========== LAYOUTS ========== */
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .three-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        @media (max-width: 720px) {
+            .two-col, .three-col {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 32px;
+            }
+
+            .speed-bar-content {
+                gap: 12px;
+                font-size: 10px;
+            }
+
+            .nav-pills {
+                gap: 8px;
+            }
+        }
+
+        /* ========== KEYFRAMES ========== */
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes ring {
+            0% {
+                transform: scale(1);
+                opacity: 0.7;
+            }
+            100% {
+                transform: scale(2.2);
+                opacity: 0;
+            }
+        }
+
+        @keyframes spRing {
+            0% {
+                transform: scale(1);
+                opacity: 0.6;
+            }
+            100% {
+                transform: scale(1.3);
+                opacity: 0;
+            }
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.1; }
+        }
+
+        /* ========== FOOTER ========== */
+        .footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--muted);
+            font-size: 11px;
+            border-top: 1px solid var(--border);
+            margin-top: 60px;
+        }
+
+        /* ========== ARROW CONNECTORS ========== */
+        .adn {
+            display: inline-block;
+            width: 20px;
+            height: 2px;
+            background: var(--muted);
+            margin: 0 4px;
+            vertical-align: middle;
+        }
+
+        .adn.lit {
+            background: var(--yellow);
+        }
+
+        .adn.ok {
+            background: var(--green);
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <!-- SPEED BAR -->
+        <div class="speed-bar">
+            <div class="exec-bar" id="execBar"></div>
+            <div class="speed-bar-content">
+                <span class="sb-label">⚡ Speed</span>
+                <div class="sb-preset">
+                    <button class="sp-btn" id="sp1">1x</button>
+                    <button class="sp-btn" id="sp2">2x</button>
+                    <button class="sp-btn on" id="sp3">3x</button>
+                    <button class="sp-btn" id="sp5">5x</button>
+                    <button class="sp-btn" id="sp8">8x</button>
+                </div>
+                <div class="sp-divider"></div>
+                <div class="sb-custom">
+                    <span>Custom:</span>
+                    <input type="number" id="customMs" class="sp-custom-input" min="100" max="10000" step="100" value="1000" placeholder="1000">
+                    <span class="sp-unit">ms</span>
+                </div>
+                <div class="sp-divider"></div>
+                <div class="sb-info">
+                    <span>Step: <span id="stepVal">1.0</span>s</span>
+                    <span>·</span>
+                    <span>Row: <span id="rowVal">0.5</span>s</span>
+                </div>
+                <div class="sp-divider"></div>
+                <div class="sb-status" id="execStatus">Ready</div>
+            </div>
+        </div>
+
+        <!-- HEADER -->
+        <div class="header">
+            <div class="badge">SQL SERVER</div>
+            <h1>Common Table Expressions</h1>
+            <p>Interactive visualization of CTE concepts with step-by-step execution</p>
+        </div>
+
+        <!-- NAV PILLS -->
+        <div class="nav-pills">
+            <a href="#dataset" class="nav-pill">📋 Dataset</a>
+            <a href="#section1" class="nav-pill">01 · CTE Basics</a>
+            <a href="#section2" class="nav-pill">02 · Order By Rule</a>
+            <a href="#section3" class="nav-pill">03 · Without CTE</a>
+            <a href="#section4" class="nav-pill">04 · Stand-Alone CTE</a>
+            <a href="#section5" class="nav-pill">05 · Nested CTEs</a>
+            <a href="#section6" class="nav-pill">06 · Recursive CTEs</a>
+        </div>
+
+        <!-- GOLDEN RULE BANNER -->
+        <div class="banner">
+            <h2>📌 The Golden Rule</h2>
+            <p><strong>ORDER BY is NOT allowed inside a CTE</strong> unless used with TOP, OFFSET, or FOR XML. Always move ORDER BY outside to the main query for better clarity and performance.</p>
+        </div>
+
+        <!-- DATASET PREVIEW -->
+        <div class="dataset-card" id="dataset">
+            <div class="dataset-header">
+                <h2>📋 Source Dataset — Sales Orders</h2>
+                <p>This dataset is used throughout all sections below</p>
+            </div>
+            <div class="tbl-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th><span class="col-badge cyan"></span>OrderID</th>
+                            <th><span class="col-badge purple"></span>OrderDate</th>
+                            <th><span class="col-badge orange"></span>CustomerID</th>
+                            <th><span class="col-badge yellow"></span>Product</th>
+                            <th><span class="col-badge yellow"></span>Sales</th>
+                            <th><span class="col-badge green"></span>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="datasetBody">
+                        <tr class="preview-row">
+                            <td class="vc">1001</td>
+                            <td class="vp">2024-01-15</td>
+                            <td class="vo">C001</td>
+                            <td class="vb">Laptop</td>
+                            <td class="vy">1200</td>
+                            <td class="vg">Shipped</td>
+                        </tr>
+                        <tr class="preview-row">
+                            <td class="vc">1002</td>
+                            <td class="vp">2024-01-16</td>
+                            <td class="vo">C002</td>
+                            <td class="vb">Mouse</td>
+                            <td class="vy">45</td>
+                            <td class="vg">Shipped</td>
+                        </tr>
+                        <tr class="preview-row">
+                            <td class="vc">1003</td>
+                            <td class="vp">2024-01-17</td>
+                            <td class="vo">C001</td>
+                            <td class="vb">Keyboard</td>
+                            <td class="vy">85</td>
+                            <td class="vg">Shipped</td>
+                        </tr>
+                        <tr class="preview-row">
+                            <td class="vc">1004</td>
+                            <td class="vp">2024-01-18</td>
+                            <td class="vo">C003</td>
+                            <td class="vb">Monitor</td>
+                            <td class="vy">320</td>
+                            <td class="vo">Pending</td>
+                        </tr>
+                        <tr class="preview-row">
+                            <td class="vc">1005</td>
+                            <td class="vp">2024-01-19</td>
+                            <td class="vo">C002</td>
+                            <td class="vb">Laptop</td>
+                            <td class="vy">1200</td>
+                            <td class="vg">Shipped</td>
+                        </tr>
+                        <tr class="preview-row">
+                            <td class="vc">1006</td>
+                            <td class="vp">2024-01-20</td>
+                            <td class="vo">C001</td>
+                            <td class="vb">Monitor</td>
+                            <td class="vy">320</td>
+                            <td class="vg">Shipped</td>
+                        </tr>
+                        <tr class="preview-row">
+                            <td class="vc">1007</td>
+                            <td class="vp">2024-01-21</td>
+                            <td class="vo">C003</td>
+                            <td class="vb">Keyboard</td>
+                            <td class="vy">85</td>
+                            <td class="vo">Pending</td>
+                        </tr>
+                        <tr class="preview-row">
+                            <td class="vc">1008</td>
+                            <td class="vp">2024-01-22</td>
+                            <td class="vo">C002</td>
+                            <td class="vb">Mouse</td>
+                            <td class="vy">45</td>
+                            <td class="vg">Shipped</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="dataset-stats">
+                <div class="stat-badge">📦 8 rows</div>
+                <div class="stat-badge">🔑 3 customers</div>
+                <div class="stat-badge">💰 Total: 3,300</div>
+                <div class="stat-badge">📊 2 statuses</div>
+            </div>
+        </div>
+
+        <!-- SECTION 1: CTE BASICS -->
+        <div class="section" id="section1">
+            <h2><span class="section-num">01</span> CTE Fundamentals</h2>
+            <div class="explain">
+                <strong>Common Table Expressions (CTEs)</strong> are temporary named result sets that exist only within a single query. They improve code readability and allow you to break complex queries into simpler parts. CTEs are defined with the <strong>WITH</strong> keyword and can be referenced in the main SELECT statement.
+            </div>
+
+            <div class="sql-box">
+                <div class="sql-header">
+                    <span class="mac-dot red"></span>
+                    <span class="mac-dot yellow"></span>
+                    <span class="mac-dot green"></span>
+                    <span class="sql-lang">SQL</span>
+                </div>
+                <div class="sql-code"><span class="kw">WITH</span> CTE_Example <span class="kw">AS</span>
+(
+    <span class="kw">SELECT</span> OrderID, CustomerID, Sales
+    <span class="kw">FROM</span> Sales.Orders
+    <span class="kw">WHERE</span> Sales > 100
+)
+<span class="kw">SELECT</span> * <span class="kw">FROM</span> CTE_Example;</div>
+            </div>
+
+            <div class="pipeline">
+                <div class="pipe-step" id="s1p1">Define CTE</div>
+                <span class="adn"></span>
+                <div class="pipe-step" id="s1p2">Filter Data</div>
+                <span class="adn"></span>
+                <div class="pipe-step" id="s1p3">Execute Query</div>
+                <span class="adn"></span>
+                <div class="pipe-step" id="s1p4">Return Results</div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-exec" id="btn-s1-exec">▶ Execute</button>
+                <button class="btn btn-reset" id="btn-s1-reset">↻ Reset</button>
+            </div>
+
+            <div class="stage" id="s1_s1">
+                <div class="stage-label">Stage 1: Scan Input Data</div>
+                <div class="tbl-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th><span class="col-badge cyan"></span>OrderID</th>
+                                <th><span class="col-badge orange"></span>CustomerID</th>
+                                <th><span class="col-badge yellow"></span>Sales</th>
+                            </tr>
+                        </thead>
+                        <tbody id="s1_s1_body">
+                            <tr><td class="vc">1001</td><td class="vo">C001</td><td class="vy">1200</td></tr>
+                            <tr><td class="vc">1002</td><td class="vo">C002</td><td class="vy">45</td></tr>
+                            <tr><td class="vc">1003</td><td class="vo">C001</td><td class="vy">85</td></tr>
+                            <tr><td class="vc">1004</td><td class="vo">C003</td><td class="vy">320</td></tr>
+                            <tr><td class="vc">1005</td><td class="vo">C002</td><td class="vy">1200</td></tr>
+                            <tr><td class="vc">1006</td><td class="vo">C001</td><td class="vy">320</td></tr>
+                            <tr><td class="vc">1007</td><td class="vo">C003</td><td class="vy">85</td></tr>
+                            <tr><td class="vc">1008</td><td class="vo">C002</td><td class="vy">45</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="stage" id="s1_s2">
+                <div class="stage-label">Stage 2: Apply WHERE Filter (Sales > 100)</div>
+                <div class="tbl-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th><span class="col-badge cyan"></span>OrderID</th>
+                                <th><span class="col-badge orange"></span>CustomerID</th>
+                                <th><span class="col-badge yellow"></span>Sales</th>
+                            </tr>
+                        </thead>
+                        <tbody id="s1_s2_body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="stage" id="s1_s3">
+                <div class="stage-label">Stage 3: CTE Definition Complete</div>
+                <div class="res-info">
+                    <div class="res-label">✓ CTE Created</div>
+                    CTE_Example now contains 4 filtered rows. This temporary result set can be used in the main SELECT statement.
+                </div>
+            </div>
+
+            <div class="stage" id="s1_s4">
+                <div class="stage-label">Stage 4: Final Query Output</div>
+                <div class="tbl-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th><span class="col-badge cyan"></span>OrderID</th>
+                                <th><span class="col-badge orange"></span>CustomerID</th>
+                                <th><span class="col-badge yellow"></span>Sales</th>
+                            </tr>
+                        </thead>
+                        <tbody id="s1_s4_body">
+                        </tbody>
+                    </table>
+                </div>
+                <div class="res-good">
+                    <div class="res-label">✓ Result</div>
+                    4 orders with sales greater than 100 have been successfully extracted.
+                    <span class="impact imp-c">Clean Readable Code</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 2: ORDER BY RULE -->
+        <div class="section" id="section2">
+            <h2><span class="section-num">02</span> The ORDER BY Rule</h2>
+            <div class="explain">
+                <strong>ORDER BY is NOT allowed inside a CTE definition</strong> unless you use TOP, OFFSET, or FOR XML. This rule exists because CTEs are temporary result sets, and the order of rows should be determined by the outer query, not the CTE itself. Always place ORDER BY in the main query.
+            </div>
+
+            <div class="two-col">
+                <div>
+                    <div class="res-bad">
+                        <div class="res-label">❌ WRONG</div>
+                        <div class="sql-box" style="margin: 8px 0;">
+                            <div class="sql-header">
+                                <span class="mac-dot red"></span>
+                                <span class="mac-dot yellow"></span>
+                                <span class="mac-dot green"></span>
+                                <span class="sql-lang">SQL</span>
+                            </div>
+                            <div class="sql-code"><span class="kw">WITH</span> CTE_Test <span class="kw">AS</span>
+(
+    <span class="kw">SELECT</span> * <span class="kw">FROM</span> Sales.Orders
+    <span class="hk">ORDER BY Sales DESC</span>
+)
+<span class="kw">SELECT</span> * <span class="kw">FROM</span> CTE_Test;</div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div class="res-good">
+                        <div class="res-label">✓ CORRECT</div>
+                        <div class="sql-box" style="margin: 8px 0;">
+                            <div class="sql-header">
+                                <span class="mac-dot red"></span>
+                                <span class="mac-dot yellow"></span>
+                                <span class="mac-dot green"></span>
+                                <span class="sql-lang">SQL</span>
+                            </div>
+                            <div class="sql-code"><span class="kw">WITH</span> CTE_Test <span class="kw">AS</span>
+(
+    <span class="kw">SELECT</span> * <span class="kw">FROM</span> Sales.Orders
+)
+<span class="kw">SELECT</span> * <span class="kw">FROM</span> CTE_Test
+<span class="hk">ORDER BY Sales DESC</span>;</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pipeline">
+                <div class="pipe-step" id="s2p1">Parse CTE</div>
+                <span class="adn"></span>
+                <div class="pipe-step" id="s2p2">Order Output</div>
+                <span class="adn"></span>
+                <div class="pipe-step" id="s2p3">Format Result</div>
+                <span class="adn"></span>
+                <div class="pipe-step" id="s2p4">Complete</div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-exec" id="btn-s2-exec">▶ Execute</button>
+                <button class="btn btn-reset" id="btn-s2-reset">↻ Reset</button>
+            </div>
+
+            <div class="stage" id="s2_s1">
+                <div class="stage-label">Correct Approach: ORDER BY in Main Query</div>
+                <div class="tbl-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th><span class="col-badge cyan"></span>OrderID</th>
+                                <th><span class="col-badge yellow"></span>Sales</th>
+                            </tr>
+                        </thead>
+                        <tbody id="s2_s1_body">
+                            <tr><td class="vc">1001</td><td class="vy">1200</td></tr>
+                            <tr><td class="vc">1005</td><td class="vy">1200</td></tr>
+                            <tr><td class="vc">1004</td><td class="vy">320</td></tr>
+                            <tr><td class="vc">1006</td><td class="vy">320</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="res-good" style="margin-top: 12px;">
+                    <div class="res-label">✓ Correct Placement</div>
+                    ORDER BY is executed in the outer SELECT, providing clear intent and better performance.
+                    <span class="impact imp-g">Proper SQL Standard</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 3: WITHOUT CTE (PROBLEM) -->
+        <div class="section" id="section3">
+            <h2><span class="section-num">03</span> The Problem Without CTEs</h2>
+            <div class="explain">
+                Without CTEs, you must write the same query logic multiple times. This leads to <strong>code duplication</strong>, maintenance issues, and reduced readability. Imagine needing the same filtered result in five different places in your code!
+            </div>
+
+            <div class="sql-box">
+                <div class="sql-header">
+                    <span class="mac-dot red"></span>
+                    <span class="mac-dot yellow"></span>
+                    <span class="mac-dot green"></span>
+                    <span class="sql-lang">SQL</span>
+                </div>
+                <div class="sql-code"><span class="cm">-- Query 1: Total Sales by Customer</span>
+<span class="kw">SELECT</span> CustomerID, <span class="fn">SUM</span>(Sales) <span class="kw">AS</span> TotalSales
+<span class="kw">FROM</span> Sales.Orders
+<span class="kw">GROUP BY</span> CustomerID;
+
+<span class="cm">-- Query 2: Last Order Date by Customer</span>
+<span class="kw">SELECT</span> CustomerID, <span class="fn">MAX</span>(OrderDate) <span class="kw">AS</span> LastOrder
+<span class="kw">FROM</span> Sales.Orders
+<span class="kw">GROUP BY</span> CustomerID;</div>
+            </div>
+
+            <div class="pipeline">
+                <div class="pipe-step" id="s3p1">Query 1</div>
+                <span class="adn"></span>
+                <div class="pipe-step" id="s3p2">Query 2</div>
+                <span class="adn"></span>
+                <div class="pipe-step" id="s3p3">Duplicate Logic</div>
+                <span class="adn"></span>
+                <div class="pipe-step" id="s3p4">Hard to Maintain</div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-exec" id="btn-s3-exec">▶ Execute</button>
+                <button class="btn btn-reset" id="btn-s3-reset">↻ Reset</button>
+            </div>
+
+            <div class="stage" id="s3_s1">
+                <div class="stage-label">Query 1: Total Sales</div>
+                <div class="tbl-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th><span class="col-badge orange"></span>CustomerID</th>
+                                <th><span class="col-badge yellow"></span>TotalSales</th>
+                            </tr>
+                        </thead>
+                        <tbody id="s3_s1_body">
+                            <tr><td class="vo">C001</td><td class="vy">1605</td></tr>
+                            <tr><td class="vo">C002</td><td class="vy">1490</td></tr>
+                            <tr><td class="vo">C003</td><td class="vy">405</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="stage" id="s3_s2">
+                <div class="stage-label">Query 2: Last Order Date (Same FROM clause!)</div>
+                <div class="tbl-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th><span class="col-badge orange"></span>CustomerID</th>
+                                <th><span class="col-badge purple"></span>LastOrder</th>
+                            </tr>
+                        </thead>
+                        <tbody id="s3_s2_body">
+                            <tr><td class="vo">C001</td><td class="vp">2024-01-20</td></tr>
+                            <tr><td class="vo">C002</td><td class="vp">2024-01-22</td></tr>
+                            <tr><td class="vo">C003</td><td class="vp">2024-01-21</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="stage" id="s3_s3">
+                <div class="res-bad">
+                    <div class="res-label">❌ Major Issues</div>
+                    <ul style="margin-left: 20px; color: var(--text);">
+                        <li>Same <span class="vy">FROM Sales.Orders</span> written twice</li>
+                        <li>If table structure changes, must update 2+ places</li>
+                        <li>Hard to understand intent at a glance</li>
+                        <li>Code duplication increases maintenance burden</li>
+                    </ul>
+                    <span class="impact imp-pk">Difficult to Maintain</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 4: STAND-ALONE CTE -->
+        <div class="section" id="section4">
+            <h2><span class="section-num">04</span> Stand-Alone CTE Solution</h2>
+            <div class="explain">
+                A <strong>Stand-Alone CTE</strong> is a single, independent CTE used once in a query. It replaces the need to write the logic inline in the SELECT statement. This improves readability and makes the query self-documenting.
+            </div>
+
+            <div class="sql-box">
+                <div class="sql-header">
+                    <span class="mac-dot red"></span>
+                    <span class="mac-dot yellow"></span>
+                    <span class="mac-dot green"></span>
+                    <span class="sql-lang">SQL</span>
+                </div>
+                <div class="sql-code"><span class="hk">WITH</span> <span class="fn">CTE_TotalSales</span> <span class="kw">AS</span>
+(
+    <span class="kw">SELECT</span> CustomerID, <span class="fn">SUM</span>(Sales) <span class="kw">AS</span> TotalSales
+    <span class="kw">FROM</span> Sales.Orders
+    <span class="kw">GROUP BY</span> CustomerID
+)
+<span class="kw">SELECT</span> CustomerID, TotalSales
+<span class="kw">FROM</span> <span class="fn">CTE_TotalSales</span>;</div>
+            </div>
+
+            <div class="pipeline">
+                <div class="pipe-step" id="s4p1">Define CTE</div>
+                <span class="adn"></span>
+                <div class="pipe-step" id="s4p2">Aggregate Data</div>
+                <span class="adn"></span>
+                <div class="pipe-step" id="s4p3">Select from CTE</div>
+                <span class="adn"></span>
+                <div class="pipe-step" id="s4p4">Return Results</div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-exec" id="btn-s4-exec">▶ Execute</button>
+                <button class="btn btn-reset" id="btn-s4-reset">↻ Reset</button>
+            </div>
+
+            <div class="stage" id="s4_s1">
+                <div class="stage-label">Stage 1: Input Data</div>
+                <div class="tbl-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th><span class="col-badge orange"></span>CustomerID</th>
+                                <th><span class="col-badge yellow"></span>Sales</th>
+                            </tr>
+                        </thead>
+                        <tbody id="s4_s1_body">
+                            <tr><td class="vo">C001</td><td class="vy">1200</td></tr>
+                            <tr><td class="vo">C002</td><td class="vy">45</td></tr>
+                            <tr><td class="vo">C001</td><td class="vy">85</td></tr>
+                            <tr><td class="vo">C003</td><td class="vy">320</td></tr>
+                            <tr><td class="vo">C002</td><td class="vy">1200</td></tr>
+                            <tr><td class="vo">C001</td><td class="vy">320</td></tr>
+                            <tr><td class="vo">C003</td><td class="vy">85</td></tr>
+                            <tr><td class="vo">C002</td><td class="vy">45</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="stage" id="s4_s2">
+                <div class="stage-label">Stage 2: GROUP BY CustomerID and SUM(Sales)</div>
+                <div class="tbl-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th><span class="col-badge orange"></span>CustomerID</th>
+                                <th><span class="col-badge yellow"></span>TotalSales</th>
+                            </tr>
+                        </thead>
+                        <tbody id="s4_s2_body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="stage" id="s4_s3">
+                <div class="res-info">
+                    <div class="res-label">CTE Definition</div>
+                    CTE_TotalSales has been defined with 3 aggregated rows.
+                </div>
+            </div>
+
+            <div class="stage" id="s4_s4">
+                <div class="stage-label">Stage 4: Final Result</div>
+                <div class="tbl-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th><span class="col-badge orange"></span>CustomerID</th>
+                                <th><span class="col-badge yellow"></span>TotalSales</th>
+                            </tr>
+                        </thead>
+                        <tbody id="s4_s4_body">
+                        </tbody>
+                    </table>
+                </div>
+                <div class="res-good">
+                    <div class="res-label">✓ Clean & Readable</div>
+                    Using a CTE makes the query intent crystal clear: "Group orders by customer and sum their sales."
+                    <span class="impact imp-g">Improved Readability</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 5: NESTED CTEs -->
+        <div class="section" id="section5">
+            <h2><span class="section-num">05</span> Nested CTEs (Multiple CTEs)</h2>
+            <div class="explain">
+                <strong>Nested CTEs</strong> allow one CTE to reference another CTE. This is powerful for breaking down complex logic into smaller, logical steps. Build one CTE, then use it as input to the next CTE, creating a chain of transformations.
+            </div>
+
+            <div class="sql-box">
+                <div class="sql-header">
+                    <span class="mac-dot red"></span>
+                    <span class="mac-dot yellow"></span>
+                    <span class="mac-dot green"></span>
+                    <span class="sql-lang">SQL</span>
+                </div>
+                <div class="sql-code"><span class="hk">WITH</span> <span class="fn">CTE_TotalSales</span> <span class="kw">AS</span>
+(
+    <span class="kw">SELECT</span> CustomerID, <span class="fn">SUM</span>(Sales) <span class="kw">AS</span> TotalSales
+    <span class="kw">FROM</span> Sales.Orders
+    <span class="kw">GROUP BY</span> CustomerID
+),
+<span class="fn">CTE_CustomerRank</span> <span class="kw">AS</span>
+(
+    <span class="kw">SELECT</span> CustomerID, TotalSales,
+           <span class="fn">RANK()</span> <span class="fn">OVER</span> (<span class="kw">ORDER BY</span> TotalSales <span class="kw">DESC</span>) <span class="kw">AS</span> Rank
+    <span class="kw">FROM</span> <span class="fn">CTE_TotalSales</span>
+)
+<span class="kw">SELECT</span> * <span class="kw">FROM</span> <span class="fn">CTE_CustomerRank</span>;</div>
+            </div>
+
+            <div class="pipeline">
+                <div class="pipe-step" id="s5p1">CTE 1: Sum</div>
+                <span class="adn"></span>
+                <div class="pipe-step" id="s5p2">CTE 2: Rank</div>
+                <span class="adn"></span>
+                <div class="pipe-step" id="s5p3">Combine Results</div>
+                <span class="adn"></span>
+                <div class="pipe-step" id="s5p4">Final Output</div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-exec" id="btn-s5-exec">▶ Execute</button>
+                <button class="btn btn-reset" id="btn-s5-reset">↻ Reset</button>
+            </div>
+
+            <div class="stage" id="s5_s1">
+                <div class="stage-label">Stage 1: CTE_TotalSales (First CTE)</div>
+                <div class="tbl-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th><span class="col-badge orange"></span>CustomerID</th>
+                                <th><span class="col-badge yellow"></span>TotalSales</th>
+                            </tr>
+                        </thead>
+                        <tbody id="s5_s1_body">
+                            <tr><td class="vo">C001</td><td class="vy">1605</td></tr>
+                            <tr><td class="vo">C002</td><td class="vy">1490</td></tr>
+                            <tr><td class="vo">C003</td><td class="vy">405</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="stage" id="s5_s2">
+                <div class="stage-label">Stage 2: CTE_CustomerRank (Uses CTE_TotalSales)</div>
+                <div class="tbl-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th><span class="col-badge orange"></span>CustomerID</th>
+                                <th><span class="col-badge yellow"></span>TotalSales</th>
+                                <th><span class="col-badge cyan"></span>Rank</th>
+                            </tr>
+                        </thead>
+                        <tbody id="s5_s2_body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="stage" id="s5_s3">
+                <div class="res-info">
+                    <div class="res-label">Chaining CTEs</div>
+                    CTE_CustomerRank references CTE_TotalSales, creating a logical data pipeline.
+                </div>
+            </div>
+
+            <div class="stage" id="s5_s4">
+                <div class="stage-label">Stage 4: Final Output</div>
+                <div class="tbl-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th><span class="col-badge orange"></span>CustomerID</th>
+                                <th><span class="col-badge yellow"></span>TotalSales</th>
+                                <th><span class="col-badge cyan"></span>Rank</th>
+                            </tr>
+                        </thead>
+                        <tbody id="s5_s4_body">
+                        </tbody>
+                    </table>
+                </div>
+                <div class="res-good">
+                    <div class="res-label">✓ Complex Logic Simplified</div>
+                    Nested CTEs break down complex transformations into digestible steps.
+                    <span class="impact imp-g">Step-by-Step Clarity</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 6: RECURSIVE CTEs -->
+        <div class="section" id="section6">
+            <h2><span class="section-num">06</span> Recursive CTEs</h2>
+            <div class="explain">
+                <strong>Recursive CTEs</strong> allow a CTE to reference itself, enabling you to generate sequences, number ranges, or traverse hierarchical data (like employee-manager relationships). They consist of an <strong>anchor member</strong> (initial query) and a <strong>recursive member</strong> (self-reference).
+            </div>
+
+            <div class="sql-box">
+                <div class="sql-header">
+                    <span class="mac-dot red"></span>
+                    <span class="mac-dot yellow"></span>
+                    <span class="mac-dot green"></span>
+                    <span class="sql-lang">SQL</span>
+                </div>
+                <div class="sql-code"><span class="hk">WITH</span> <span class="fn">CTE_NumberSeries</span> <span class="kw">AS</span>
+(
+    <span class="cm">-- Anchor Member: Start with 1</span>
+    <span class="kw">SELECT</span> 1 <span class="kw">AS</span> Number
+    <span class="kw">UNION ALL</span>
+    <span class="cm">-- Recursive Member: Add 1 each iteration</span>
+    <span class="kw">SELECT</span> Number + 1
+    <span class="kw">FROM</span> <span class="fn">CTE_NumberSeries</span>
+    <span class="kw">WHERE</span> Number < 10
+)
+<span class="kw">SELECT</span> * <span class="kw">FROM</span> <span class="fn">CTE_NumberSeries</span>;
+</div>
+            </div>
+
+            <div class="pipeline">
+                <div class="pipe-step" id="s6p1">Anchor (Start)</div>
+                <span class="adn"></span>
+                <div class="pipe-step" id="s6p2">Recursive Loop</div>
+                <span class="adn"></span>
+                <div class="pipe-step" id="s6p3">Condition Check</div>
+                <span class="adn"></span>
+                <div class="pipe-step" id="s6p4">Return Sequence</div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-exec" id="btn-s6-exec">▶ Execute</button>
+                <button class="btn btn-reset" id="btn-s6-reset">↻ Reset</button>
+            </div>
+
+            <div class="stage" id="s6_s1">
+                <div class="stage-label">Stage 1: Anchor Member (Initial Query)</div>
+                <div class="tbl-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th><span class="col-badge cyan"></span>Number</th>
+                            </tr>
+                        </thead>
+                        <tbody id="s6_s1_body">
+                            <tr><td class="vc">1</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="stage" id="s6_s2">
+                <div class="stage-label">Stage 2: Recursive Loop (Building Sequence)</div>
+                <div class="tbl-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th><span class="col-badge cyan"></span>Number</th>
+                                <th><span class="col-badge purple"></span>Iteration</th>
+                            </tr>
+                        </thead>
+                        <tbody id="s6_s2_body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="stage" id="s6_s3">
+                <div class="res-info">
+                    <div class="res-label">Loop Progress</div>
+                    Recursion continues until the WHERE condition is no longer met.
+                </div>
+            </div>
+
+            <div class="stage" id="s6_s4">
+                <div class="stage-label">Stage 4: Final Sequence</div>
+                <div class="tbl-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th><span class="col-badge cyan"></span>Number</th>
+                            </tr>
+                        </thead>
+                        <tbody id="s6_s4_body">
+                        </tbody>
+                    </table>
+                </div>
+                <div class="res-good">
+                    <div class="res-label">✓ Sequence Generated</div>
+                    Recursive CTE generated a number sequence from 1 to 10 without looping in application code.
+                    <span class="impact imp-g">No Loop Needed</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="footer">
+            <p>SQL Server Common Table Expressions (CTEs) Interactive Visualization</p>
+            <p style="margin-top: 8px; color: var(--muted);">Use the speed controls to adjust animation timing. Click Execute to run each section.</p>
+        </div>
+    </main>
+
+    <script>
+        // ========== SPEED CONTROL ==========
+        let SM = 3; // Speed multiplier (default 3x)
+
+        const SD = (base) => new Promise(r => setTimeout(r, Math.round(base * Math.pow(SM, 1.45))));
+        const RD = (base) => new Promise(r => setTimeout(r, Math.round(base * Math.pow(SM, 1.4))));
+
+        function setSpeed(s) {
+            SM = s;
+            [1,2,3,5,8].forEach(v => {
+                const btn = document.getElementById('sp' + v);
+                if (btn) btn.className = 'sp-btn' + (v === s ? ' on' : '');
+            });
+
+            const stepMs = Math.round(200 * Math.pow(s, 1.45));
+            const customInput = document.getElementById('customMs');
+            if (customInput) customInput.value = stepMs;
+
+            document.getElementById('stepVal').textContent = (stepMs / 1000).toFixed(1) + 's';
+            const rowMs = Math.round(120 * Math.pow(s, 1.4));
+            document.getElementById('rowVal').textContent = (rowMs / 1000).toFixed(1) + 's';
+        }
+
+        // Setup preset buttons
+        [1,2,3,5,8].forEach(v => {
+            const btn = document.getElementById('sp' + v);
+            if (btn) {
+                btn.addEventListener('click', () => setSpeed(v));
+            }
+        });
+
+        // Custom input handler
+        const customInput = document.getElementById('customMs');
+        if (customInput) {
+            customInput.addEventListener('input', function() {
+                let ms = Math.max(100, Math.min(10000, parseInt(this.value) || 1000));
+                SM = Math.pow(ms / 200, 1 / 1.45);
+
+                [1,2,3,5,8].forEach(v => {
+                    const btn = document.getElementById('sp' + v);
+                    if (btn) btn.className = 'sp-btn';
+                });
+
+                const presetMs = {1: 248, 2: 530, 3: 1000, 5: 2378, 8: 5278};
+                for (const [preset, preMs] of Object.entries(presetMs)) {
+                    if (Math.abs(ms - preMs) < 50) {
+                        const btn = document.getElementById('sp' + preset);
+                        if (btn) btn.className = 'sp-btn on';
+                    }
+                }
+
+                document.getElementById('stepVal').textContent = (ms / 1000).toFixed(1) + 's';
+                const rowMs = Math.round(120 * Math.pow(SM, 1.4));
+                document.getElementById('rowVal').textContent = (rowMs / 1000).toFixed(1) + 's';
+            });
+        }
+
+        // Progress bar
+        let pTimer = null;
+        function startProg() {
+            const bar = document.getElementById('execBar');
+            bar.style.width = '0%';
+            bar.classList.add('run');
+            const status = document.getElementById('execStatus');
+            status.style.color = 'var(--yellow)';
+            status.textContent = '⟳ Running...';
+            let p = 0;
+            pTimer = setInterval(() => {
+                p = Math.min(p + 1.5, 90);
+                bar.style.width = p + '%';
+            }, Math.round(50 * Math.pow(SM, 0.6)));
+        }
+
+        function endProg() {
+            clearInterval(pTimer);
+            const bar = document.getElementById('execBar');
+            bar.style.width = '100%';
+            bar.classList.remove('run');
+            const status = document.getElementById('execStatus');
+            status.style.color = 'var(--green)';
+            status.textContent = '✓ Done';
+            setTimeout(() => {
+                bar.style.width = '0%';
+                status.style.color = 'var(--muted)';
+                status.textContent = '● Ready';
+            }, 1800);
+        }
+
+        // ========== HELPER FUNCTIONS ==========
+        function sp(id, s) {
+            const e = document.getElementById(id);
+            if (e) e.className = 'pipe-step ' + (s || '');
+        }
+
+        function show(id) {
+            const e = document.getElementById(id);
+            if (e) {
+                e.classList.add('show');
+                setTimeout(() => e.scrollIntoView({behavior: 'smooth', block: 'nearest'}), 60);
+            }
+        }
+
+        function hide(id) {
+            const e = document.getElementById(id);
+            if (e) e.classList.remove('show');
+        }
+
+        function clr(id) {
+            const e = document.getElementById(id);
+            if (e) e.innerHTML = '';
+        }
+
+        // ========== SECTION 1: CTE BASICS ==========
+        async function runSection1() {
+            const btn = document.getElementById('btn-s1-exec');
+            btn.disabled = true;
+            startProg();
+
+            sp('s1p1', 'active');
+            show('s1_s1');
+            const tbody1 = document.getElementById('s1_s1_body');
+            const rows1 = Array.from(tbody1.querySelectorAll('tr'));
+            await SD(150);
+            for (const tr of rows1) {
+                tr.classList.add('hl-y');
+                await RD(100);
+                tr.classList.remove('hl-y');
+            }
+            await SD(300);
+
+            sp('s1p1', 'done');
+            sp('s1p2', 'active');
+            show('s1_s2');
+            const tbody2 = document.getElementById('s1_s2_body');
+            tbody2.innerHTML = '';
+            const filterData = [
+                {id: '1001', cid: 'C001', sales: '1200'},
+                {id: '1004', cid: 'C003', sales: '320'},
+                {id: '1005', cid: 'C002', sales: '1200'},
+                {id: '1006', cid: 'C001', sales: '320'}
+            ];
+            await SD(500);
+            for (const row of filterData) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td class="vc">${row.id}</td><td class="vo">${row.cid}</td><td class="vy">${row.sales}</td>`;
+                tr.classList.add('hl-y');
+                tbody2.appendChild(tr);
+                await RD(120);
+                tr.classList.remove('hl-y');
+            }
+
+            sp('s1p2', 'done');
+            sp('s1p3', 'active');
+            show('s1_s3');
+            await SD(600);
+
+            sp('s1p3', 'done');
+            sp('s1p4', 'active');
+            show('s1_s4');
+            const tbody4 = document.getElementById('s1_s4_body');
+            tbody4.innerHTML = '';
+            for (const row of filterData) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td class="vc">${row.id}</td><td class="vo">${row.cid}</td><td class="vy">${row.sales}</td>`;
+                tr.classList.add('hl-y');
+                tbody4.appendChild(tr);
+                await RD(100);
+                tr.classList.remove('hl-y');
+            }
+
+            sp('s1p4', 'done');
+            endProg();
+            btn.disabled = false;
+        }
+
+        function resetSection1() {
+            ['s1p1','s1p2','s1p3','s1p4'].forEach(i => sp(i, ''));
+            ['s1_s1','s1_s2','s1_s3','s1_s4'].forEach(hide);
+            ['s1_s2_body','s1_s4_body'].forEach(clr);
+            document.getElementById('btn-s1-exec').disabled = false;
+        }
+
+        document.getElementById('btn-s1-exec').addEventListener('click', runSection1);
+        document.getElementById('btn-s1-reset').addEventListener('click', resetSection1);
+
+        // ========== SECTION 2: ORDER BY RULE ==========
+        async function runSection2() {
+            const btn = document.getElementById('btn-s2-exec');
+            btn.disabled = true;
+            startProg();
+
+            sp('s2p1', 'active');
+            await SD(400);
+
+            sp('s2p1', 'done');
+            sp('s2p2', 'active');
+            show('s2_s1');
+            await SD(500);
+
+            sp('s2p2', 'done');
+            sp('s2p3', 'active');
+            await SD(300);
+
+            sp('s2p3', 'done');
+            sp('s2p4', 'active');
+            await SD(400);
+
+            sp('s2p4', 'done');
+            endProg();
+            btn.disabled = false;
+        }
+
+        function resetSection2() {
+            ['s2p1','s2p2','s2p3','s2p4'].forEach(i => sp(i, ''));
+            ['s2_s1'].forEach(hide);
+            document.getElementById('btn-s2-exec').disabled = false;
+        }
+
+        document.getElementById('btn-s2-exec').addEventListener('click', runSection2);
+        document.getElementById('btn-s2-reset').addEventListener('click', resetSection2);
+
+        // ========== SECTION 3: WITHOUT CTE ==========
+        async function runSection3() {
+            const btn = document.getElementById('btn-s3-exec');
+            btn.disabled = true;
+            startProg();
+
+            sp('s3p1', 'active');
+            show('s3_s1');
+            const tbody1 = document.getElementById('s3_s1_body');
+            const rows1 = Array.from(tbody1.querySelectorAll('tr'));
+            await SD(200);
+            for (const tr of rows1) {
+                tr.classList.add('hl-y');
+                await RD(100);
+                tr.classList.remove('hl-y');
+            }
+            await SD(400);
+
+            sp('s3p1', 'done');
+            sp('s3p2', 'active');
+            show('s3_s2');
+            const tbody2 = document.getElementById('s3_s2_body');
+            const rows2 = Array.from(tbody2.querySelectorAll('tr'));
+            await SD(200);
+            for (const tr of rows2) {
+                tr.classList.add('hl-y');
+                await RD(100);
+                tr.classList.remove('hl-y');
+            }
+            await SD(400);
+
+            sp('s3p2', 'done');
+            sp('s3p3', 'active');
+            await SD(300);
+
+            sp('s3p3', 'done');
+            sp('s3p4', 'active');
+            show('s3_s3');
+            await SD(600);
+
+            sp('s3p4', 'done');
+            endProg();
+            btn.disabled = false;
+        }
+
+        function resetSection3() {
+            ['s3p1','s3p2','s3p3','s3p4'].forEach(i => sp(i, ''));
+            ['s3_s1','s3_s2','s3_s3'].forEach(hide);
+            document.getElementById('btn-s3-exec').disabled = false;
+        }
+
+        document.getElementById('btn-s3-exec').addEventListener('click', runSection3);
+        document.getElementById('btn-s3-reset').addEventListener('click', resetSection3);
+
+        // ========== SECTION 4: STAND-ALONE CTE ==========
+        async function runSection4() {
+            const btn = document.getElementById('btn-s4-exec');
+            btn.disabled = true;
+            startProg();
+
+            sp('s4p1', 'active');
+            show('s4_s1');
+            const tbody1 = document.getElementById('s4_s1_body');
+            const rows1 = Array.from(tbody1.querySelectorAll('tr'));
+            await SD(150);
+            for (const tr of rows1) {
+                tr.classList.add('hl-y');
+                await RD(80);
+                tr.classList.remove('hl-y');
+            }
+            await SD(300);
+
+            sp('s4p1', 'done');
+            sp('s4p2', 'active');
+            show('s4_s2');
+            const tbody2 = document.getElementById('s4_s2_body');
+            tbody2.innerHTML = '';
+            const aggData = [
+                {cid: 'C001', total: '1605'},
+                {cid: 'C002', total: '1490'},
+                {cid: 'C003', total: '405'}
+            ];
+            await SD(500);
+            for (const row of aggData) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td class="vo">${row.cid}</td><td class="vy">${row.total}</td>`;
+                tr.classList.add('hl-y');
+                tbody2.appendChild(tr);
+                await RD(150);
+                tr.classList.remove('hl-y');
+            }
+
+            sp('s4p2', 'done');
+            sp('s4p3', 'active');
+            show('s4_s3');
+            await SD(400);
+
+            sp('s4p3', 'done');
+            sp('s4p4', 'active');
+            show('s4_s4');
+            const tbody4 = document.getElementById('s4_s4_body');
+            tbody4.innerHTML = '';
+            await SD(300);
+            for (const row of aggData) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td class="vo">${row.cid}</td><td class="vy">${row.total}</td>`;
+                tr.classList.add('hl-y');
+                tbody4.appendChild(tr);
+                await RD(100);
+                tr.classList.remove('hl-y');
+            }
+
+            sp('s4p4', 'done');
+            endProg();
+            btn.disabled = false;
+        }
+
+        function resetSection4() {
+            ['s4p1','s4p2','s4p3','s4p4'].forEach(i => sp(i, ''));
+            ['s4_s1','s4_s2','s4_s3','s4_s4'].forEach(hide);
+            ['s4_s2_body','s4_s4_body'].forEach(clr);
+            document.getElementById('btn-s4-exec').disabled = false;
+        }
+
+        document.getElementById('btn-s4-exec').addEventListener('click', runSection4);
+        document.getElementById('btn-s4-reset').addEventListener('click', resetSection4);
+
+        // ========== SECTION 5: NESTED CTEs ==========
+        async function runSection5() {
+            const btn = document.getElementById('btn-s5-exec');
+            btn.disabled = true;
+            startProg();
+
+            sp('s5p1', 'active');
+            show('s5_s1');
+            await SD(500);
+
+            sp('s5p1', 'done');
+            sp('s5p2', 'active');
+            show('s5_s2');
+            const tbody2 = document.getElementById('s5_s2_body');
+            tbody2.innerHTML = '';
+            const rankData = [
+                {cid: 'C001', total: '1605', rank: '1'},
+                {cid: 'C002', total: '1490', rank: '2'},
+                {cid: 'C003', total: '405', rank: '3'}
+            ];
+            await SD(400);
+            for (const row of rankData) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td class="vo">${row.cid}</td><td class="vy">${row.total}</td><td class="vc">${row.rank}</td>`;
+                tr.classList.add('hl-y');
+                tbody2.appendChild(tr);
+                await RD(120);
+                tr.classList.remove('hl-y');
+            }
+
+            sp('s5p2', 'done');
+            sp('s5p3', 'active');
+            show('s5_s3');
+            await SD(400);
+
+            sp('s5p3', 'done');
+            sp('s5p4', 'active');
+            show('s5_s4');
+            const tbody4 = document.getElementById('s5_s4_body');
+            tbody4.innerHTML = '';
+            await SD(300);
+            for (const row of rankData) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td class="vo">${row.cid}</td><td class="vy">${row.total}</td><td class="vc">${row.rank}</td>`;
+                tr.classList.add('hl-y');
+                tbody4.appendChild(tr);
+                await RD(100);
+                tr.classList.remove('hl-y');
+            }
+
+            sp('s5p4', 'done');
+            endProg();
+            btn.disabled = false;
+        }
+
+        function resetSection5() {
+            ['s5p1','s5p2','s5p3','s5p4'].forEach(i => sp(i, ''));
+            ['s5_s1','s5_s2','s5_s3','s5_s4'].forEach(hide);
+            ['s5_s2_body','s5_s4_body'].forEach(clr);
+            document.getElementById('btn-s5-exec').disabled = false;
+        }
+
+        document.getElementById('btn-s5-exec').addEventListener('click', runSection5);
+        document.getElementById('btn-s5-reset').addEventListener('click', resetSection5);
+
+        // ========== SECTION 6: RECURSIVE CTEs ==========
+        async function runSection6() {
+            const btn = document.getElementById('btn-s6-exec');
+            btn.disabled = true;
+            startProg();
+
+            sp('s6p1', 'active');
+            show('s6_s1');
+            await SD(400);
+
+            sp('s6p1', 'done');
+            sp('s6p2', 'active');
+            show('s6_s2');
+            const tbody2 = document.getElementById('s6_s2_body');
+            tbody2.innerHTML = '';
+            await SD(300);
+            for (let i = 2; i <= 10; i++) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td class="vc">${i}</td><td class="vp">${i-1}</td>`;
+                tr.classList.add('hl-y');
+                tbody2.appendChild(tr);
+                await RD(100);
+                tr.classList.remove('hl-y');
+            }
+
+            sp('s6p2', 'done');
+            sp('s6p3', 'active');
+            show('s6_s3');
+            await SD(400);
+
+            sp('s6p3', 'done');
+            sp('s6p4', 'active');
+            show('s6_s4');
+            const tbody4 = document.getElementById('s6_s4_body');
+            tbody4.innerHTML = '';
+            await SD(300);
+            for (let i = 1; i <= 10; i++) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td class="vc">${i}</td>`;
+                tr.classList.add('hl-y');
+                tbody4.appendChild(tr);
+                await RD(80);
+                tr.classList.remove('hl-y');
+            }
+
+            sp('s6p4', 'done');
+            endProg();
+            btn.disabled = false;
+        }
+
+        function resetSection6() {
+            ['s6p1','s6p2','s6p3','s6p4'].forEach(i => sp(i, ''));
+            ['s6_s1','s6_s2','s6_s3','s6_s4'].forEach(hide);
+            ['s6_s2_body','s6_s4_body'].forEach(clr);
+            document.getElementById('btn-s6-exec').disabled = false;
+        }
+
+        document.getElementById('btn-s6-exec').addEventListener('click', runSection6);
+        document.getElementById('btn-s6-reset').addEventListener('click', resetSection6);
+
+        // Initialize speed display
+        setSpeed(3);
+    </script>
+</body>
+</html>

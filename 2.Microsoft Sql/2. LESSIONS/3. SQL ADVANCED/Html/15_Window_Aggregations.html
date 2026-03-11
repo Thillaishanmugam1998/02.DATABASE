@@ -1,0 +1,1895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL Window Aggregate Functions - Interactive Visualization</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700&display=swap');
+
+        :root {
+            --bg-dark: #0a0d14;
+            --bg-card: #1a1f2e;
+            --bg-secondary: #252d3d;
+            --cyan: #00d9ff;
+            --purple: #b366ff;
+            --orange: #ff8c42;
+            --green: #4ade80;
+            --pink: #ff6b9d;
+            --yellow: #fbbf24;
+            --gray: #6b7280;
+            --text-primary: #f0f4f8;
+            --text-secondary: #a8b2bf;
+            --grid-color: rgba(0, 217, 255, 0.05);
+            --accent-gradient: linear-gradient(135deg, #00d9ff 0%, #b366ff 50%, #ff8c42 100%);
+        }
+
+        body {
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: 'Syne', sans-serif;
+            overflow-x: hidden;
+            background-image: 
+                linear-gradient(0deg, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+            background-size: 50px 50px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: 3em;
+            margin-bottom: 10px;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -1px;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1em;
+            margin-bottom: 60px;
+            font-weight: 400;
+        }
+
+        .section {
+            margin-bottom: 80px;
+            animation: slideDown 0.8s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .section-title {
+            font-size: 2em;
+            margin-bottom: 30px;
+            color: var(--cyan);
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .section-number {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 45px;
+            height: 45px;
+            background: linear-gradient(135deg, var(--cyan) 0%, var(--purple) 100%);
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 1.2em;
+        }
+
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        @media (max-width: 1400px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid rgba(0, 217, 255, 0.1);
+            border-radius: 12px;
+            padding: 25px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--cyan) 0%, var(--purple) 50%, var(--orange) 100%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        .card:hover {
+            border-color: rgba(0, 217, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .card-title {
+            font-size: 1.3em;
+            margin-bottom: 20px;
+            color: var(--orange);
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-title::before {
+            content: '';
+            width: 6px;
+            height: 20px;
+            background: var(--orange);
+            border-radius: 3px;
+        }
+
+        .input-table, .output-table {
+            width: 100%;
+            margin-bottom: 20px;
+            border-collapse: collapse;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9em;
+        }
+
+        .input-table thead, .output-table thead {
+            background: var(--bg-secondary);
+            border-bottom: 2px solid var(--cyan);
+        }
+
+        .input-table th, .output-table th {
+            padding: 12px;
+            text-align: left;
+            color: var(--cyan);
+            font-weight: 600;
+        }
+
+        .input-table td, .output-table td {
+            padding: 12px;
+            border-bottom: 1px solid rgba(0, 217, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .input-table tbody tr:hover, .output-table tbody tr:hover {
+            background: rgba(0, 217, 255, 0.1);
+        }
+
+        .null-value {
+            color: var(--pink);
+            font-style: italic;
+            opacity: 0.8;
+        }
+
+        .correct-value {
+            color: var(--green);
+            font-weight: 600;
+        }
+
+        .wrong-value {
+            color: var(--pink);
+            text-decoration: line-through;
+            opacity: 0.7;
+        }
+
+        .query-box {
+            background: var(--bg-secondary);
+            border: 1px solid rgba(179, 102, 255, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85em;
+            color: var(--text-primary);
+            overflow-x: auto;
+            position: relative;
+        }
+
+        .query-label {
+            position: absolute;
+            top: 8px;
+            right: 12px;
+            font-size: 0.75em;
+            color: var(--cyan);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .keyword {
+            color: var(--purple);
+            font-weight: 600;
+        }
+
+        .string {
+            color: var(--green);
+        }
+
+        .function {
+            color: var(--orange);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: linear-gradient(135deg, var(--cyan) 0%, var(--purple) 100%);
+            color: var(--bg-dark);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-family: 'Syne', sans-serif;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.95em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 217, 255, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .reset-btn {
+            background: linear-gradient(135deg, var(--gray) 0%, rgba(107, 114, 128, 0.7) 100%);
+            color: var(--text-primary);
+        }
+
+        .execution-flow {
+            margin: 25px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            padding: 20px;
+            background: rgba(0, 217, 255, 0.05);
+            border-radius: 8px;
+            border-left: 3px solid var(--cyan);
+        }
+
+        .flow-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            text-align: center;
+        }
+
+        .step-badge {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9em;
+            background: var(--bg-secondary);
+            border: 2px solid var(--gray);
+            color: var(--text-secondary);
+            transition: all 0.4s ease;
+        }
+
+        .step-badge.active {
+            background: var(--yellow);
+            color: var(--bg-dark);
+            border-color: var(--yellow);
+            transform: scale(1.1);
+        }
+
+        .step-badge.complete {
+            background: var(--green);
+            color: var(--bg-dark);
+            border-color: var(--green);
+        }
+
+        .step-label {
+            font-size: 0.8em;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .step-label.active {
+            color: var(--yellow);
+        }
+
+        .step-arrow {
+            color: var(--cyan);
+            font-size: 1.5em;
+            opacity: 0.5;
+        }
+
+        .comparison-box {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 25px 0;
+            padding: 20px;
+            background: rgba(0, 217, 255, 0.05);
+            border-radius: 8px;
+            border: 1px solid rgba(0, 217, 255, 0.15);
+        }
+
+        .comparison-item {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .comparison-label {
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.95em;
+        }
+
+        .comparison-wrong {
+            color: var(--pink);
+        }
+
+        .comparison-correct {
+            color: var(--green);
+        }
+
+        .comparison-content {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85em;
+            padding: 10px;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            border-left: 3px solid var(--pink);
+        }
+
+        .comparison-content.correct {
+            border-left-color: var(--green);
+        }
+
+        .metric-box {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 15px;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            margin: 15px 0;
+            border-left: 3px solid var(--cyan);
+        }
+
+        .metric-label {
+            color: var(--text-secondary);
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+
+        .metric-value {
+            color: var(--cyan);
+            font-weight: 700;
+            font-size: 1.1em;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .explanation {
+            background: rgba(255, 140, 66, 0.1);
+            border-left: 3px solid var(--orange);
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+            font-size: 0.95em;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        .pulse-animation {
+            animation: pulse 0.6s ease-in-out;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                background-color: transparent;
+            }
+            50% {
+                background-color: rgba(251, 191, 36, 0.3);
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .highlight-row {
+            background: rgba(0, 217, 255, 0.2) !important;
+        }
+
+        .demo-status {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            margin-top: 10px;
+            font-style: italic;
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🪟 SQL Window Aggregate Functions</h1>
+        <p class="subtitle">Master COUNT, SUM, AVG, MAX/MIN, and rolling calculations with interactive visualizations</p>
+
+        <!-- SECTION 1: COUNT -->
+        <div class="section">
+            <h2 class="section-title">
+                <span class="section-number">1</span>
+                COUNT: Counting Rows & Duplicates
+            </h2>
+
+            <div class="content-grid">
+                <!-- Query 1: Basic COUNT -->
+                <div class="card">
+                    <h3 class="card-title">❌ Without Window Function</h3>
+                    <div class="demo-status">Traditional subquery approach</div>
+
+                    <p style="margin: 15px 0; color: var(--text-secondary); font-size: 0.9em;">
+                        <strong>Input Table:</strong> Orders
+                    </p>
+                    <table class="input-table">
+                        <thead>
+                            <tr>
+                                <th>OrderID</th>
+                                <th>CustomerID</th>
+                                <th>Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody id="count-input-1">
+                            <tr>
+                                <td>101</td>
+                                <td>C001</td>
+                                <td>$500</td>
+                            </tr>
+                            <tr>
+                                <td>102</td>
+                                <td>C002</td>
+                                <td>$750</td>
+                            </tr>
+                            <tr>
+                                <td>103</td>
+                                <td>C001</td>
+                                <td>$300</td>
+                            </tr>
+                            <tr>
+                                <td>104</td>
+                                <td>C003</td>
+                                <td>$600</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="query-box">
+                        <span class="query-label">Subquery Approach</span>
+                        <span class="keyword">SELECT</span> OrderID, CustomerID,<br>
+                        (<span class="keyword">SELECT</span> <span class="function">COUNT</span>(*) <span class="keyword">FROM</span> Orders) <span class="keyword">AS</span> TotalOrders<br>
+                        <span class="keyword">FROM</span> Orders
+                    </div>
+
+                    <div class="execution-flow" id="count-flow-1">
+                        <div class="flow-step">
+                            <div class="step-badge">1</div>
+                            <div class="step-label">Scan Table</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">2</div>
+                            <div class="step-label">Count Rows</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">3</div>
+                            <div class="step-label">Repeat (×4)</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">4</div>
+                            <div class="step-label">Result</div>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button onclick="executeCountDemo(1, false)">▶ Execute Query</button>
+                        <button class="reset-btn" onclick="resetCountDemo(1)">↻ Reset</button>
+                    </div>
+
+                    <table class="output-table" id="count-output-1">
+                        <thead>
+                            <tr>
+                                <th>OrderID</th>
+                                <th>CustomerID</th>
+                                <th>TotalOrders</th>
+                            </tr>
+                        </thead>
+                        <tbody id="count-output-body-1">
+                            <tr class="hidden">
+                                <td>101</td>
+                                <td>C001</td>
+                                <td>4</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="metric-box">
+                        <div class="metric-label">Inefficiency</div>
+                        <div class="metric-value">⚠️ Scanned 4 rows × 4 times = 16 operations</div>
+                    </div>
+                </div>
+
+                <!-- Query 2: Optimized COUNT -->
+                <div class="card">
+                    <h3 class="card-title">✓ With Window Function</h3>
+                    <div class="demo-status">Efficient single-pass approach</div>
+
+                    <p style="margin: 15px 0; color: var(--text-secondary); font-size: 0.9em;">
+                        <strong>Input Table:</strong> Orders
+                    </p>
+                    <table class="input-table">
+                        <thead>
+                            <tr>
+                                <th>OrderID</th>
+                                <th>CustomerID</th>
+                                <th>Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody id="count-input-2">
+                            <tr>
+                                <td>101</td>
+                                <td>C001</td>
+                                <td>$500</td>
+                            </tr>
+                            <tr>
+                                <td>102</td>
+                                <td>C002</td>
+                                <td>$750</td>
+                            </tr>
+                            <tr>
+                                <td>103</td>
+                                <td>C001</td>
+                                <td>$300</td>
+                            </tr>
+                            <tr>
+                                <td>104</td>
+                                <td>C003</td>
+                                <td>$600</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="query-box">
+                        <span class="query-label">Window Function</span>
+                        <span class="keyword">SELECT</span> OrderID, CustomerID,<br>
+                        <span class="function">COUNT</span>(*) <span class="keyword">OVER</span>() <span class="keyword">AS</span> TotalOrders,<br>
+                        <span class="function">COUNT</span>(*) <span class="keyword">OVER</span>(<span class="keyword">PARTITION BY</span> CustomerID) <span class="keyword">AS</span> OrdersByCustomer<br>
+                        <span class="keyword">FROM</span> Orders
+                    </div>
+
+                    <div class="execution-flow" id="count-flow-2">
+                        <div class="flow-step">
+                            <div class="step-badge">1</div>
+                            <div class="step-label">Scan Table (1×)</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">2</div>
+                            <div class="step-label">Partition</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">3</div>
+                            <div class="step-label">Count All</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">4</div>
+                            <div class="step-label">Result</div>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button onclick="executeCountDemo(2, true)">▶ Execute Query</button>
+                        <button class="reset-btn" onclick="resetCountDemo(2)">↻ Reset</button>
+                    </div>
+
+                    <table class="output-table" id="count-output-2">
+                        <thead>
+                            <tr>
+                                <th>OrderID</th>
+                                <th>CustomerID</th>
+                                <th>TotalOrders</th>
+                                <th>OrdersByCustomer</th>
+                            </tr>
+                        </thead>
+                        <tbody id="count-output-body-2">
+                            <tr class="hidden">
+                                <td>101</td>
+                                <td>C001</td>
+                                <td class="correct-value">4</td>
+                                <td class="correct-value">2</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="metric-box">
+                        <div class="metric-label">Efficiency</div>
+                        <div class="metric-value">✓ Single table scan = 4 operations</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="comparison-box">
+                <div class="comparison-item">
+                    <div class="comparison-label comparison-wrong">❌ Subquery Problem</div>
+                    <div class="comparison-content">
+                        Executes the subquery 4 times (once per row), creating duplicate scans and increased I/O load
+                    </div>
+                </div>
+                <div class="comparison-item">
+                    <div class="comparison-label comparison-correct">✓ Window Solution</div>
+                    <div class="comparison-content correct">
+                        Single table scan calculates COUNT for all rows simultaneously, enabling partition-specific counts
+                    </div>
+                </div>
+            </div>
+
+            <div class="explanation">
+                <strong>💡 Key Insight:</strong> Window functions eliminate the need for correlated subqueries. Instead of repeating a COUNT operation for each row, the OVER() clause calculates the aggregate once and distributes it to every row. Using PARTITION BY creates segment-specific counts without requiring separate queries.
+            </div>
+        </div>
+
+        <!-- SECTION 2: SUM -->
+        <div class="section">
+            <h2 class="section-title">
+                <span class="section-number">2</span>
+                SUM: Total & Percentage Contribution
+            </h2>
+
+            <div class="content-grid">
+                <!-- Query 1: Basic SUM -->
+                <div class="card">
+                    <h3 class="card-title">❌ Without Window Function</h3>
+                    <div class="demo-status">Requires GROUP BY + JOIN</div>
+
+                    <p style="margin: 15px 0; color: var(--text-secondary); font-size: 0.9em;">
+                        <strong>Input Table:</strong> Sales
+                    </p>
+                    <table class="input-table">
+                        <thead>
+                            <tr>
+                                <th>OrderID</th>
+                                <th>ProductID</th>
+                                <th>Sales</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td>P101</td>
+                                <td>$1000</td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td>P102</td>
+                                <td>$1500</td>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td>P101</td>
+                                <td>$800</td>
+                            </tr>
+                            <tr>
+                                <td>4</td>
+                                <td>P103</td>
+                                <td>$1200</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="query-box">
+                        <span class="query-label">GROUP BY + JOIN</span>
+                        <span class="keyword">SELECT</span> o.OrderID, o.ProductID, o.Sales,<br>
+                        s.TotalSales<br>
+                        <span class="keyword">FROM</span> Orders o<br>
+                        <span class="keyword">JOIN</span> (<span class="keyword">SELECT</span> <span class="function">SUM</span>(Sales) TotalSales <span class="keyword">FROM</span> Orders) s
+                    </div>
+
+                    <div class="execution-flow">
+                        <div class="flow-step">
+                            <div class="step-badge">1</div>
+                            <div class="step-label">GROUP BY</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">2</div>
+                            <div class="step-label">SUM()</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">3</div>
+                            <div class="step-label">JOIN</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">4</div>
+                            <div class="step-label">Result</div>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button onclick="executeSumDemo(1, false)">▶ Execute Query</button>
+                        <button class="reset-btn" onclick="resetSumDemo(1)">↻ Reset</button>
+                    </div>
+
+                    <table class="output-table">
+                        <thead>
+                            <tr>
+                                <th>OrderID</th>
+                                <th>ProductID</th>
+                                <th>Sales</th>
+                                <th>TotalSales</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sum-output-body-1">
+                            <tr class="hidden">
+                                <td>1</td>
+                                <td>P101</td>
+                                <td>$1000</td>
+                                <td>$4500</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="metric-box">
+                        <div class="metric-label">Complexity</div>
+                        <div class="metric-value">⚠️ Multiple operations: GROUP BY + JOIN + SUM</div>
+                    </div>
+                </div>
+
+                <!-- Query 2: Optimized SUM -->
+                <div class="card">
+                    <h3 class="card-title">✓ With Window Function</h3>
+                    <div class="demo-status">Single clean operation</div>
+
+                    <p style="margin: 15px 0; color: var(--text-secondary); font-size: 0.9em;">
+                        <strong>Input Table:</strong> Sales
+                    </p>
+                    <table class="input-table">
+                        <thead>
+                            <tr>
+                                <th>OrderID</th>
+                                <th>ProductID</th>
+                                <th>Sales</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td>P101</td>
+                                <td>$1000</td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td>P102</td>
+                                <td>$1500</td>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td>P101</td>
+                                <td>$800</td>
+                            </tr>
+                            <tr>
+                                <td>4</td>
+                                <td>P103</td>
+                                <td>$1200</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="query-box">
+                        <span class="query-label">Window Function</span>
+                        <span class="keyword">SELECT</span> OrderID, ProductID, Sales,<br>
+                        <span class="function">SUM</span>(Sales) <span class="keyword">OVER</span>() <span class="keyword">AS</span> TotalSales,<br>
+                        <span class="function">SUM</span>(Sales) <span class="keyword">OVER</span>(<span class="keyword">PARTITION BY</span> ProductID) <span class="keyword">AS</span> SalesByProduct<br>
+                        <span class="keyword">FROM</span> Orders
+                    </div>
+
+                    <div class="execution-flow">
+                        <div class="flow-step">
+                            <div class="step-badge">1</div>
+                            <div class="step-label">Scan Table</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">2</div>
+                            <div class="step-label">Partition</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">3</div>
+                            <div class="step-label">SUM()</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">4</div>
+                            <div class="step-label">Result</div>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button onclick="executeSumDemo(2, true)">▶ Execute Query</button>
+                        <button class="reset-btn" onclick="resetSumDemo(2)">↻ Reset</button>
+                    </div>
+
+                    <table class="output-table">
+                        <thead>
+                            <tr>
+                                <th>OrderID</th>
+                                <th>ProductID</th>
+                                <th>Sales</th>
+                                <th>TotalSales</th>
+                                <th>SalesByProduct</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sum-output-body-2">
+                            <tr class="hidden">
+                                <td>1</td>
+                                <td>P101</td>
+                                <td>$1000</td>
+                                <td class="correct-value">$4500</td>
+                                <td class="correct-value">$1800</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="metric-box">
+                        <div class="metric-label">Efficiency</div>
+                        <div class="metric-value">✓ Single clean calculation for all metrics</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="comparison-box">
+                <div class="comparison-item">
+                    <div class="comparison-label comparison-wrong">❌ GROUP BY Limitation</div>
+                    <div class="comparison-content">
+                        Aggregating data with GROUP BY loses row-level details. Need to join back to get individual order values alongside aggregate totals.
+                    </div>
+                </div>
+                <div class="comparison-item">
+                    <div class="comparison-label comparison-correct">✓ Window Advantage</div>
+                    <div class="comparison-content correct">
+                        Retains every row with its detail values while adding aggregate totals. Both SUM() OVER() and SUM() OVER(PARTITION BY ProductID) calculated in one pass.
+                    </div>
+                </div>
+            </div>
+
+            <div class="explanation">
+                <strong>💡 Key Insight:</strong> Window functions preserve row-level detail while computing aggregates. This is crucial for calculating metrics like "percentage contribution" (Sales / TotalSales * 100) where you need both the individual value and the aggregate in the same row.
+            </div>
+        </div>
+
+        <!-- SECTION 3: AVG -->
+        <div class="section">
+            <h2 class="section-title">
+                <span class="section-number">3</span>
+                AVG: Handling NULL Values in Averages
+            </h2>
+
+            <div class="content-grid">
+                <!-- Query 1: AVG with NULL -->
+                <div class="card">
+                    <h3 class="card-title">❌ AVG Without NULL Handling</h3>
+                    <div class="demo-status">Silently excludes NULL values</div>
+
+                    <p style="margin: 15px 0; color: var(--text-secondary); font-size: 0.9em;">
+                        <strong>Input Table:</strong> Customers (with missing scores)
+                    </p>
+                    <table class="input-table">
+                        <thead>
+                            <tr>
+                                <th>CustomerID</th>
+                                <th>Score</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>C001</td>
+                                <td>85</td>
+                            </tr>
+                            <tr>
+                                <td>C002</td>
+                                <td><span class="null-value">NULL</span></td>
+                            </tr>
+                            <tr>
+                                <td>C003</td>
+                                <td>92</td>
+                            </tr>
+                            <tr>
+                                <td>C004</td>
+                                <td><span class="null-value">NULL</span></td>
+                            </tr>
+                            <tr>
+                                <td>C005</td>
+                                <td>78</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="query-box">
+                        <span class="query-label">Basic AVG</span>
+                        <span class="keyword">SELECT</span> CustomerID, Score,<br>
+                        <span class="function">AVG</span>(Score) <span class="keyword">OVER</span>() <span class="keyword">AS</span> AvgScore<br>
+                        <span class="keyword">FROM</span> Customers
+                    </div>
+
+                    <div class="execution-flow">
+                        <div class="flow-step">
+                            <div class="step-badge">1</div>
+                            <div class="step-label">Scan Rows</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">2</div>
+                            <div class="step-label">Ignore NULL</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">3</div>
+                            <div class="step-label">Sum: 85+92+78</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">4</div>
+                            <div class="step-label">÷3 = 85</div>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button onclick="executeAvgDemo(1, false)">▶ Execute Query</button>
+                        <button class="reset-btn" onclick="resetAvgDemo(1)">↻ Reset</button>
+                    </div>
+
+                    <table class="output-table">
+                        <thead>
+                            <tr>
+                                <th>CustomerID</th>
+                                <th>Score</th>
+                                <th>AvgScore</th>
+                                <th>Impact</th>
+                            </tr>
+                        </thead>
+                        <tbody id="avg-output-body-1">
+                            <tr class="hidden">
+                                <td>C001</td>
+                                <td>85</td>
+                                <td class="wrong-value">85.00</td>
+                                <td><span class="pink">Hidden NULLs</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="metric-box">
+                        <div class="metric-label">Problem</div>
+                        <div class="metric-value">⚠️ Silently excludes 2 NULL values → inflated average</div>
+                    </div>
+                </div>
+
+                <!-- Query 2: AVG with COALESCE -->
+                <div class="card">
+                    <h3 class="card-title">✓ AVG With Explicit NULL Handling</h3>
+                    <div class="demo-status">Treats NULL as default value</div>
+
+                    <p style="margin: 15px 0; color: var(--text-secondary); font-size: 0.9em;">
+                        <strong>Input Table:</strong> Customers (with missing scores)
+                    </p>
+                    <table class="input-table">
+                        <thead>
+                            <tr>
+                                <th>CustomerID</th>
+                                <th>Score</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>C001</td>
+                                <td>85</td>
+                            </tr>
+                            <tr>
+                                <td>C002</td>
+                                <td><span class="null-value">NULL</span></td>
+                            </tr>
+                            <tr>
+                                <td>C003</td>
+                                <td>92</td>
+                            </tr>
+                            <tr>
+                                <td>C004</td>
+                                <td><span class="null-value">NULL</span></td>
+                            </tr>
+                            <tr>
+                                <td>C005</td>
+                                <td>78</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="query-box">
+                        <span class="query-label">With COALESCE</span>
+                        <span class="keyword">SELECT</span> CustomerID, Score,<br>
+                        <span class="keyword">COALESCE</span>(Score, 0) <span class="keyword">AS</span> CustomerScore,<br>
+                        <span class="function">AVG</span>(<span class="keyword">COALESCE</span>(Score, 0)) <span class="keyword">OVER</span>() <span class="keyword">AS</span> AvgScore<br>
+                        <span class="keyword">FROM</span> Customers
+                    </div>
+
+                    <div class="execution-flow">
+                        <div class="flow-step">
+                            <div class="step-badge">1</div>
+                            <div class="step-label">Scan Rows</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">2</div>
+                            <div class="step-label">COALESCE NULL→0</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">3</div>
+                            <div class="step-label">Sum: 85+0+92+0+78</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">4</div>
+                            <div class="step-label">÷5 = 71</div>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button onclick="executeAvgDemo(2, true)">▶ Execute Query</button>
+                        <button class="reset-btn" onclick="resetAvgDemo(2)">↻ Reset</button>
+                    </div>
+
+                    <table class="output-table">
+                        <thead>
+                            <tr>
+                                <th>CustomerID</th>
+                                <th>Score</th>
+                                <th>CustomerScore</th>
+                                <th>AvgScore</th>
+                            </tr>
+                        </thead>
+                        <tbody id="avg-output-body-2">
+                            <tr class="hidden">
+                                <td>C001</td>
+                                <td>85</td>
+                                <td class="correct-value">85</td>
+                                <td class="correct-value">71.00</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="metric-box">
+                        <div class="metric-label">Benefit</div>
+                        <div class="metric-value">✓ Explicit handling includes all 5 rows in average calculation</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="comparison-box">
+                <div class="comparison-item">
+                    <div class="comparison-label comparison-wrong">❌ Silent Exclusion</div>
+                    <div class="comparison-content">
+                        AVG() silently ignores NULLs: (85+92+78)/3 = 85.00. Results hide the presence of missing data, leading to misleading insights.
+                    </div>
+                </div>
+                <div class="comparison-item">
+                    <div class="comparison-label comparison-correct">✓ Explicit Treatment</div>
+                    <div class="comparison-content correct">
+                        COALESCE(Score, 0) converts NULLs to 0: (85+0+92+0+78)/5 = 71.00. Honest calculation that reflects incomplete data.
+                    </div>
+                </div>
+            </div>
+
+            <div class="explanation">
+                <strong>💡 Key Insight:</strong> SQL's AVG() function silently excludes NULL values, which can distort analysis. Use COALESCE() to explicitly handle NULLs before computing the average. This ensures your calculation reflects the actual data distribution, not just the non-NULL subset.
+            </div>
+        </div>
+
+        <!-- SECTION 4: MAX/MIN -->
+        <div class="section">
+            <h2 class="section-title">
+                <span class="section-number">4</span>
+                MAX/MIN: Finding Extremes & Deviations
+            </h2>
+
+            <div class="content-grid">
+                <!-- Query 1: Basic MAX/MIN -->
+                <div class="card">
+                    <h3 class="card-title">❌ Without Window Function</h3>
+                    <div class="demo-status">Requires separate aggregate queries</div>
+
+                    <p style="margin: 15px 0; color: var(--text-secondary); font-size: 0.9em;">
+                        <strong>Input Table:</strong> Sales
+                    </p>
+                    <table class="input-table">
+                        <thead>
+                            <tr>
+                                <th>OrderID</th>
+                                <th>Sales</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td>$2000</td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td>$5000</td>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td>$1500</td>
+                            </tr>
+                            <tr>
+                                <td>4</td>
+                                <td>$3500</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="query-box">
+                        <span class="query-label">Traditional Approach</span>
+                        <span class="keyword">SELECT</span> <span class="function">MIN</span>(Sales) <span class="keyword">AS</span> MinSales, <span class="function">MAX</span>(Sales) <span class="keyword">AS</span> MaxSales<br>
+                        <span class="keyword">FROM</span> Orders
+                    </div>
+
+                    <div class="execution-flow">
+                        <div class="flow-step">
+                            <div class="step-badge">1</div>
+                            <div class="step-label">Scan Table</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">2</div>
+                            <div class="step-label">Find MIN</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">3</div>
+                            <div class="step-label">Find MAX</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">4</div>
+                            <div class="step-label">2 Rows</div>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button onclick="executeMinMaxDemo(1, false)">▶ Execute Query</button>
+                        <button class="reset-btn" onclick="resetMinMaxDemo(1)">↻ Reset</button>
+                    </div>
+
+                    <table class="output-table">
+                        <thead>
+                            <tr>
+                                <th>MinSales</th>
+                                <th>MaxSales</th>
+                            </tr>
+                        </thead>
+                        <tbody id="minmax-output-body-1">
+                            <tr class="hidden">
+                                <td>$1500</td>
+                                <td>$5000</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="metric-box">
+                        <div class="metric-label">Limitation</div>
+                        <div class="metric-value">⚠️ Loses individual row data in aggregation</div>
+                    </div>
+                </div>
+
+                <!-- Query 2: Optimized MAX/MIN -->
+                <div class="card">
+                    <h3 class="card-title">✓ With Window Function</h3>
+                    <div class="demo-status">All data with extremes + deviations</div>
+
+                    <p style="margin: 15px 0; color: var(--text-secondary); font-size: 0.9em;">
+                        <strong>Input Table:</strong> Sales
+                    </p>
+                    <table class="input-table">
+                        <thead>
+                            <tr>
+                                <th>OrderID</th>
+                                <th>Sales</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td>$2000</td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td>$5000</td>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td>$1500</td>
+                            </tr>
+                            <tr>
+                                <td>4</td>
+                                <td>$3500</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="query-box">
+                        <span class="query-label">Window Function</span>
+                        <span class="keyword">SELECT</span> OrderID, Sales,<br>
+                        <span class="function">MIN</span>(Sales) <span class="keyword">OVER</span>() <span class="keyword">AS</span> LowestSales,<br>
+                        <span class="function">MAX</span>(Sales) <span class="keyword">OVER</span>() <span class="keyword">AS</span> HighestSales,<br>
+                        Sales - <span class="function">MIN</span>(Sales) <span class="keyword">OVER</span>() <span class="keyword">AS</span> DeviationFromMin<br>
+                        <span class="keyword">FROM</span> Orders
+                    </div>
+
+                    <div class="execution-flow">
+                        <div class="flow-step">
+                            <div class="step-badge">1</div>
+                            <div class="step-label">Scan Table</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">2</div>
+                            <div class="step-label">Find MIN/MAX</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">3</div>
+                            <div class="step-label">Calculate Dev</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">4</div>
+                            <div class="step-label">4 Rows</div>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button onclick="executeMinMaxDemo(2, true)">▶ Execute Query</button>
+                        <button class="reset-btn" onclick="resetMinMaxDemo(2)">↻ Reset</button>
+                    </div>
+
+                    <table class="output-table">
+                        <thead>
+                            <tr>
+                                <th>OrderID</th>
+                                <th>Sales</th>
+                                <th>LowestSales</th>
+                                <th>HighestSales</th>
+                                <th>DeviationFromMin</th>
+                            </tr>
+                        </thead>
+                        <tbody id="minmax-output-body-2">
+                            <tr class="hidden">
+                                <td>1</td>
+                                <td>$2000</td>
+                                <td class="correct-value">$1500</td>
+                                <td class="correct-value">$5000</td>
+                                <td class="correct-value">$500</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="metric-box">
+                        <div class="metric-label">Benefit</div>
+                        <div class="metric-value">✓ Individual rows retain data while showing extremes & deviations</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="comparison-box">
+                <div class="comparison-item">
+                    <div class="comparison-label comparison-wrong">❌ Aggregate Loss</div>
+                    <div class="comparison-content">
+                        Traditional MIN/MAX returns only 1 summary row. Cannot see which individual orders contributed to min/max, nor calculate per-row deviations.
+                    </div>
+                </div>
+                <div class="comparison-item">
+                    <div class="comparison-label comparison-correct">✓ Window Retention</div>
+                    <div class="comparison-content correct">
+                        Returns all 4 rows with min/max values attached. Enables deviation calculations (Sales - MIN) without losing any original data.
+                    </div>
+                </div>
+            </div>
+
+            <div class="explanation">
+                <strong>💡 Key Insight:</strong> Window functions preserve row identity while computing extremes. This enables powerful analysis like "how much does each sale deviate from the minimum?" Without windows, you'd need to join the original table back to aggregate results.
+            </div>
+        </div>
+
+        <!-- SECTION 5: ROLLING SUM -->
+        <div class="section">
+            <h2 class="section-title">
+                <span class="section-number">5</span>
+                Rolling Aggregates: Moving Averages & Cumulative Sums
+            </h2>
+
+            <div class="content-grid">
+                <!-- Query 1: Simple AVG -->
+                <div class="card">
+                    <h3 class="card-title">❌ Basic AVG (All Rows)</h3>
+                    <div class="demo-status">No temporal progression</div>
+
+                    <p style="margin: 15px 0; color: var(--text-secondary); font-size: 0.9em;">
+                        <strong>Input Table:</strong> Monthly Sales by Product
+                    </p>
+                    <table class="input-table">
+                        <thead>
+                            <tr>
+                                <th>ProductID</th>
+                                <th>Month</th>
+                                <th>Sales</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>P101</td>
+                                <td>Jan</td>
+                                <td>$1000</td>
+                            </tr>
+                            <tr>
+                                <td>P101</td>
+                                <td>Feb</td>
+                                <td>$1200</td>
+                            </tr>
+                            <tr>
+                                <td>P101</td>
+                                <td>Mar</td>
+                                <td>$1100</td>
+                            </tr>
+                            <tr>
+                                <td>P101</td>
+                                <td>Apr</td>
+                                <td>$1300</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="query-box">
+                        <span class="query-label">Basic Average</span>
+                        <span class="keyword">SELECT</span> ProductID, Month, Sales,<br>
+                        <span class="function">AVG</span>(Sales) <span class="keyword">OVER</span>(<span class="keyword">PARTITION BY</span> ProductID) <span class="keyword">AS</span> AvgByProduct<br>
+                        <span class="keyword">FROM</span> SalesHistory
+                    </div>
+
+                    <div class="execution-flow">
+                        <div class="flow-step">
+                            <div class="step-badge">1</div>
+                            <div class="step-label">Partition P101</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">2</div>
+                            <div class="step-label">AVG(All)</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">3</div>
+                            <div class="step-label">Distribute</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">4</div>
+                            <div class="step-label">$1150</div>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button onclick="executeRollingDemo(1, false)">▶ Execute Query</button>
+                        <button class="reset-btn" onclick="resetRollingDemo(1)">↻ Reset</button>
+                    </div>
+
+                    <table class="output-table">
+                        <thead>
+                            <tr>
+                                <th>ProductID</th>
+                                <th>Month</th>
+                                <th>Sales</th>
+                                <th>AvgByProduct</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rolling-output-body-1">
+                            <tr class="hidden">
+                                <td>P101</td>
+                                <td>Jan</td>
+                                <td>$1000</td>
+                                <td class="wrong-value">$1150</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="metric-box">
+                        <div class="metric-label">Issue</div>
+                        <div class="metric-value">⚠️ Jan average = $1150 (includes future data!)</div>
+                    </div>
+                </div>
+
+                <!-- Query 2: Moving AVG -->
+                <div class="card">
+                    <h3 class="card-title">✓ Moving Average (With ORDER BY)</h3>
+                    <div class="demo-status">Respects temporal order</div>
+
+                    <p style="margin: 15px 0; color: var(--text-secondary); font-size: 0.9em;">
+                        <strong>Input Table:</strong> Monthly Sales by Product
+                    </p>
+                    <table class="input-table">
+                        <thead>
+                            <tr>
+                                <th>ProductID</th>
+                                <th>Month</th>
+                                <th>Sales</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>P101</td>
+                                <td>Jan</td>
+                                <td>$1000</td>
+                            </tr>
+                            <tr>
+                                <td>P101</td>
+                                <td>Feb</td>
+                                <td>$1200</td>
+                            </tr>
+                            <tr>
+                                <td>P101</td>
+                                <td>Mar</td>
+                                <td>$1100</td>
+                            </tr>
+                            <tr>
+                                <td>P101</td>
+                                <td>Apr</td>
+                                <td>$1300</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="query-box">
+                        <span class="query-label">Moving Average</span>
+                        <span class="keyword">SELECT</span> ProductID, Month, Sales,<br>
+                        <span class="function">AVG</span>(Sales) <span class="keyword">OVER</span>(<span class="keyword">PARTITION BY</span> ProductID <span class="keyword">ORDER BY</span> Month <span class="keyword">ROWS BETWEEN CURRENT ROW AND 1 FOLLOWING</span>) <span class="keyword">AS</span> MovingAvg<br>
+                        <span class="keyword">FROM</span> SalesHistory
+                    </div>
+
+                    <div class="execution-flow">
+                        <div class="flow-step">
+                            <div class="step-badge">1</div>
+                            <div class="step-label">Partition P101</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">2</div>
+                            <div class="step-label">ORDER BY Month</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">3</div>
+                            <div class="step-label">ROWS WINDOW</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                        <div class="flow-step">
+                            <div class="step-badge">4</div>
+                            <div class="step-label">Moving Avg</div>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button onclick="executeRollingDemo(2, true)">▶ Execute Query</button>
+                        <button class="reset-btn" onclick="resetRollingDemo(2)">↻ Reset</button>
+                    </div>
+
+                    <table class="output-table">
+                        <thead>
+                            <tr>
+                                <th>ProductID</th>
+                                <th>Month</th>
+                                <th>Sales</th>
+                                <th>MovingAvg</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rolling-output-body-2">
+                            <tr class="hidden">
+                                <td>P101</td>
+                                <td>Jan</td>
+                                <td>$1000</td>
+                                <td class="correct-value">$1100</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="metric-box">
+                        <div class="metric-label">Advantage</div>
+                        <div class="metric-value">✓ Jan avg = $1100 (Jan + Feb average = respects time order)</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="comparison-box">
+                <div class="comparison-item">
+                    <div class="comparison-label comparison-wrong">❌ No ORDER BY</div>
+                    <div class="comparison-content">
+                        AVG without ORDER BY considers all rows in partition equally, violating temporal logic. Jan's average shouldn't include future months.
+                    </div>
+                </div>
+                <div class="comparison-item">
+                    <div class="comparison-label comparison-correct">✓ With ORDER BY</div>
+                    <div class="comparison-content correct">
+                        ORDER BY establishes row sequence. ROWS BETWEEN CURRENT ROW AND 1 FOLLOWING creates a rolling 2-row window that progresses through time correctly.
+                    </div>
+                </div>
+            </div>
+
+            <div class="explanation">
+                <strong>💡 Key Insight:</strong> ORDER BY is critical for time-series analysis. Without it, window aggregates treat all rows identically. Adding ORDER BY + ROWS BETWEEN clauses creates rolling/cumulative calculations that respect temporal progression. This is essential for moving averages, running totals, and trend analysis.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Demo data
+        const countData = {
+            1: [
+                { OrderID: 101, CustomerID: 'C001', Amount: '$500' },
+                { OrderID: 102, CustomerID: 'C002', Amount: '$750' },
+                { OrderID: 103, CustomerID: 'C001', Amount: '$300' },
+                { OrderID: 104, CustomerID: 'C003', Amount: '$600' }
+            ],
+            2: [
+                { OrderID: 101, CustomerID: 'C001', Amount: '$500', TotalOrders: 4, OrdersByCustomer: 2 },
+                { OrderID: 102, CustomerID: 'C002', Amount: '$750', TotalOrders: 4, OrdersByCustomer: 1 },
+                { OrderID: 103, CustomerID: 'C001', Amount: '$300', TotalOrders: 4, OrdersByCustomer: 2 },
+                { OrderID: 104, CustomerID: 'C003', Amount: '$600', TotalOrders: 4, OrdersByCustomer: 1 }
+            ]
+        };
+
+        function executeCountDemo(version, isOptimized) {
+            const flowElement = document.getElementById(`count-flow-${version}`);
+            const outputBody = document.getElementById(`count-output-body-${version}`);
+            
+            // Animate flow steps
+            const badges = flowElement.querySelectorAll('.step-badge');
+            badges.forEach((badge, index) => {
+                setTimeout(() => {
+                    badge.classList.add('active');
+                    setTimeout(() => {
+                        badge.classList.remove('active');
+                        badge.classList.add('complete');
+                    }, 400);
+                }, index * 300);
+            });
+
+            // Show results after animation
+            setTimeout(() => {
+                if (version === 1) {
+                    outputBody.innerHTML = `
+                        <tr class="fade-in">
+                            <td>101</td>
+                            <td>C001</td>
+                            <td class="wrong-value">4</td>
+                        </tr>
+                    `;
+                } else {
+                    outputBody.innerHTML = `
+                        <tr class="fade-in">
+                            <td>101</td>
+                            <td>C001</td>
+                            <td class="correct-value">4</td>
+                            <td class="correct-value">2</td>
+                        </tr>
+                        <tr class="fade-in" style="animation-delay: 0.1s">
+                            <td>102</td>
+                            <td>C002</td>
+                            <td class="correct-value">4</td>
+                            <td class="correct-value">1</td>
+                        </tr>
+                        <tr class="fade-in" style="animation-delay: 0.2s">
+                            <td>103</td>
+                            <td>C001</td>
+                            <td class="correct-value">4</td>
+                            <td class="correct-value">2</td>
+                        </tr>
+                        <tr class="fade-in" style="animation-delay: 0.3s">
+                            <td>104</td>
+                            <td>C003</td>
+                            <td class="correct-value">4</td>
+                            <td class="correct-value">1</td>
+                        </tr>
+                    `;
+                }
+            }, 1200);
+        }
+
+        function resetCountDemo(version) {
+            const flowElement = document.getElementById(`count-flow-${version}`);
+            const outputBody = document.getElementById(`count-output-body-${version}`);
+            
+            flowElement.querySelectorAll('.step-badge').forEach(badge => {
+                badge.classList.remove('active', 'complete');
+            });
+            
+            outputBody.innerHTML = '<tr class="hidden"><td colspan="4"></td></tr>';
+        }
+
+        function executeSumDemo(version, isOptimized) {
+            const outputBody = document.getElementById(`sum-output-body-${version}`);
+            
+            if (version === 1) {
+                setTimeout(() => {
+                    outputBody.innerHTML = `
+                        <tr class="fade-in">
+                            <td>1</td>
+                            <td>P101</td>
+                            <td>$1000</td>
+                            <td class="wrong-value">$4500</td>
+                        </tr>
+                        <tr class="fade-in" style="animation-delay: 0.1s">
+                            <td>2</td>
+                            <td>P102</td>
+                            <td>$1500</td>
+                            <td class="wrong-value">$4500</td>
+                        </tr>
+                    `;
+                }, 800);
+            } else {
+                setTimeout(() => {
+                    outputBody.innerHTML = `
+                        <tr class="fade-in">
+                            <td>1</td>
+                            <td>P101</td>
+                            <td>$1000</td>
+                            <td class="correct-value">$4500</td>
+                            <td class="correct-value">$1800</td>
+                        </tr>
+                        <tr class="fade-in" style="animation-delay: 0.1s">
+                            <td>2</td>
+                            <td>P102</td>
+                            <td>$1500</td>
+                            <td class="correct-value">$4500</td>
+                            <td class="correct-value">$1500</td>
+                        </tr>
+                    `;
+                }, 800);
+            }
+        }
+
+        function resetSumDemo(version) {
+            const outputBody = document.getElementById(`sum-output-body-${version}`);
+            outputBody.innerHTML = '<tr class="hidden"><td colspan="5"></td></tr>';
+        }
+
+        function executeAvgDemo(version, isOptimized) {
+            const outputBody = document.getElementById(`avg-output-body-${version}`);
+            
+            if (version === 1) {
+                setTimeout(() => {
+                    outputBody.innerHTML = `
+                        <tr class="fade-in">
+                            <td>C001</td>
+                            <td>85</td>
+                            <td class="wrong-value">85.00</td>
+                            <td><span style="color: var(--pink)">Hidden NULLs</span></td>
+                        </tr>
+                        <tr class="fade-in" style="animation-delay: 0.1s">
+                            <td>C002</td>
+                            <td><span class="null-value">NULL</span></td>
+                            <td class="wrong-value">85.00</td>
+                            <td><span style="color: var(--pink)">Excluded</span></td>
+                        </tr>
+                    `;
+                }, 800);
+            } else {
+                setTimeout(() => {
+                    outputBody.innerHTML = `
+                        <tr class="fade-in">
+                            <td>C001</td>
+                            <td>85</td>
+                            <td class="correct-value">85</td>
+                            <td class="correct-value">71.00</td>
+                        </tr>
+                        <tr class="fade-in" style="animation-delay: 0.1s">
+                            <td>C002</td>
+                            <td><span class="null-value">NULL</span></td>
+                            <td class="correct-value">0</td>
+                            <td class="correct-value">71.00</td>
+                        </tr>
+                    `;
+                }, 800);
+            }
+        }
+
+        function resetAvgDemo(version) {
+            const outputBody = document.getElementById(`avg-output-body-${version}`);
+            outputBody.innerHTML = '<tr class="hidden"><td colspan="4"></td></tr>';
+        }
+
+        function executeMinMaxDemo(version, isOptimized) {
+            const outputBody = document.getElementById(`minmax-output-body-${version}`);
+            
+            if (version === 1) {
+                setTimeout(() => {
+                    outputBody.innerHTML = `
+                        <tr class="fade-in">
+                            <td>$1500</td>
+                            <td>$5000</td>
+                        </tr>
+                    `;
+                }, 800);
+            } else {
+                setTimeout(() => {
+                    outputBody.innerHTML = `
+                        <tr class="fade-in">
+                            <td>1</td>
+                            <td>$2000</td>
+                            <td class="correct-value">$1500</td>
+                            <td class="correct-value">$5000</td>
+                            <td class="correct-value">$500</td>
+                        </tr>
+                        <tr class="fade-in" style="animation-delay: 0.1s">
+                            <td>2</td>
+                            <td>$5000</td>
+                            <td class="correct-value">$1500</td>
+                            <td class="correct-value">$5000</td>
+                            <td class="correct-value">$3500</td>
+                        </tr>
+                        <tr class="fade-in" style="animation-delay: 0.2s">
+                            <td>3</td>
+                            <td>$1500</td>
+                            <td class="correct-value">$1500</td>
+                            <td class="correct-value">$5000</td>
+                            <td class="correct-value">$0</td>
+                        </tr>
+                    `;
+                }, 800);
+            }
+        }
+
+        function resetMinMaxDemo(version) {
+            const outputBody = document.getElementById(`minmax-output-body-${version}`);
+            outputBody.innerHTML = '<tr class="hidden"><td colspan="5"></td></tr>';
+        }
+
+        function executeRollingDemo(version, isOptimized) {
+            const outputBody = document.getElementById(`rolling-output-body-${version}`);
+            
+            if (version === 1) {
+                setTimeout(() => {
+                    outputBody.innerHTML = `
+                        <tr class="fade-in">
+                            <td>P101</td>
+                            <td>Jan</td>
+                            <td>$1000</td>
+                            <td class="wrong-value">$1150</td>
+                        </tr>
+                        <tr class="fade-in" style="animation-delay: 0.1s">
+                            <td>P101</td>
+                            <td>Feb</td>
+                            <td>$1200</td>
+                            <td class="wrong-value">$1150</td>
+                        </tr>
+                    `;
+                }, 800);
+            } else {
+                setTimeout(() => {
+                    outputBody.innerHTML = `
+                        <tr class="fade-in">
+                            <td>P101</td>
+                            <td>Jan</td>
+                            <td>$1000</td>
+                            <td class="correct-value">$1100</td>
+                        </tr>
+                        <tr class="fade-in" style="animation-delay: 0.1s">
+                            <td>P101</td>
+                            <td>Feb</td>
+                            <td>$1200</td>
+                            <td class="correct-value">$1150</td>
+                        </tr>
+                        <tr class="fade-in" style="animation-delay: 0.2s">
+                            <td>P101</td>
+                            <td>Mar</td>
+                            <td>$1100</td>
+                            <td class="correct-value">$1200</td>
+                        </tr>
+                    `;
+                }, 800);
+            }
+        }
+
+        function resetRollingDemo(version) {
+            const outputBody = document.getElementById(`rolling-output-body-${version}`);
+            outputBody.innerHTML = '<tr class="hidden"><td colspan="4"></td></tr>';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,1831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL Window Value Functions</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0d14;
+            --bg2: #0f1320;
+            --card: #111520;
+            --border: #1e2535;
+            --cyan: #00d4ff;
+            --purple: #a855f7;
+            --orange: #f97316;
+            --green: #22d3a0;
+            --pink: #f43f5e;
+            --yellow: #fbbf24;
+            --blue: #3b82f6;
+            --text: #e2e8f0;
+            --muted: #64748b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            scroll-padding-top: 60px;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'JetBrains Mono', monospace;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(0, 212, 255, 0.025) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 212, 255, 0.025) 1px, transparent 1px);
+            background-size: 44px 44px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .content-wrapper {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+        }
+
+        /* ========== SPEED CONTROL BAR ========== */
+        .speed-bar {
+            position: sticky;
+            top: 0;
+            z-index: 200;
+            background: rgba(10, 13, 20, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            font-size: 11px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .speed-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .speed-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .speed-btn:hover {
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        .speed-btn.active {
+            background: var(--cyan);
+            border-color: var(--cyan);
+            color: var(--bg);
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.4);
+        }
+
+        .speed-btn.active::before {
+            content: '';
+            position: absolute;
+            inset: -6px;
+            border: 1px solid var(--cyan);
+            border-radius: 4px;
+            opacity: 0.3;
+            animation: spRing 0.9s ease infinite;
+        }
+
+        .speed-display {
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .progress-bar {
+            flex: 1;
+            height: 2px;
+            background: var(--border);
+            border-radius: 1px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--cyan), var(--purple));
+            transition: width 0.3s ease;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+
+        .status-indicator.running .status-dot {
+            background: var(--yellow);
+            animation: blink 0.6s ease infinite;
+        }
+
+        .status-indicator.done .status-dot {
+            background: var(--green);
+        }
+
+        /* ========== HEADER ========== */
+        .header {
+            padding: 40px 20px;
+            text-align: center;
+        }
+
+        .badge {
+            display: inline-block;
+            border: 1px solid var(--cyan);
+            color: var(--cyan);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 16px;
+        }
+
+        .header h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: clamp(28px, 5vw, 54px);
+            font-weight: 800;
+            margin-bottom: 12px;
+            background: linear-gradient(90deg, var(--text), var(--cyan), var(--purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            font-size: 12px;
+            letter-spacing: 1px;
+        }
+
+        /* ========== NAV PILLS ========== */
+        .nav-pills {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+            padding: 0 20px 40px;
+        }
+
+        .nav-pill {
+            padding: 8px 16px;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--muted);
+            cursor: pointer;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.2s;
+        }
+
+        .nav-pill:hover {
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        .nav-pill.active {
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        /* ========== GOLDEN RULE BANNER ========== */
+        .golden-rule {
+            margin: 40px 20px;
+            padding: 20px;
+            border-radius: 10px;
+            background: rgba(168, 85, 247, 0.08);
+            border: 1px solid var(--border);
+            border-top: 3px solid var(--purple);
+        }
+
+        .golden-rule h3 {
+            font-family: 'Syne', sans-serif;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--cyan);
+            margin-bottom: 12px;
+        }
+
+        .rule-syntax {
+            font-size: 12px;
+            line-height: 1.8;
+            color: var(--text);
+        }
+
+        .kw { color: var(--purple); font-weight: bold; }
+        .fn { color: var(--cyan); }
+        .hk { color: var(--yellow); font-weight: bold; }
+        .part { color: var(--orange); font-weight: bold; }
+        .order { color: var(--green); font-weight: bold; }
+        .frame { color: var(--pink); }
+        .cm { color: var(--muted); font-style: italic; }
+
+        /* ========== SECTIONS ========== */
+        section {
+            margin: 40px 20px;
+            scroll-margin-top: 60px;
+        }
+
+        .section-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .section-card.s01 { border-top: 3px solid var(--cyan); }
+        .section-card.s02 { border-top: 3px solid var(--purple); }
+        .section-card.s03 { border-top: 3px solid var(--orange); }
+        .section-card.s04 { border-top: 3px solid var(--green); }
+
+        .section-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .section-number {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--muted);
+        }
+
+        .section-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            margin-top: 8px;
+        }
+
+        .s01 .section-title { color: var(--cyan); }
+        .s02 .section-title { color: var(--purple); }
+        .s03 .section-title { color: var(--orange); }
+        .s04 .section-title { color: var(--green); }
+
+        /* ========== EXPLAIN BLOCK ========== */
+        .explain {
+            padding: 16px;
+            margin: 0 20px 20px;
+            border-left: 3px solid;
+            background: rgba(0, 212, 255, 0.04);
+            border-radius: 4px;
+            font-size: 13px;
+            color: var(--text);
+            line-height: 1.7;
+        }
+
+        .s01 .explain { border-left-color: var(--cyan); background: rgba(0, 212, 255, 0.04); }
+        .s02 .explain { border-left-color: var(--purple); background: rgba(168, 85, 247, 0.04); }
+        .s03 .explain { border-left-color: var(--orange); background: rgba(249, 115, 22, 0.04); }
+        .s04 .explain { border-left-color: var(--green); background: rgba(34, 211, 160, 0.04); }
+
+        .explain strong {
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        /* ========== TAB SWITCHER ========== */
+        .tabs {
+            display: flex;
+            gap: 12px;
+            padding: 0 20px 12px;
+            border-bottom: 1px solid var(--border);
+            overflow-x: auto;
+        }
+
+        .tab {
+            padding: 8px 14px;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: var(--muted);
+            cursor: pointer;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .tab:hover {
+            color: var(--orange);
+        }
+
+        .tab.active {
+            color: var(--orange);
+            border-bottom-color: var(--orange);
+            background: rgba(249, 115, 22, 0.1);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.show {
+            display: block;
+        }
+
+        /* ========== SQL QUERY BOX ========== */
+        .sql-box {
+            margin: 0 20px;
+            background: #080b12;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .sql-header {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .mac-dots {
+            display: flex;
+            gap: 6px;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .dot.r { background: var(--pink); }
+        .dot.y { background: var(--yellow); }
+        .dot.g { background: var(--green); }
+
+        .sql-lang {
+            margin-left: auto;
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--muted);
+        }
+
+        .sql-code {
+            padding: 16px;
+            overflow-x: auto;
+            font-size: 11px;
+            line-height: 1.6;
+            color: var(--text);
+        }
+
+        .sql-code .kw { color: var(--purple); font-weight: bold; }
+        .sql-code .fn { color: var(--cyan); }
+        .sql-code .hk { color: var(--yellow); font-weight: bold; }
+        .sql-code .cm { color: var(--muted); font-style: italic; }
+
+        /* ========== PIPELINE BAR ========== */
+        .pipeline {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin: 30px 20px;
+            position: relative;
+        }
+
+        .pipeline::before,
+        .pipeline::after {
+            content: '';
+            position: absolute;
+            height: 2px;
+            background: var(--border);
+            top: 24px;
+            z-index: 0;
+        }
+
+        .pipeline::before {
+            left: 12.5%;
+            right: 62.5%;
+        }
+
+        .pipeline::after {
+            left: 37.5%;
+            right: 12.5%;
+        }
+
+        .pipe-step {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .pipe-dot {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: var(--muted);
+            transition: all 0.35s;
+            border: 2px solid transparent;
+        }
+
+        .pipe-step.active .pipe-dot {
+            background: var(--yellow);
+            color: var(--bg);
+            border-color: var(--yellow);
+        }
+
+        .pipe-step.done .pipe-dot {
+            background: var(--green);
+            color: var(--bg);
+            border-color: var(--green);
+        }
+
+        .pipe-step.active::after {
+            content: '';
+            position: absolute;
+            top: 12px;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 2px solid var(--yellow);
+            animation: ring 0.9s ease infinite;
+        }
+
+        .pipe-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--muted);
+            text-align: center;
+            transition: all 0.35s;
+        }
+
+        .pipe-step.active .pipe-label {
+            color: var(--yellow);
+        }
+
+        .pipe-step.done .pipe-label {
+            color: var(--green);
+        }
+
+        /* ========== BUTTONS ========== */
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin: 20px;
+            justify-content: center;
+        }
+
+        button {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+        }
+
+        .btn-execute {
+            background: linear-gradient(135deg, var(--cyan), var(--purple));
+            color: var(--bg);
+            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+        }
+
+        .btn-execute:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 212, 255, 0.4);
+        }
+
+        .btn-execute:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-reset {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--muted);
+        }
+
+        .btn-reset:hover {
+            border-color: var(--muted);
+            color: var(--text);
+        }
+
+        /* ========== STAGES ========== */
+        .stages-container {
+            margin: 20px;
+        }
+
+        .stage {
+            display: none;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: rgba(0, 212, 255, 0.04);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .stage.show {
+            display: block;
+            animation: fadeUp 0.4s ease both;
+        }
+
+        .stage-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 16px;
+            color: var(--cyan);
+        }
+
+        /* ========== TABLES ========== */
+        .tbl-wrap {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+
+        .tbl-title {
+            padding: 12px 16px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--muted);
+            border-bottom: 1px solid var(--border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: rgba(0, 212, 255, 0.1);
+            color: var(--cyan);
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background: rgba(0, 212, 255, 0.04);
+        }
+
+        /* ========== COLOR CODING ========== */
+        .vc { color: var(--cyan); }
+        .vo { color: var(--orange); }
+        .vp { color: var(--purple); }
+        .vg { color: var(--green); font-weight: bold; }
+        .vy { color: var(--yellow); }
+        .vm { color: var(--muted); }
+        .vpk { color: var(--pink); }
+        .vb { color: var(--blue); }
+
+        tr.hl-y td { background: rgba(251, 191, 36, 0.15); }
+        tr.hl-c td { background: rgba(0, 212, 255, 0.15); }
+        tr.hl-o td { background: rgba(249, 115, 22, 0.15); }
+        tr.hl-p td { background: rgba(168, 85, 247, 0.15); }
+        tr.hl-g td { background: rgba(34, 211, 160, 0.15); }
+
+        /* ========== RESULT BOXES ========== */
+        .res-bad, .res-good, .res-info {
+            border: 2px solid;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 12px 0;
+            font-size: 12px;
+        }
+
+        .res-bad {
+            border-color: var(--pink);
+            background: rgba(244, 63, 94, 0.08);
+            color: var(--text);
+        }
+
+        .res-good {
+            border-color: var(--green);
+            background: rgba(34, 211, 160, 0.08);
+            color: var(--text);
+        }
+
+        .res-info {
+            border-color: var(--cyan);
+            background: rgba(0, 212, 255, 0.08);
+            color: var(--text);
+        }
+
+        /* ========== IMPACT BADGE ========== */
+        .impact {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: bold;
+            margin-top: 8px;
+        }
+
+        .imp-c { background: rgba(0, 212, 255, 0.2); color: var(--cyan); }
+        .imp-p { background: rgba(168, 85, 247, 0.2); color: var(--purple); }
+        .imp-o { background: rgba(249, 115, 22, 0.2); color: var(--orange); }
+        .imp-g { background: rgba(34, 211, 160, 0.2); color: var(--green); }
+        .imp-pk { background: rgba(244, 63, 94, 0.2); color: var(--pink); }
+        .imp-y { background: rgba(251, 191, 36, 0.2); color: var(--yellow); }
+
+        /* ========== LAYOUT HELPERS ========== */
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .three-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+        }
+
+        @media (max-width: 720px) {
+            .two-col, .three-col {
+                grid-template-columns: 1fr;
+            }
+            .pipeline {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+            .pipeline::before, .pipeline::after {
+                display: none;
+            }
+        }
+
+        /* ========== ANIMATIONS ========== */
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes ring {
+            0% {
+                transform: scale(1);
+                opacity: 0.7;
+            }
+            100% {
+                transform: scale(2.2);
+                opacity: 0;
+            }
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.1; }
+        }
+
+        @keyframes spRing {
+            0% {
+                transform: scale(1);
+                opacity: 0.6;
+            }
+            100% {
+                transform: scale(1.3);
+                opacity: 0;
+            }
+        }
+
+        /* ========== FOOTER ========== */
+        footer {
+            margin-top: 80px;
+            padding: 40px 20px;
+            text-align: center;
+            border-top: 1px solid var(--border);
+            color: var(--muted);
+            font-size: 11px;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+    <div class="content-wrapper">
+        <!-- SPEED BAR -->
+        <div class="speed-bar">
+            <div class="speed-buttons">
+                <button class="speed-btn" data-speed="1">1x</button>
+                <button class="speed-btn" data-speed="2">2x</button>
+                <button class="speed-btn active" data-speed="3">3x</button>
+                <button class="speed-btn" data-speed="5">5x</button>
+                <button class="speed-btn" data-speed="8">8x</button>
+            </div>
+            <div class="speed-display">
+                <span id="stepDisplay">Step: 1.0s</span> · <span id="rowDisplay">Row: 0.5s</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill"></div>
+            </div>
+            <div class="status-indicator" id="status">
+                <div class="status-dot"></div>
+                <span id="statusText">Ready</span>
+            </div>
+        </div>
+
+        <!-- HEADER -->
+        <div class="header">
+            <div class="badge">SQL Window Functions</div>
+            <h1>Window Value Functions</h1>
+            <p class="subtitle">Analyze data relationships across rows without complex joins</p>
+        </div>
+
+        <!-- NAV PILLS -->
+        <div class="nav-pills">
+            <button class="nav-pill active" data-section="1">01. Lead/Lag</button>
+            <button class="nav-pill" data-section="2">02. Lead/Lag Adv</button>
+            <button class="nav-pill" data-section="3">03. First Value</button>
+            <button class="nav-pill" data-section="4">04. Last Value</button>
+        </div>
+
+        <!-- GOLDEN RULE -->
+        <div class="golden-rule">
+            <h3>The Core Pattern</h3>
+            <div class="rule-syntax">
+                <span class="kw">SELECT</span> *,<br/>
+                &nbsp;&nbsp;<span class="fn">LAG</span>|<span class="fn">LEAD</span>|<span class="fn">FIRST_VALUE</span>|<span class="fn">LAST_VALUE</span>(<span class="hk">column</span>)
+                <span class="kw">OVER</span> (
+                <span class="part">PARTITION BY</span> col <span class="order">ORDER BY</span> col
+                <span class="frame">ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING</span>
+                )<br/>
+                <span class="kw">FROM</span> table;
+            </div>
+        </div>
+
+        <!-- SECTION 1: LEAD/LAG BASIC -->
+        <section id="sec1">
+            <div class="section-card s01">
+                <div class="section-header">
+                    <div class="section-number">Section 01</div>
+                    <div class="section-title">LEAD & LAG: Month-over-Month</div>
+                </div>
+
+                <div class="explain">
+                    <strong>LAG</strong> retrieves a value from a <strong>previous row</strong> in the result set.
+                    <strong>LEAD</strong> retrieves a value from the <strong>next row</strong>.
+                    Together they enable row-to-row comparisons without self-joins.
+                </div>
+
+                <div class="sql-box">
+                    <div class="sql-header">
+                        <div class="mac-dots">
+                            <div class="dot r"></div>
+                            <div class="dot y"></div>
+                            <div class="dot g"></div>
+                        </div>
+                        <div class="sql-lang">SQL</div>
+                    </div>
+                    <div class="sql-code">
+<span class="cm">-- Month-over-Month Sales Change</span><br/>
+<span class="kw">SELECT</span><br/>
+&nbsp;&nbsp;OrderMonth,<br/>
+&nbsp;&nbsp;CurrentMonthSales,<br/>
+&nbsp;&nbsp;<span class="hk">LAG</span><span class="fn">(</span>CurrentMonthSales<span class="fn">)</span> <span class="kw">OVER</span> (<span class="kw">ORDER BY</span> OrderMonth<span class="fn">)</span> <span class="kw">AS</span> PreviousMonth,<br/>
+&nbsp;&nbsp;CurrentMonthSales - LAG(...) <span class="kw">AS</span> MoM_Change<br/>
+<span class="kw">FROM</span> MonthlySales;
+                    </div>
+                </div>
+
+                <div class="pipeline">
+                    <div class="pipe-step">
+                        <div class="pipe-dot">1</div>
+                        <div class="pipe-label">Scan Months</div>
+                    </div>
+                    <div class="pipe-step">
+                        <div class="pipe-dot">2</div>
+                        <div class="pipe-label">Sort Order</div>
+                    </div>
+                    <div class="pipe-step">
+                        <div class="pipe-dot">3</div>
+                        <div class="pipe-label">Fetch Prev</div>
+                    </div>
+                    <div class="pipe-step">
+                        <div class="pipe-dot">4</div>
+                        <div class="pipe-label">Calculate</div>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-execute" id="btn-s1">Execute</button>
+                    <button class="btn-reset" id="reset-s1">Reset</button>
+                </div>
+
+                <div class="stages-container">
+                    <div class="stage" id="stage_s1_1">
+                        <div class="stage-title">Stage 1: Input Data</div>
+                        <div class="tbl-wrap">
+                            <div class="tbl-title">Monthly Sales Data</div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Month</th>
+                                        <th>Sales ($)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="s1_stage1">
+                                    <tr><td class="vy">Jan</td><td class="vg">45000</td></tr>
+                                    <tr><td class="vy">Feb</td><td class="vg">52000</td></tr>
+                                    <tr><td class="vy">Mar</td><td class="vg">48500</td></tr>
+                                    <tr><td class="vy">Apr</td><td class="vg">61200</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="stage" id="stage_s1_2">
+                        <div class="stage-title">Stage 2: Apply LAG Window</div>
+                        <div class="tbl-wrap">
+                            <div class="tbl-title">With Previous Month</div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Month</th>
+                                        <th>Current Sales</th>
+                                        <th>Previous Sales</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="s1_stage2"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="stage" id="stage_s1_3">
+                        <div class="stage-title">Stage 3: Calculate Change</div>
+                        <div class="tbl-wrap">
+                            <div class="tbl-title">Month-over-Month Analysis</div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Month</th>
+                                        <th>Current</th>
+                                        <th>Previous</th>
+                                        <th>Change</th>
+                                        <th>%</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="s1_stage3"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="stage" id="stage_s1_4">
+                        <div class="stage-title">Stage 4: Results</div>
+                        <div class="res-good">
+                            <strong>✓ Success:</strong> LAG() retrieved previous month values in a single pass.
+                            No complex JOIN needed!
+                            <span class="impact imp-g">Efficient</span>
+                        </div>
+                        <p style="margin-top: 12px; color: var(--muted); font-size: 12px;">
+                            Notice Jan shows NULL for Previous Month (no prior value exists).
+                            This is the standard behavior—use COALESCE() to provide defaults.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: LEAD/LAG ADVANCED -->
+        <section id="sec2">
+            <div class="section-card s02">
+                <div class="section-header">
+                    <div class="section-number">Section 02</div>
+                    <div class="section-title">LEAD & LAG: Customer Loyalty</div>
+                </div>
+
+                <div class="explain">
+                    <strong>Partition-based windows</strong> segment data by category (e.g., per customer).
+                    <strong>LEAD</strong> with <strong>PARTITION BY</strong> finds the next order <strong>within each customer's timeline</strong>,
+                    enabling cross-row analysis on grouped subsets.
+                </div>
+
+                <div class="sql-box">
+                    <div class="sql-header">
+                        <div class="mac-dots">
+                            <div class="dot r"></div>
+                            <div class="dot y"></div>
+                            <div class="dot g"></div>
+                        </div>
+                        <div class="sql-lang">SQL</div>
+                    </div>
+                    <div class="sql-code">
+<span class="cm">-- Customer Order Intervals</span><br/>
+<span class="kw">SELECT</span><br/>
+&nbsp;&nbsp;CustomerID,<br/>
+&nbsp;&nbsp;OrderDate,<br/>
+&nbsp;&nbsp;<span class="hk">LEAD</span><span class="fn">(</span>OrderDate<span class="fn">)</span> <span class="kw">OVER</span> (<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="part">PARTITION BY</span> CustomerID<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">ORDER BY</span> OrderDate<br/>
+&nbsp;&nbsp;<span class="fn">)</span> <span class="kw">AS</span> NextOrder,<br/>
+&nbsp;&nbsp;<span class="fn">DATEDIFF</span>(day, OrderDate, <span class="hk">LEAD</span>(...)) <span class="kw">AS</span> DaysBetween<br/>
+<span class="kw">FROM</span> Orders;
+                    </div>
+                </div>
+
+                <div class="pipeline">
+                    <div class="pipe-step">
+                        <div class="pipe-dot">1</div>
+                        <div class="pipe-label">Partition Cust</div>
+                    </div>
+                    <div class="pipe-step">
+                        <div class="pipe-dot">2</div>
+                        <div class="pipe-label">Sort Orders</div>
+                    </div>
+                    <div class="pipe-step">
+                        <div class="pipe-dot">3</div>
+                        <div class="pipe-label">Pair Rows</div>
+                    </div>
+                    <div class="pipe-step">
+                        <div class="pipe-dot">4</div>
+                        <div class="pipe-label">Compute Diff</div>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-execute" id="btn-s2">Execute</button>
+                    <button class="btn-reset" id="reset-s2">Reset</button>
+                </div>
+
+                <div class="stages-container">
+                    <div class="stage" id="stage_s2_1">
+                        <div class="stage-title">Stage 1: Input Orders</div>
+                        <div class="tbl-wrap">
+                            <div class="tbl-title">All Customer Orders</div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Cust ID</th>
+                                        <th>Order Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="s2_stage1"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="stage" id="stage_s2_2">
+                        <div class="stage-title">Stage 2: Partition by Customer</div>
+                        <div class="res-info">
+                            Data is grouped by CustomerID. Each customer's orders are kept together and sorted chronologically.
+                        </div>
+                        <div class="tbl-wrap">
+                            <div class="tbl-title">Partitioned & Sorted</div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Cust ID</th>
+                                        <th>Order Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="s2_stage2"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="stage" id="stage_s2_3">
+                        <div class="stage-title">Stage 3: Apply LEAD</div>
+                        <div class="tbl-wrap">
+                            <div class="tbl-title">With Next Order Date</div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Cust ID</th>
+                                        <th>Order Date</th>
+                                        <th>Next Order</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="s2_stage3"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="stage" id="stage_s2_4">
+                        <div class="stage-title">Stage 4: Results</div>
+                        <div class="tbl-wrap">
+                            <div class="tbl-title">Days Between Orders (Loyalty Metric)</div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Cust ID</th>
+                                        <th>Order Date</th>
+                                        <th>Next Date</th>
+                                        <th>Days Between</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="s2_stage4"></tbody>
+                            </table>
+                        </div>
+                        <div class="res-good">
+                            <strong>✓ Complete:</strong> Identified order intervals per customer without subqueries.
+                            <span class="impact imp-g">Loyalty Analysis Ready</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 3: FIRST_VALUE -->
+        <section id="sec3">
+            <div class="section-card s03">
+                <div class="section-header">
+                    <div class="section-number">Section 03</div>
+                    <div class="section-title">FIRST_VALUE: Product Price Baselines</div>
+                </div>
+
+                <div class="explain">
+                    <strong>FIRST_VALUE</strong> returns the <strong>first value in the window</strong> according to the
+                    <strong>ORDER BY</strong> clause. It's perfect for comparing each row against a baseline (lowest price, first date, etc.).
+                </div>
+
+                <div class="sql-box">
+                    <div class="sql-header">
+                        <div class="mac-dots">
+                            <div class="dot r"></div>
+                            <div class="dot y"></div>
+                            <div class="dot g"></div>
+                        </div>
+                        <div class="sql-lang">SQL</div>
+                    </div>
+                    <div class="sql-code">
+<span class="cm">-- Sales vs Lowest Price Per Product</span><br/>
+<span class="kw">SELECT</span><br/>
+&nbsp;&nbsp;ProductID,<br/>
+&nbsp;&nbsp;Sales,<br/>
+&nbsp;&nbsp;<span class="hk">FIRST_VALUE</span><span class="fn">(</span>Sales<span class="fn">)</span> <span class="kw">OVER</span> (<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="part">PARTITION BY</span> ProductID<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">ORDER BY</span> Sales<br/>
+&nbsp;&nbsp;<span class="fn">)</span> <span class="kw">AS</span> LowestPrice<br/>
+<span class="kw">FROM</span> Orders;
+                    </div>
+                </div>
+
+                <div class="pipeline">
+                    <div class="pipe-step">
+                        <div class="pipe-dot">1</div>
+                        <div class="pipe-label">Partition Prod</div>
+                    </div>
+                    <div class="pipe-step">
+                        <div class="pipe-dot">2</div>
+                        <div class="pipe-label">Sort by Price</div>
+                    </div>
+                    <div class="pipe-step">
+                        <div class="pipe-dot">3</div>
+                        <div class="pipe-label">Grab First</div>
+                    </div>
+                    <div class="pipe-step">
+                        <div class="pipe-dot">4</div>
+                        <div class="pipe-label">Compare</div>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-execute" id="btn-s3">Execute</button>
+                    <button class="btn-reset" id="reset-s3">Reset</button>
+                </div>
+
+                <div class="stages-container">
+                    <div class="stage" id="stage_s3_1">
+                        <div class="stage-title">Stage 1: Product Sales</div>
+                        <div class="tbl-wrap">
+                            <div class="tbl-title">Unsorted Sales</div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Prod ID</th>
+                                        <th>Sales</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="s3_stage1"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="stage" id="stage_s3_2">
+                        <div class="stage-title">Stage 2: Partition & Sort</div>
+                        <div class="res-info">
+                            Data is partitioned by ProductID and sorted by Sales (ascending).
+                            The first row in each partition becomes the baseline.
+                        </div>
+                        <div class="tbl-wrap">
+                            <div class="tbl-title">Sorted by Price (Low→High)</div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Prod ID</th>
+                                        <th>Sales</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="s3_stage2"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="stage" id="stage_s3_3">
+                        <div class="stage-title">Stage 3: Identify Baselines</div>
+                        <div class="tbl-wrap">
+                            <div class="tbl-title">FIRST_VALUE per Product</div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Prod ID</th>
+                                        <th>Current Sales</th>
+                                        <th>Baseline (Lowest)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="s3_stage3"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="stage" id="stage_s3_4">
+                        <div class="stage-title">Stage 4: Final Results</div>
+                        <div class="tbl-wrap">
+                            <div class="tbl-title">Sales with Baseline Comparison</div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Prod ID</th>
+                                        <th>Sales</th>
+                                        <th>Lowest</th>
+                                        <th>vs. Baseline</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="s3_stage4"></tbody>
+                            </table>
+                        </div>
+                        <div class="res-good">
+                            <strong>✓ Complete:</strong> FIRST_VALUE locked the baseline for each product.
+                            <span class="impact imp-o">Baseline Locked</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 4: LAST_VALUE -->
+        <section id="sec4">
+            <div class="section-card s04">
+                <div class="section-header">
+                    <div class="section-number">Section 04</div>
+                    <div class="section-title">LAST_VALUE: Product Price Ceiling</div>
+                </div>
+
+                <div class="explain">
+                    <strong>LAST_VALUE</strong> returns the <strong>last value in the window</strong>. To include all rows,
+                    use a <strong>ROWS frame</strong>: <span class="vy">ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING</span>.
+                    This captures the maximum/final value across the entire partition.
+                </div>
+
+                <div class="sql-box">
+                    <div class="sql-header">
+                        <div class="mac-dots">
+                            <div class="dot r"></div>
+                            <div class="dot y"></div>
+                            <div class="dot g"></div>
+                        </div>
+                        <div class="sql-lang">SQL</div>
+                    </div>
+                    <div class="sql-code">
+<span class="cm">-- Sales vs Highest Price Per Product</span><br/>
+<span class="kw">SELECT</span><br/>
+&nbsp;&nbsp;ProductID,<br/>
+&nbsp;&nbsp;Sales,<br/>
+&nbsp;&nbsp;<span class="hk">LAST_VALUE</span><span class="fn">(</span>Sales<span class="fn">)</span> <span class="kw">OVER</span> (<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="part">PARTITION BY</span> ProductID<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">ORDER BY</span> Sales<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="frame">ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING</span><br/>
+&nbsp;&nbsp;<span class="fn">)</span> <span class="kw">AS</span> HighestPrice<br/>
+<span class="kw">FROM</span> Orders;
+                    </div>
+                </div>
+
+                <div class="pipeline">
+                    <div class="pipe-step">
+                        <div class="pipe-dot">1</div>
+                        <div class="pipe-label">Partition Prod</div>
+                    </div>
+                    <div class="pipe-step">
+                        <div class="pipe-dot">2</div>
+                        <div class="pipe-label">Sort by Price</div>
+                    </div>
+                    <div class="pipe-step">
+                        <div class="pipe-dot">3</div>
+                        <div class="pipe-label">Expand Frame</div>
+                    </div>
+                    <div class="pipe-step">
+                        <div class="pipe-dot">4</div>
+                        <div class="pipe-label">Grab Last</div>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-execute" id="btn-s4">Execute</button>
+                    <button class="btn-reset" id="reset-s4">Reset</button>
+                </div>
+
+                <div class="stages-container">
+                    <div class="stage" id="stage_s4_1">
+                        <div class="stage-title">Stage 1: Product Sales</div>
+                        <div class="tbl-wrap">
+                            <div class="tbl-title">Input Sales Data</div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Prod ID</th>
+                                        <th>Sales</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="s4_stage1"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="stage" id="stage_s4_2">
+                        <div class="stage-title">Stage 2: Partition & Sort</div>
+                        <div class="res-info">
+                            Data is partitioned by ProductID and sorted by Sales (ascending).
+                        </div>
+                        <div class="tbl-wrap">
+                            <div class="tbl-title">Sorted by Sales</div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Prod ID</th>
+                                        <th>Sales</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="s4_stage2"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="stage" id="stage_s4_3">
+                        <div class="stage-title">Stage 3: Expand Window Frame</div>
+                        <div class="res-info">
+                            The ROWS frame extends from current row to UNBOUNDED FOLLOWING,
+                            so each row can "see" all rows from itself to the last.
+                        </div>
+                        <div class="tbl-wrap">
+                            <div class="tbl-title">Window Scope (ROWS BETWEEN)</div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Prod ID</th>
+                                        <th>Sales</th>
+                                        <th>Window Scope</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="s4_stage3"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="stage" id="stage_s4_4">
+                        <div class="stage-title">Stage 4: Final Results</div>
+                        <div class="tbl-wrap">
+                            <div class="tbl-title">Sales Range (Min → Max)</div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Prod ID</th>
+                                        <th>Sales</th>
+                                        <th>Lowest</th>
+                                        <th>Highest</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="s4_stage4"></tbody>
+                            </table>
+                        </div>
+                        <div class="res-good">
+                            <strong>✓ Complete:</strong> LAST_VALUE with ROWS frame captured the price ceiling.
+                            <span class="impact imp-g">Range Analysis Done</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FOOTER -->
+        <footer>
+            SQL Window Functions · Interactive Visualization · Built with Pure HTML/CSS/JavaScript
+        </footer>
+    </div>
+
+    <script>
+        // ========== STATE & CONFIG ==========
+        let SM = 3; // Speed multiplier (default 3x)
+
+        const SD = base => new Promise(r => setTimeout(r, Math.round(base * Math.pow(SM, 1.45))));
+        const RD = base => new Promise(r => setTimeout(r, Math.round(base * Math.pow(SM, 1.4))));
+
+        function sp(id, state) {
+            const el = document.getElementById(id);
+            if (el) el.className = 'pipe-step ' + (state || '');
+        }
+
+        function show(id) {
+            const el = document.getElementById(id);
+            if (el) {
+                el.classList.add('show');
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        function hide(id) {
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('show');
+        }
+
+        function clr(id) {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = '';
+        }
+
+        function startProg() {
+            document.getElementById('status').classList.remove('done');
+            document.getElementById('status').classList.add('running');
+            document.getElementById('statusText').textContent = 'Running...';
+            document.querySelector('.progress-fill').style.width = '0%';
+        }
+
+        function endProg() {
+            document.getElementById('status').classList.remove('running');
+            document.getElementById('status').classList.add('done');
+            document.getElementById('statusText').textContent = 'Done';
+            document.querySelector('.progress-fill').style.width = '100%';
+        }
+
+        // ========== SPEED CONTROL ==========
+        document.querySelectorAll('.speed-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                SM = parseInt(btn.dataset.speed);
+                updateSpeedDisplay();
+            });
+        });
+
+        function updateSpeedDisplay() {
+            const stepMs = Math.round(150 * Math.pow(SM, 1.45));
+            const rowMs = Math.round(100 * Math.pow(SM, 1.4));
+            document.getElementById('stepDisplay').textContent = `Step: ${(stepMs / 1000).toFixed(2)}s`;
+            document.getElementById('rowDisplay').textContent = `Row: ${(rowMs / 1000).toFixed(2)}s`;
+        }
+
+        updateSpeedDisplay();
+
+        // ========== NAV PILLS ==========
+        document.querySelectorAll('.nav-pill').forEach(pill => {
+            pill.addEventListener('click', () => {
+                document.querySelectorAll('.nav-pill').forEach(p => p.classList.remove('active'));
+                pill.classList.add('active');
+                const section = document.getElementById('sec' + pill.dataset.section);
+                if (section) section.scrollIntoView({ behavior: 'smooth' });
+            });
+        });
+
+        // ========== SECTION 1: LEAD/LAG BASIC ==========
+        document.getElementById('btn-s1').addEventListener('click', runS1);
+        document.getElementById('reset-s1').addEventListener('click', resetS1);
+
+        async function runS1() {
+            document.getElementById('btn-s1').disabled = true;
+            startProg();
+
+            const data = [
+                { month: 'Jan', sales: 45000 },
+                { month: 'Feb', sales: 52000 },
+                { month: 'Mar', sales: 48500 },
+                { month: 'Apr', sales: 61200 }
+            ];
+
+            // Stage 1
+            sp('s1-pipe-1', 'active');
+            clr('s1_stage1');
+            show('stage_s1_1');
+            const tb1 = document.getElementById('s1_stage1');
+            for (const row of data) {
+                const tr = document.createElement('tr');
+                tr.classList.add('hl-y');
+                tr.innerHTML = `<td class="vy">${row.month}</td><td class="vg">${row.sales.toLocaleString()}</td>`;
+                tb1.appendChild(tr);
+                await RD(100);
+            }
+            await SD(300);
+
+            // Stage 2
+            sp('s1-pipe-1', 'done');
+            sp('s1-pipe-2', 'active');
+            clr('s1_stage2');
+            show('stage_s1_2');
+            const tb2 = document.getElementById('s1_stage2');
+            for (let i = 0; i < data.length; i++) {
+                const tr = document.createElement('tr');
+                tr.classList.add('hl-c');
+                const prev = i === 0 ? '—' : data[i - 1].sales.toLocaleString();
+                tr.innerHTML = `<td class="vy">${data[i].month}</td><td class="vg">${data[i].sales.toLocaleString()}</td><td class="vm">${prev}</td>`;
+                tb2.appendChild(tr);
+                await RD(120);
+            }
+            await SD(300);
+
+            // Stage 3
+            sp('s1-pipe-2', 'done');
+            sp('s1-pipe-3', 'active');
+            clr('s1_stage3');
+            show('stage_s1_3');
+            const tb3 = document.getElementById('s1_stage3');
+            for (let i = 0; i < data.length; i++) {
+                const tr = document.createElement('tr');
+                tr.classList.add('hl-o');
+                const prev = i === 0 ? null : data[i - 1].sales;
+                const change = prev === null ? '—' : (data[i].sales - prev).toLocaleString();
+                const pct = prev === null ? '—' : ((data[i].sales - prev) / prev * 100).toFixed(1) + '%';
+                const changeColor = prev === null ? 'vm' : (data[i].sales >= prev ? 'vg' : 'vpk');
+                tr.innerHTML = `<td class="vy">${data[i].month}</td><td class="vg">${data[i].sales.toLocaleString()}</td><td class="vm">${prev ? prev.toLocaleString() : '—'}</td><td class="${changeColor}">${change}</td><td class="${changeColor}">${pct}</td>`;
+                tb3.appendChild(tr);
+                await RD(140);
+            }
+            await SD(300);
+
+            // Stage 4
+            sp('s1-pipe-3', 'done');
+            sp('s1-pipe-4', 'active');
+            show('stage_s1_4');
+            await SD(500);
+            sp('s1-pipe-4', 'done');
+            endProg();
+            document.getElementById('btn-s1').disabled = false;
+        }
+
+        function resetS1() {
+            ['s1_stage1', 's1_stage2', 's1_stage3'].forEach(clr);
+            ['stage_s1_1', 'stage_s1_2', 'stage_s1_3', 'stage_s1_4'].forEach(hide);
+            ['s1-pipe-1', 's1-pipe-2', 's1-pipe-3', 's1-pipe-4'].forEach(i => sp(i, ''));
+            document.getElementById('btn-s1').disabled = false;
+        }
+
+        // ========== SECTION 2: LEAD/LAG ADVANCED ==========
+        document.getElementById('btn-s2').addEventListener('click', runS2);
+        document.getElementById('reset-s2').addEventListener('click', resetS2);
+
+        async function runS2() {
+            document.getElementById('btn-s2').disabled = true;
+            startProg();
+
+            const orders = [
+                { cid: 'C001', date: '2024-01-05' },
+                { cid: 'C001', date: '2024-02-10' },
+                { cid: 'C001', date: '2024-04-15' },
+                { cid: 'C002', date: '2024-01-12' },
+                { cid: 'C002', date: '2024-03-20' },
+                { cid: 'C003', date: '2024-02-01' }
+            ];
+
+            const colors = { 'C001': 'hl-c', 'C002': 'hl-o', 'C003': 'hl-p' };
+
+            // Stage 1
+            sp('s2-pipe-1', 'active');
+            clr('s2_stage1');
+            show('stage_s2_1');
+            const tb1 = document.getElementById('s2_stage1');
+            for (const order of orders) {
+                const tr = document.createElement('tr');
+                tr.classList.add('hl-y');
+                tr.innerHTML = `<td class="vc">${order.cid}</td><td class="vy">${order.date}</td>`;
+                tb1.appendChild(tr);
+                await RD(100);
+            }
+            await SD(300);
+
+            // Stage 2
+            sp('s2-pipe-1', 'done');
+            sp('s2-pipe-2', 'active');
+            clr('s2_stage2');
+            show('stage_s2_2');
+            const tb2 = document.getElementById('s2_stage2');
+            for (const order of orders) {
+                const tr = document.createElement('tr');
+                tr.classList.add(colors[order.cid]);
+                tr.innerHTML = `<td class="vc">${order.cid}</td><td class="vy">${order.date}</td>`;
+                tb2.appendChild(tr);
+                await RD(120);
+            }
+            await SD(300);
+
+            // Stage 3
+            sp('s2-pipe-2', 'done');
+            sp('s2-pipe-3', 'active');
+            clr('s2_stage3');
+            show('stage_s2_3');
+            const tb3 = document.getElementById('s2_stage3');
+            const ordered = [
+                { cid: 'C001', date: '2024-01-05', next: '2024-02-10' },
+                { cid: 'C001', date: '2024-02-10', next: '2024-04-15' },
+                { cid: 'C001', date: '2024-04-15', next: null },
+                { cid: 'C002', date: '2024-01-12', next: '2024-03-20' },
+                { cid: 'C002', date: '2024-03-20', next: null },
+                { cid: 'C003', date: '2024-02-01', next: null }
+            ];
+            for (const order of ordered) {
+                const tr = document.createElement('tr');
+                tr.classList.add(colors[order.cid]);
+                tr.innerHTML = `<td class="vc">${order.cid}</td><td class="vy">${order.date}</td><td class="vg">${order.next || '—'}</td>`;
+                tb3.appendChild(tr);
+                await RD(120);
+            }
+            await SD(300);
+
+            // Stage 4
+            sp('s2-pipe-3', 'done');
+            sp('s2-pipe-4', 'active');
+            clr('s2_stage4');
+            show('stage_s2_4');
+            const tb4 = document.getElementById('s2_stage4');
+            for (const order of ordered) {
+                const tr = document.createElement('tr');
+                tr.classList.add(colors[order.cid]);
+                const days = order.next ? Math.floor((new Date(order.next) - new Date(order.date)) / (1000 * 60 * 60 * 24)) : null;
+                tr.innerHTML = `<td class="vc">${order.cid}</td><td class="vy">${order.date}</td><td class="vy">${order.next || '—'}</td><td class="vg">${days ? days + ' days' : '—'}</td>`;
+                tb4.appendChild(tr);
+                await RD(120);
+            }
+            await SD(300);
+            sp('s2-pipe-4', 'done');
+            endProg();
+            document.getElementById('btn-s2').disabled = false;
+        }
+
+        function resetS2() {
+            ['s2_stage1', 's2_stage2', 's2_stage3', 's2_stage4'].forEach(clr);
+            ['stage_s2_1', 'stage_s2_2', 'stage_s2_3', 'stage_s2_4'].forEach(hide);
+            ['s2-pipe-1', 's2-pipe-2', 's2-pipe-3', 's2-pipe-4'].forEach(i => sp(i, ''));
+            document.getElementById('btn-s2').disabled = false;
+        }
+
+        // ========== SECTION 3: FIRST_VALUE ==========
+        document.getElementById('btn-s3').addEventListener('click', runS3);
+        document.getElementById('reset-s3').addEventListener('click', resetS3);
+
+        async function runS3() {
+            document.getElementById('btn-s3').disabled = true;
+            startProg();
+
+            const sales = [
+                { pid: 'P001', sales: 120 },
+                { pid: 'P001', sales: 95 },
+                { pid: 'P001', sales: 150 },
+                { pid: 'P002', sales: 200 },
+                { pid: 'P002', sales: 175 },
+                { pid: 'P002', sales: 250 }
+            ];
+
+            const pcolor = { 'P001': 'hl-c', 'P002': 'hl-o' };
+
+            // Stage 1
+            sp('s3-pipe-1', 'active');
+            clr('s3_stage1');
+            show('stage_s3_1');
+            const tb1 = document.getElementById('s3_stage1');
+            for (const row of sales) {
+                const tr = document.createElement('tr');
+                tr.classList.add('hl-y');
+                tr.innerHTML = `<td class="vc">${row.pid}</td><td class="vg">${row.sales}</td>`;
+                tb1.appendChild(tr);
+                await RD(100);
+            }
+            await SD(300);
+
+            // Stage 2
+            sp('s3-pipe-1', 'done');
+            sp('s3-pipe-2', 'active');
+            clr('s3_stage2');
+            show('stage_s3_2');
+            const tb2 = document.getElementById('s3_stage2');
+            const sorted = [...sales].sort((a, b) => a.pid !== b.pid ? a.pid.localeCompare(b.pid) : a.sales - b.sales);
+            for (const row of sorted) {
+                const tr = document.createElement('tr');
+                tr.classList.add(pcolor[row.pid]);
+                tr.innerHTML = `<td class="vc">${row.pid}</td><td class="vg">${row.sales}</td>`;
+                tb2.appendChild(tr);
+                await RD(110);
+            }
+            await SD(300);
+
+            // Stage 3
+            sp('s3-pipe-2', 'done');
+            sp('s3-pipe-3', 'active');
+            clr('s3_stage3');
+            show('stage_s3_3');
+            const tb3 = document.getElementById('s3_stage3');
+            const baselines = { 'P001': 95, 'P002': 175 };
+            for (const row of sorted) {
+                const tr = document.createElement('tr');
+                tr.classList.add(pcolor[row.pid]);
+                tr.innerHTML = `<td class="vc">${row.pid}</td><td class="vg">${row.sales}</td><td class="vy">${baselines[row.pid]}</td>`;
+                tb3.appendChild(tr);
+                await RD(110);
+            }
+            await SD(300);
+
+            // Stage 4
+            sp('s3-pipe-3', 'done');
+            sp('s3-pipe-4', 'active');
+            clr('s3_stage4');
+            show('stage_s3_4');
+            const tb4 = document.getElementById('s3_stage4');
+            for (const row of sorted) {
+                const tr = document.createElement('tr');
+                tr.classList.add(pcolor[row.pid]);
+                const diff = row.sales - baselines[row.pid];
+                tr.innerHTML = `<td class="vc">${row.pid}</td><td class="vg">${row.sales}</td><td class="vm">${baselines[row.pid]}</td><td class="${diff === 0 ? 'vm' : 'vg'}">${diff === 0 ? '(baseline)' : '+' + diff}</td>`;
+                tb4.appendChild(tr);
+                await RD(110);
+            }
+            await SD(300);
+            sp('s3-pipe-4', 'done');
+            endProg();
+            document.getElementById('btn-s3').disabled = false;
+        }
+
+        function resetS3() {
+            ['s3_stage1', 's3_stage2', 's3_stage3', 's3_stage4'].forEach(clr);
+            ['stage_s3_1', 'stage_s3_2', 'stage_s3_3', 'stage_s3_4'].forEach(hide);
+            ['s3-pipe-1', 's3-pipe-2', 's3-pipe-3', 's3-pipe-4'].forEach(i => sp(i, ''));
+            document.getElementById('btn-s3').disabled = false;
+        }
+
+        // ========== SECTION 4: LAST_VALUE ==========
+        document.getElementById('btn-s4').addEventListener('click', runS4);
+        document.getElementById('reset-s4').addEventListener('click', resetS4);
+
+        async function runS4() {
+            document.getElementById('btn-s4').disabled = true;
+            startProg();
+
+            const sales = [
+                { pid: 'P001', sales: 95 },
+                { pid: 'P001', sales: 120 },
+                { pid: 'P001', sales: 150 },
+                { pid: 'P002', sales: 175 },
+                { pid: 'P002', sales: 200 },
+                { pid: 'P002', sales: 250 }
+            ];
+
+            const pcolor = { 'P001': 'hl-c', 'P002': 'hl-o' };
+
+            // Stage 1
+            sp('s4-pipe-1', 'active');
+            clr('s4_stage1');
+            show('stage_s4_1');
+            const tb1 = document.getElementById('s4_stage1');
+            for (const row of sales) {
+                const tr = document.createElement('tr');
+                tr.classList.add('hl-y');
+                tr.innerHTML = `<td class="vc">${row.pid}</td><td class="vg">${row.sales}</td>`;
+                tb1.appendChild(tr);
+                await RD(100);
+            }
+            await SD(300);
+
+            // Stage 2
+            sp('s4-pipe-1', 'done');
+            sp('s4-pipe-2', 'active');
+            clr('s4_stage2');
+            show('stage_s4_2');
+            const tb2 = document.getElementById('s4_stage2');
+            for (const row of sales) {
+                const tr = document.createElement('tr');
+                tr.classList.add(pcolor[row.pid]);
+                tr.innerHTML = `<td class="vc">${row.pid}</td><td class="vg">${row.sales}</td>`;
+                tb2.appendChild(tr);
+                await RD(110);
+            }
+            await SD(300);
+
+            // Stage 3
+            sp('s4-pipe-2', 'done');
+            sp('s4-pipe-3', 'active');
+            clr('s4_stage3');
+            show('stage_s4_3');
+            const tb3 = document.getElementById('s4_stage3');
+            for (let i = 0; i < sales.length; i++) {
+                const row = sales[i];
+                const tr = document.createElement('tr');
+                tr.classList.add(pcolor[row.pid]);
+                const scope = `[${i}→end]`;
+                tr.innerHTML = `<td class="vc">${row.pid}</td><td class="vg">${row.sales}</td><td class="vm">${scope}</td>`;
+                tb3.appendChild(tr);
+                await RD(110);
+            }
+            await SD(300);
+
+            // Stage 4
+            sp('s4-pipe-3', 'done');
+            sp('s4-pipe-4', 'active');
+            clr('s4_stage4');
+            show('stage_s4_4');
+            const tb4 = document.getElementById('s4_stage4');
+            const baselines = { 'P001': 95, 'P002': 175 };
+            const ceilings = { 'P001': 150, 'P002': 250 };
+            for (const row of sales) {
+                const tr = document.createElement('tr');
+                tr.classList.add(pcolor[row.pid]);
+                tr.innerHTML = `<td class="vc">${row.pid}</td><td class="vg">${row.sales}</td><td class="vm">${baselines[row.pid]}</td><td class="vy">${ceilings[row.pid]}</td>`;
+                tb4.appendChild(tr);
+                await RD(110);
+            }
+            await SD(300);
+            sp('s4-pipe-4', 'done');
+            endProg();
+            document.getElementById('btn-s4').disabled = false;
+        }
+
+        function resetS4() {
+            ['s4_stage1', 's4_stage2', 's4_stage3', 's4_stage4'].forEach(clr);
+            ['stage_s4_1', 'stage_s4_2', 'stage_s4_3', 'stage_s4_4'].forEach(hide);
+            ['s4-pipe-1', 's4-pipe-2', 's4-pipe-3', 's4-pipe-4'].forEach(i => sp(i, ''));
+            document.getElementById('btn-s4').disabled = false;
+        }
+    </script>
+</body>
+</html>
