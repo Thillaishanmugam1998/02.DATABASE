@@ -101,7 +101,78 @@ GROUP BY CustomerID;
    SOLUTION → CTE use pannuvom! (Next section)
 */
 
+--WHY CTE?
+-- The real-world situations where CTE becomes genuinely necessary:
+-- Case 1 — Filter using an aggregated value (most common real need)
+-- This FAILS — can't use SUM in WHERE directly
 
+
+
+
+
+-- CTE fixes this cleanly
+WITH CustomerSales AS (
+    SELECT CustomerID, SUM(Sales) AS TotalSales
+    FROM Sales.Orders
+    GROUP BY CustomerID
+)
+SELECT * FROM CustomerSales
+WHERE TotalSales > 5000;   -- works!
+
+
+-- Case 2 — Get top N per group (ROW_NUMBER trick)
+-- "Show me the top 1 order per customer"
+WITH Ranked AS (
+    SELECT *, ROW_NUMBER() OVER (PARTITION BY CustomerID ORDER BY Sales DESC) AS rn
+    FROM Sales.Orders
+)
+SELECT * FROM Ranked WHERE rn = 1;
+-- Without CTE, you can't filter on rn in the same query
+
+-- Goal: customers whose total sales > average of all customer totals
+
+SELECT CustomerID, TotalSales
+FROM (
+    SELECT CustomerID, SUM(Sales) AS TotalSales
+    FROM Sales.Orders
+    GROUP BY CustomerID
+) AS CustomerSales                          -- subquery written once here
+WHERE TotalSales > (
+    SELECT AVG(TotalSales)
+    FROM (
+        SELECT CustomerID, SUM(Sales) AS TotalSales
+        FROM Sales.Orders
+        GROUP BY CustomerID
+    ) AS CustomerSales2                     -- same subquery written AGAIN here!
+);
+
+/*
+See the problem? SELECT CustomerID, SUM(Sales) ... GROUP BY CustomerID is written twice. 
+If tomorrow the business says "filter only active customers", you have to change it in two places. 
+One day you'll forget to change the second one — that's a real bug.
+*/
+
+-- CTE version — clean:
+WITH CustomerSales AS (
+    SELECT CustomerID, SUM(Sales) AS TotalSales
+    FROM Sales.Orders
+    GROUP BY CustomerID           -- written ONCE here
+)
+SELECT CustomerID, TotalSales
+FROM CustomerSales                -- used here
+WHERE TotalSales > (
+    SELECT AVG(TotalSales)
+    FROM CustomerSales            -- reused here — same name, same logic
+);
+
+/*
+Both queries give identical results. The difference is purely maintenance — 
+when a subquery appears more than once in your query,
+CTE lets you name it once and reference it everywhere. 
+Change the definition in one place, it updates everywhere automatically.
+That's the real-world case for CTE over subquery — not just cleanliness,
+but reducing the chance of a bug when requirements change.
+*/
 
 /* ==============================================================================
    SECTION 3 — CTE SYNTAX — HOW TO WRITE
