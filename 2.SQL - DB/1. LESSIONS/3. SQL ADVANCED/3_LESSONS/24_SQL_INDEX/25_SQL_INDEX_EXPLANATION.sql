@@ -24,7 +24,28 @@
    SECTION 18 : PRACTICAL DEMO (Full Working Example)
 ============================================================================== */
 
+/*
+SQL Server-ல உள்ள Index Types:
+Most commonly used (Day-to-day):
+Clustered Index — Table-ஓட physical order. Primary Key default-ஆ இதுவே. Every table-ல ஒன்னு மட்டும்.
+Non-Clustered Index — Separate B-Tree, row pointer வச்சு data fetch. ஒரு table-ல multiple போடலாம். அடிக்கடி search பண்ற columns-க்கு போடுவாங்க.
+Composite Index — NCI-ஓட ஒரு வகை. 2+ columns சேர்த்து ஒரே index. WHERE a = x AND b = y மாதிரி queries-க்கு.
 
+Situational-ஆ use பண்றவை:
+Filtered Index — NCI + WHERE clause. Subset of data மட்டும். உதா: active users மட்டும், india customers மட்டும்.
+Covering Index — NCI-ல INCLUDE வச்சு extra columns சேர்ப்பது. Key Lookup avoid பண்ண. SELECT-ல தேவையான எல்லா columns-உம் index-லயே இருக்கும்.
+Unique Index — Duplicate values allow பண்ணாத index. UNIQUE constraint போட்டா automatically இது create ஆகும்.
+
+Specific use case-க்கு மட்டும்:
+Full-Text Index — Long text search-க்கு. LIKE '%word%' slow ஆகும் இடத்துல இதை use பண்ணுவாங்க. Articles, descriptions search பண்ண.
+Columnstore Index — Analytics / Data Warehouse-க்கு. Millions of rows-ஐ column-wise compress பண்ணி store பண்ணும். OLAP queries மிகவும் fast.
+Spatial Index — Geography / Geometry data-க்கு. Map coordinates, location-based queries.
+XML Index — XML column-ல search பண்ண.
+Hash Index — Memory-Optimized tables-க்கு மட்டும். In-Memory OLTP.
+
+Real project-ல 90% இந்த 3 மட்டும் போதும்:
+Indexஎப்போ போடுவாங்கClusteredPrimary Key-ல (automatic)Non-ClusteredWHERE, JOIN columns-லCompositeMultiple columns சேர்த்து filter பண்ணும்போது
+*/
 
 /* ==============================================================================
    SECTION 1 — SQL DATABASE FILES (.MDF & .LDF)
@@ -350,6 +371,7 @@ GO
 CREATE INDEX idx_Heap_Country_Score
 ON Demo_Heap (Country, Score);
 GO
+
 
 -- ✅ This USES the index (Country is leftmost)
 SELECT * FROM Demo_Heap
