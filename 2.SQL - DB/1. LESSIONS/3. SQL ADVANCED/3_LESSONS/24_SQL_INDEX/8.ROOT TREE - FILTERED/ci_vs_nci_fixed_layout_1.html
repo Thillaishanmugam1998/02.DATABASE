@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Clustered vs Non-Clustered Index — 5000 Customers</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', Consolas, monospace;
+  --color-bg:            #ffffff;
+  --color-bg-secondary:  #f5f5f0;
+  --color-bg-tertiary:   #eeede8;
+  --color-text-primary:  #1a1a18;
+  --color-text-secondary:#6b6b67;
+  --color-text-tertiary: #9c9a92;
+  --color-border:        rgba(0,0,0,0.12);
+  --color-border-secondary: rgba(0,0,0,0.22);
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg:            #1a1a18;
+    --color-bg-secondary:  #242422;
+    --color-bg-tertiary:   #2c2c2a;
+    --color-text-primary:  #e8e6de;
+    --color-text-secondary:#a0a098;
+    --color-text-tertiary: #6b6b67;
+    --color-border:        rgba(255,255,255,0.12);
+    --color-border-secondary: rgba(255,255,255,0.22);
+  }
+}
+body {
+  font-family: var(--font-sans);
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  padding: 2rem;
+  line-height: 1.5;
+}
+h1 { font-size: 20px; font-weight: 500; margin-bottom: 4px; }
+.subtitle { font-size: 13px; color: var(--color-text-secondary); margin-bottom: 1.5rem; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1rem; }
+.tab {
+  padding: 6px 13px; font-size: 12px;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: 20px; background: transparent;
+  color: var(--color-text-secondary); cursor: pointer;
+  transition: all .2s; white-space: nowrap;
+}
+.tab.on { background: #E6F1FB; color: #0C447C; border-color: #185FA5; font-weight: 500; }
+.panel { display: none; }
+.panel.on { display: block; }
+table { border-collapse: collapse; width: 100%; font-size: 12px; }
+th { padding: 7px 10px; background: var(--color-bg-secondary); border: 0.5px solid var(--color-border); color: var(--color-text-secondary); text-align: left; }
+td { padding: 7px 10px; border: 0.5px solid var(--color-border); }
+.card { border-radius: var(--radius-md); padding: .65rem 1rem; font-size: 12px; margin-bottom: 8px; line-height: 1.6; }
+.pill { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+.step { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 8px; }
+.snum { border-radius: 50%; width: 24px; height: 24px; min-width: 24px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; color: #fff; }
+.section-header { padding: .5rem 1rem; border-radius: var(--radius-md); font-size: 12px; font-weight: 500; margin-bottom: .75rem; text-align: center; }
+.divider { height: 2px; background: var(--color-border); margin: 1.25rem 0; border-radius: 2px; }
+code { font-size: 11px; background: var(--color-bg-secondary); padding: 1px 5px; border-radius: 4px; font-family: var(--font-mono); }
+</style>
+</head>
+<body>
+
+<h1>Clustered vs Non-Clustered Index</h1>
+<p class="subtitle">5000 Customers table — Step-by-step B-Tree formation comparison</p>
+
+<div class="tabs" id="tabs-bar"></div>
+<div id="content"></div>
+
+<script>
+const sampleRows = [
+  {id:1,    name:'Arjun M.',  city:'Chennai',   score:92,  country:'India', status:'Active'},
+  {id:250,  name:'Priya S.',  city:'Mumbai',    score:78,  country:'India', status:'Active'},
+  {id:500,  name:'John D.',   city:'New York',  score:85,  country:'USA',   status:'Active'},
+  {id:999,  name:'Meera R.',  city:'Delhi',     score:95,  country:'India', status:'Inactive'},
+  {id:1200, name:'Li W.',     city:'Beijing',   score:70,  country:'China', status:'Active'},
+  {id:2000, name:'Ravi K.',   city:'Bangalore', score:88,  country:'India', status:'Active'},
+  {id:3100, name:'Fatima Z.', city:'Dubai',     score:74,  country:'UAE',   status:'Active'},
+  {id:3800, name:'Sneha L.',  city:'Hyderabad', score:96,  country:'India', status:'Active'},
+  {id:4500, name:'Karan T.',  city:'Pune',      score:83,  country:'India', status:'Inactive'},
+  {id:5000, name:'Divya P.',  city:'Chennai',   score:91,  country:'India', status:'Active'},
+];
+
+function cPill(c) {
+  const m = {India:['#E1F5EE','#085041'], USA:['#E6F1FB','#0C447C'], China:['#FAEEDA','#633806'], UAE:['#EEEDFE','#3C3489']};
+  const [bg,fg] = m[c] || ['#F1EFE8','#5F5E5A'];
+  return `<span class="pill" style="background:${bg};color:${fg}">${c}</span>`;
+}
+function sPill(s) {
+  return `<span class="pill" style="background:${s==='Active'?'#EAF3DE':'#F1EFE8'};color:${s==='Active'?'#27500A':'#5F5E5A'}">${s}</span>`;
+}
+function fullTable(hlIndia) {
+  return `<table><thead><tr>
+    <th>ID</th><th>Name</th><th>City</th><th>Score</th><th>Country</th><th>Status</th>
+  </tr></thead><tbody>
+  ${sampleRows.map(r => {
+    const isIndia = r.country === 'India';
+    const bg = hlIndia && !isIndia ? 'opacity:.35;' : hlIndia && isIndia ? 'background:#E1F5EE40;' : '';
+    return `<tr style="${bg}">
+      <td style="font-family:var(--font-mono);font-weight:500">${r.id}</td>
+      <td>${r.name}</td><td>${r.city}</td>
+      <td style="font-weight:500">${r.score}</td>
+      <td>${cPill(r.country)}</td>
+      <td>${sPill(r.status)}</td>
+    </tr>`;
+  }).join('')}
+  </tbody></table>`;
+}
+
+const steps = [
+
+// STEP 1
+`<div class="section-header" style="background:#E6F1FB;color:#0C447C">CLUSTERED INDEX</div>
+<div class="card" style="background:#E6F1FB;color:#0C447C">
+  <code>CREATE CLUSTERED INDEX CIX_CID ON Customers(CustomerID)</code><br>
+  <span style="font-size:11px;margin-top:4px;display:block">Table-ல உள்ள எல்லா 5000 rows-உம் index-ல போகும். Table-ஐயே physically sort பண்ணும்.</span>
+</div>
+<div style="font-size:11px;font-weight:500;color:var(--color-text-secondary);margin-bottom:6px">Customers table — sample 10 rows (total 5000)</div>
+${fullTable(false)}
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:.75rem">
+  <div class="card" style="background:var(--color-bg-secondary);color:var(--color-text-primary);text-align:center">Total rows<br><strong style="font-size:22px">5,000</strong></div>
+  <div class="card" style="background:#E6F1FB;color:#0C447C;text-align:center">All rows indexed<br><strong style="font-size:22px">5,000</strong></div>
+  <div class="card" style="background:#EAF3DE;color:#27500A;text-align:center">Per page ~400 rows<br><strong style="font-size:22px">13 pages</strong></div>
+</div>
+<div class="divider"></div>
+<div class="section-header" style="background:#E1F5EE;color:#085041">NON-CLUSTERED INDEX (Filtered)</div>
+<div class="card" style="background:#E1F5EE;color:#085041">
+  <code>CREATE NONCLUSTERED INDEX IX_India ON Customers(CustomerID,Score) WHERE Country='India'</code><br>
+  <span style="font-size:11px;margin-top:4px;display:block">WHERE Country='India' = gate. India rows மட்டும் index-ல போகும். USA, China skip.</span>
+</div>
+<div style="font-size:11px;font-weight:500;color:var(--color-text-secondary);margin-bottom:6px">India rows highlighted — others dimmed:</div>
+${fullTable(true)}
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:.75rem">
+  <div class="card" style="background:var(--color-bg-secondary);color:var(--color-text-primary);text-align:center">Total rows<br><strong style="font-size:22px">5,000</strong></div>
+  <div class="card" style="background:#E1F5EE;color:#085041;text-align:center">India rows indexed<br><strong style="font-size:22px">3,500</strong></div>
+  <div class="card" style="background:#FCEBEB;color:#791F1F;text-align:center">Non-India skipped<br><strong style="font-size:22px">1,500</strong></div>
+</div>`,
+
+// STEP 2
+`<div class="section-header" style="background:#E6F1FB;color:#0C447C">CLUSTERED INDEX — Sort</div>
+<div class="card" style="background:#E6F1FB;color:#0C447C">
+  Table rows CustomerID-வச்சு physically reorder ஆகும். Insertion order matter-ஆகல.
+</div>
+<table style="margin-bottom:.75rem">
+  <thead><tr><th>Leaf #</th><th>CustomerID</th><th>Name</th><th>Score</th><th>Country</th><th>Leaf content</th></tr></thead>
+  <tbody>
+    <tr style="background:#E6F1FB40"><td>#1</td><td style="font-family:var(--font-mono);font-weight:500;color:#185FA5">1</td><td>Arjun M.</td><td>92</td><td>${cPill('India')}</td><td><span class="pill" style="background:#EAF3DE;color:#27500A">Full row</span></td></tr>
+    <tr><td>#2</td><td style="font-family:var(--font-mono);font-weight:500;color:#185FA5">2</td><td>...</td><td>...</td><td>...</td><td><span class="pill" style="background:#EAF3DE;color:#27500A">Full row</span></td></tr>
+    <tr style="background:var(--color-bg-secondary)"><td colspan="6" style="text-align:center;color:var(--color-text-tertiary)">... 4997 more rows sorted by CustomerID ...</td></tr>
+    <tr><td>#5000</td><td style="font-family:var(--font-mono);font-weight:500;color:#185FA5">5000</td><td>Divya P.</td><td>91</td><td>${cPill('India')}</td><td><span class="pill" style="background:#EAF3DE;color:#27500A">Full row</span></td></tr>
+  </tbody>
+</table>
+<div class="card" style="background:#27500A;color:#fff">
+  Leaf-ல என்ன இருக்கு: CustomerID ✓ Name ✓ City ✓ Score ✓ Country ✓ Status ✓ — <strong>FULL ROW DATA</strong>
+</div>
+<div class="divider"></div>
+<div class="section-header" style="background:#E1F5EE;color:#085041">NON-CLUSTERED INDEX — Filter then Sort</div>
+<div class="card" style="background:#E1F5EE;color:#085041">
+  முதல் WHERE Country='India' filter → 3500 rows. பிறகு (CustomerID, Score) sort.
+</div>
+<table style="margin-bottom:.75rem">
+  <thead><tr><th>Leaf #</th><th>CustomerID</th><th>Score</th><th>Country stored?</th><th>Leaf content</th></tr></thead>
+  <tbody>
+    <tr style="background:#E1F5EE40"><td>#1</td><td style="font-family:var(--font-mono);font-weight:500;color:#085041">1</td><td style="font-family:var(--font-mono)">92</td><td><span class="pill" style="background:#FCEBEB;color:#791F1F">இல்ல ✗</span></td><td><span class="pill" style="background:#FCEBEB;color:#791F1F">Key+ptr only</span></td></tr>
+    <tr><td>#2</td><td style="font-family:var(--font-mono);font-weight:500;color:#085041">2</td><td style="font-family:var(--font-mono)">...</td><td><span class="pill" style="background:#FCEBEB;color:#791F1F">இல்ல ✗</span></td><td><span class="pill" style="background:#FCEBEB;color:#791F1F">Key+ptr only</span></td></tr>
+    <tr style="background:var(--color-bg-secondary)"><td colspan="5" style="text-align:center;color:var(--color-text-tertiary)">... India rows only — 3498 more ...</td></tr>
+    <tr><td>#3500</td><td style="font-family:var(--font-mono);font-weight:500;color:#085041">5000</td><td style="font-family:var(--font-mono)">91</td><td><span class="pill" style="background:#FCEBEB;color:#791F1F">இல்ல ✗</span></td><td><span class="pill" style="background:#FCEBEB;color:#791F1F">Key+ptr only</span></td></tr>
+  </tbody>
+</table>
+<div class="card" style="background:#A32D2D;color:#fff">
+  Leaf-ல என்ன இருக்கு: CustomerID ✓ Score ✓ Row pointer ✓ | Name ✗ City ✗ Country ✗ Status ✗
+</div>`,
+
+// STEP 3
+`<div class="section-header" style="background:#E6F1FB;color:#0C447C">CLUSTERED INDEX — Leaf Pages</div>
+<div class="card" style="background:#E6F1FB;color:#0C447C">
+  5000 rows ÷ 400 per page = <strong>13 leaf pages</strong>. Each leaf = full data row.
+</div>
+<table style="margin-bottom:.75rem">
+  <thead><tr><th>Page #</th><th>CustomerID range</th><th>Rows</th><th>Content</th></tr></thead>
+  <tbody>
+    <tr style="background:#EAF3DE40"><td style="font-weight:500">Page 1</td><td style="font-family:var(--font-mono)">1 – 400</td><td>400</td><td><span class="pill" style="background:#EAF3DE;color:#27500A">Full data row ✓</span></td></tr>
+    <tr><td style="font-weight:500">Page 2</td><td style="font-family:var(--font-mono)">401 – 800</td><td>400</td><td><span class="pill" style="background:#EAF3DE;color:#27500A">Full data row ✓</span></td></tr>
+    <tr style="background:#EAF3DE40"><td style="font-weight:500">Page 3</td><td style="font-family:var(--font-mono)">801 – 1200</td><td>400</td><td><span class="pill" style="background:#EAF3DE;color:#27500A">Full data row ✓</span></td></tr>
+    <tr><td style="color:var(--color-text-tertiary)">Pages 4–12</td><td style="font-family:var(--font-mono);color:var(--color-text-tertiary)">1201 – 4800</td><td style="color:var(--color-text-tertiary)">400 each</td><td><span class="pill" style="background:#EAF3DE;color:#27500A">Full data row ✓</span></td></tr>
+    <tr style="background:#EAF3DE40"><td style="font-weight:500">Page 13</td><td style="font-family:var(--font-mono)">4801 – 5000</td><td>200</td><td><span class="pill" style="background:#EAF3DE;color:#27500A">Full data row ✓</span></td></tr>
+  </tbody>
+</table>
+<div class="card" style="background:#27500A;color:#fff;text-align:center">Total: <strong>13 leaf pages</strong> | Leaf = Table data itself</div>
+<div class="divider"></div>
+<div class="section-header" style="background:#E1F5EE;color:#085041">NON-CLUSTERED INDEX — Leaf Pages</div>
+<div class="card" style="background:#E1F5EE;color:#085041">
+  3500 India rows ÷ 700 per page = <strong>5 leaf pages</strong>. Key+ptr smaller → more per page.
+</div>
+<table style="margin-bottom:.75rem">
+  <thead><tr><th>Page #</th><th>CustomerID range</th><th>Entries</th><th>Content</th></tr></thead>
+  <tbody>
+    <tr style="background:#E1F5EE40"><td style="font-weight:500">NCI Page 1</td><td style="font-family:var(--font-mono)">1 – 700</td><td>700</td><td><span class="pill" style="background:#FCEBEB;color:#791F1F">Key + ptr only</span></td></tr>
+    <tr><td style="font-weight:500">NCI Page 2</td><td style="font-family:var(--font-mono)">701 – 1400</td><td>700</td><td><span class="pill" style="background:#FCEBEB;color:#791F1F">Key + ptr only</span></td></tr>
+    <tr style="background:#E1F5EE40"><td style="font-weight:500">NCI Page 3</td><td style="font-family:var(--font-mono)">1401 – 2100</td><td>700</td><td><span class="pill" style="background:#FCEBEB;color:#791F1F">Key + ptr only</span></td></tr>
+    <tr><td style="font-weight:500">NCI Page 4</td><td style="font-family:var(--font-mono)">2101 – 2800</td><td>700</td><td><span class="pill" style="background:#FCEBEB;color:#791F1F">Key + ptr only</span></td></tr>
+    <tr style="background:#E1F5EE40"><td style="font-weight:500">NCI Page 5</td><td style="font-family:var(--font-mono)">2801 – 3500</td><td>700</td><td><span class="pill" style="background:#FCEBEB;color:#791F1F">Key + ptr only</span></td></tr>
+  </tbody>
+</table>
+<div class="card" style="background:#A32D2D;color:#fff;text-align:center">Total: <strong>5 NCI leaf pages</strong> | CI-ல 13 pages vs NCI-ல 5 pages — 62% smaller!</div>`,
+
+// STEP 4
+`<div class="section-header" style="background:#E6F1FB;color:#0C447C">CLUSTERED INDEX — Root Keys</div>
+<div class="step"><div class="snum" style="background:#185FA5">1</div>
+<div class="card" style="background:#E6F1FB;color:#0C447C;flex:1;margin-bottom:0">13 leaf pages → 3 equal groups: [1–4] [5–9] [10–13]</div></div>
+<div class="step"><div class="snum" style="background:#185FA5">2</div>
+<div class="card" style="background:#E6F1FB;color:#0C447C;flex:1;margin-bottom:0">Group 2 first = CustomerID <strong>1601</strong> → Root Key 1<br>Group 3 first = CustomerID <strong>3601</strong> → Root Key 2</div></div>
+<div class="step"><div class="snum" style="background:#27500A">3</div>
+<div class="card" style="background:#EAF3DE;color:#27500A;flex:1;margin-bottom:0">Root: 2 keys → 3 children (N+1 rule)</div></div>
+<table style="margin-bottom:.5rem">
+  <thead><tr><th>Root Key</th><th>Value</th><th>Search logic</th></tr></thead>
+  <tbody>
+    <tr><td style="font-weight:500">Key 1</td><td style="font-family:var(--font-mono);color:#185FA5">CustomerID = 1601</td><td style="font-size:11px;color:var(--color-text-secondary)">ID &lt; 1601 → left group</td></tr>
+    <tr><td style="font-weight:500">Key 2</td><td style="font-family:var(--font-mono);color:#185FA5">CustomerID = 3601</td><td style="font-size:11px;color:var(--color-text-secondary)">1601 ≤ ID &lt; 3601 → mid | ≥ 3601 → right</td></tr>
+  </tbody>
+</table>
+<div class="divider"></div>
+<div class="section-header" style="background:#E1F5EE;color:#085041">NON-CLUSTERED INDEX — Root Keys</div>
+<div class="step"><div class="snum" style="background:#0F6E56">1</div>
+<div class="card" style="background:#E1F5EE;color:#085041;flex:1;margin-bottom:0">5 NCI leaf pages → 3 groups: [1–2] [3–4] [5]</div></div>
+<div class="step"><div class="snum" style="background:#0F6E56">2</div>
+<div class="card" style="background:#E1F5EE;color:#085041;flex:1;margin-bottom:0">Group 2 first = CustomerID <strong>1401</strong> → NCI Root Key 1<br>Group 3 first = CustomerID <strong>2801</strong> → NCI Root Key 2</div></div>
+<div class="step"><div class="snum" style="background:#27500A">3</div>
+<div class="card" style="background:#EAF3DE;color:#27500A;flex:1;margin-bottom:0">NCI Root: 2 keys → 3 children. Same N+1 rule!</div></div>
+<table>
+  <thead><tr><th>NCI Root Key</th><th>Value</th><th>Search logic</th></tr></thead>
+  <tbody>
+    <tr><td style="font-weight:500">Key 1</td><td style="font-family:var(--font-mono);color:#0F6E56">CustomerID = 1401</td><td style="font-size:11px;color:var(--color-text-secondary)">ID &lt; 1401 → left group</td></tr>
+    <tr><td style="font-weight:500">Key 2</td><td style="font-family:var(--font-mono);color:#0F6E56">CustomerID = 2801</td><td style="font-size:11px;color:var(--color-text-secondary)">1401 ≤ ID &lt; 2801 → mid | ≥ 2801 → right</td></tr>
+  </tbody>
+</table>`,
+
+// STEP 5
+`<div class="section-header" style="background:#E6F1FB;color:#0C447C">CLUSTERED INDEX — B-Tree (5000 rows = 13 leaf pages)</div>
+<svg width="100%" viewBox="0 0 680 255" style="display:block;margin-bottom:.75rem">
+<defs><marker id="ar1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<text x="2" y="36" style="font-size:9px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">Root</text>
+<text x="2" y="108" style="font-size:9px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">Inter</text>
+<text x="2" y="194" style="font-size:9px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">Leaf</text>
+<rect x="110" y="10" width="460" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="1.5"/>
+<line x1="340" y1="10" x2="340" y2="54" stroke="#185FA5" stroke-width="0.8"/>
+<text x="225" y="29" text-anchor="middle" style="font-size:10px;font-weight:500;fill:#0C447C;font-family:var(--font-sans)">Key 1: CustomerID = 1601</text>
+<text x="225" y="46" text-anchor="middle" style="font-size:9px;fill:#185FA5;font-family:var(--font-sans)">(group 2 first)</text>
+<text x="455" y="29" text-anchor="middle" style="font-size:10px;font-weight:500;fill:#0C447C;font-family:var(--font-sans)">Key 2: CustomerID = 3601</text>
+<text x="455" y="46" text-anchor="middle" style="font-size:9px;fill:#185FA5;font-family:var(--font-sans)">(group 3 first)</text>
+<rect x="110" y="10" width="44" height="16" rx="3" fill="#185FA5"/>
+<text x="132" y="22" text-anchor="middle" style="font-size:8px;fill:#fff;font-weight:500;font-family:var(--font-sans)">ROOT</text>
+<line x1="200" y1="54" x2="145" y2="90" stroke="var(--color-border-secondary)" stroke-width="0.8" marker-end="url(#ar1)"/>
+<line x1="340" y1="54" x2="340" y2="90" stroke="var(--color-border-secondary)" stroke-width="0.8" marker-end="url(#ar1)"/>
+<line x1="480" y1="54" x2="535" y2="90" stroke="var(--color-border-secondary)" stroke-width="0.8" marker-end="url(#ar1)"/>
+<rect x="48" y="90" width="190" height="34" rx="6" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+<text x="143" y="104" text-anchor="middle" style="font-size:10px;font-weight:500;fill:#0C447C;font-family:var(--font-sans)">Group 1: ID 1–1600</text>
+<text x="143" y="118" text-anchor="middle" style="font-size:9px;fill:#185FA5;font-family:var(--font-sans)">Pages 1–4 (4 leaves)</text>
+<rect x="245" y="90" width="190" height="34" rx="6" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+<text x="340" y="104" text-anchor="middle" style="font-size:10px;font-weight:500;fill:#0C447C;font-family:var(--font-sans)">Group 2: ID 1601–3600</text>
+<text x="340" y="118" text-anchor="middle" style="font-size:9px;fill:#185FA5;font-family:var(--font-sans)">Pages 5–9 (5 leaves)</text>
+<rect x="442" y="90" width="190" height="34" rx="6" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+<text x="537" y="104" text-anchor="middle" style="font-size:10px;font-weight:500;fill:#0C447C;font-family:var(--font-sans)">Group 3: ID 3601–5000</text>
+<text x="537" y="118" text-anchor="middle" style="font-size:9px;fill:#185FA5;font-family:var(--font-sans)">Pages 10–13 (4 leaves)</text>
+<line x1="82" y1="124" x2="62" y2="172" stroke="var(--color-border-secondary)" stroke-width="0.7" marker-end="url(#ar1)"/>
+<line x1="144" y1="124" x2="144" y2="172" stroke="var(--color-border-secondary)" stroke-width="0.7" marker-end="url(#ar1)"/>
+<line x1="260" y1="124" x2="244" y2="172" stroke="var(--color-border-secondary)" stroke-width="0.7" marker-end="url(#ar1)"/>
+<line x1="340" y1="124" x2="340" y2="172" stroke="var(--color-border-secondary)" stroke-width="0.7" marker-end="url(#ar1)"/>
+<line x1="420" y1="124" x2="436" y2="172" stroke="var(--color-border-secondary)" stroke-width="0.7" marker-end="url(#ar1)"/>
+<line x1="536" y1="124" x2="546" y2="172" stroke="var(--color-border-secondary)" stroke-width="0.7" marker-end="url(#ar1)"/>
+<rect x="22"  y="172" width="72" height="50" rx="5" fill="#27500A" stroke="#3B6D11" stroke-width="1"/>
+<text x="58"  y="190" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#fff;font-family:var(--font-sans)">Leaf 1</text>
+<text x="58"  y="203" text-anchor="middle" style="font-size:8px;fill:#9FE1CB;font-family:var(--font-sans)">ID 1–400</text>
+<text x="58"  y="215" text-anchor="middle" style="font-size:8px;fill:#5DCAA5;font-family:var(--font-sans)">FULL ROW</text>
+<rect x="108" y="172" width="72" height="50" rx="5" fill="#27500A" stroke="#3B6D11" stroke-width="1"/>
+<text x="144" y="190" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#fff;font-family:var(--font-sans)">Leaf 2</text>
+<text x="144" y="203" text-anchor="middle" style="font-size:8px;fill:#9FE1CB;font-family:var(--font-sans)">ID 401–800</text>
+<text x="144" y="215" text-anchor="middle" style="font-size:8px;fill:#5DCAA5;font-family:var(--font-sans)">FULL ROW</text>
+<text x="218" y="200" text-anchor="middle" style="font-size:16px;fill:var(--color-text-tertiary)">···</text>
+<rect x="258" y="172" width="72" height="50" rx="5" fill="#27500A" stroke="#3B6D11" stroke-width="1"/>
+<text x="294" y="190" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#fff;font-family:var(--font-sans)">Leaf 7</text>
+<text x="294" y="203" text-anchor="middle" style="font-size:8px;fill:#9FE1CB;font-family:var(--font-sans)">ID 2401–2800</text>
+<text x="294" y="215" text-anchor="middle" style="font-size:8px;fill:#5DCAA5;font-family:var(--font-sans)">FULL ROW</text>
+<text x="368" y="200" text-anchor="middle" style="font-size:16px;fill:var(--color-text-tertiary)">···</text>
+<rect x="418" y="172" width="80" height="50" rx="5" fill="#27500A" stroke="#3B6D11" stroke-width="1"/>
+<text x="458" y="190" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#fff;font-family:var(--font-sans)">Leaf 12</text>
+<text x="458" y="203" text-anchor="middle" style="font-size:8px;fill:#9FE1CB;font-family:var(--font-sans)">ID 4401–4800</text>
+<text x="458" y="215" text-anchor="middle" style="font-size:8px;fill:#5DCAA5;font-family:var(--font-sans)">FULL ROW</text>
+<rect x="514" y="172" width="80" height="50" rx="5" fill="#27500A" stroke="#3B6D11" stroke-width="1"/>
+<text x="554" y="190" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#fff;font-family:var(--font-sans)">Leaf 13</text>
+<text x="554" y="203" text-anchor="middle" style="font-size:8px;fill:#9FE1CB;font-family:var(--font-sans)">ID 4801–5000</text>
+<text x="554" y="215" text-anchor="middle" style="font-size:8px;fill:#5DCAA5;font-family:var(--font-sans)">FULL ROW</text>
+<line x1="94" y1="197" x2="106" y2="197" stroke="#3B6D11" stroke-width="0.8" stroke-dasharray="3 2" marker-end="url(#ar1)"/>
+<line x1="180" y1="197" x2="192" y2="197" stroke="#3B6D11" stroke-width="0.8" stroke-dasharray="3 2" marker-end="url(#ar1)"/>
+<line x1="498" y1="197" x2="512" y2="197" stroke="#3B6D11" stroke-width="0.8" stroke-dasharray="3 2" marker-end="url(#ar1)"/>
+<text x="340" y="244" text-anchor="middle" style="font-size:10px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">13 leaf pages. Green = FULL DATA ROW (table IS the B-Tree)</text>
+</svg>
+<div class="divider"></div>
+<div class="section-header" style="background:#E1F5EE;color:#085041">NON-CLUSTERED INDEX — B-Tree (3500 India rows = 5 leaf pages)</div>
+<svg width="100%" viewBox="0 0 680 255" style="display:block">
+<defs><marker id="ar2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<text x="2" y="36" style="font-size:9px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">Root</text>
+<text x="2" y="108" style="font-size:9px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">Inter</text>
+<text x="2" y="194" style="font-size:9px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">Leaf</text>
+<rect x="110" y="10" width="460" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1.5"/>
+<line x1="340" y1="10" x2="340" y2="54" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="225" y="29" text-anchor="middle" style="font-size:10px;font-weight:500;fill:#085041;font-family:var(--font-sans)">Key 1: CustomerID = 1401</text>
+<text x="225" y="46" text-anchor="middle" style="font-size:9px;fill:#0F6E56;font-family:var(--font-sans)">(group 2 first)</text>
+<text x="455" y="29" text-anchor="middle" style="font-size:10px;font-weight:500;fill:#085041;font-family:var(--font-sans)">Key 2: CustomerID = 2801</text>
+<text x="455" y="46" text-anchor="middle" style="font-size:9px;fill:#0F6E56;font-family:var(--font-sans)">(group 3 first)</text>
+<rect x="110" y="10" width="44" height="16" rx="3" fill="#0F6E56"/>
+<text x="132" y="22" text-anchor="middle" style="font-size:8px;fill:#fff;font-weight:500;font-family:var(--font-sans)">ROOT</text>
+<line x1="200" y1="54" x2="145" y2="90" stroke="var(--color-border-secondary)" stroke-width="0.8" marker-end="url(#ar2)"/>
+<line x1="340" y1="54" x2="340" y2="90" stroke="var(--color-border-secondary)" stroke-width="0.8" marker-end="url(#ar2)"/>
+<line x1="480" y1="54" x2="535" y2="90" stroke="var(--color-border-secondary)" stroke-width="0.8" marker-end="url(#ar2)"/>
+<rect x="48" y="90" width="190" height="34" rx="6" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="143" y="104" text-anchor="middle" style="font-size:10px;font-weight:500;fill:#085041;font-family:var(--font-sans)">Group 1: ID 1–1400</text>
+<text x="143" y="118" text-anchor="middle" style="font-size:9px;fill:#0F6E56;font-family:var(--font-sans)">Pages 1–2 (2 leaves)</text>
+<rect x="245" y="90" width="190" height="34" rx="6" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="340" y="104" text-anchor="middle" style="font-size:10px;font-weight:500;fill:#085041;font-family:var(--font-sans)">Group 2: ID 1401–2800</text>
+<text x="340" y="118" text-anchor="middle" style="font-size:9px;fill:#0F6E56;font-family:var(--font-sans)">Pages 3–4 (2 leaves)</text>
+<rect x="442" y="90" width="190" height="34" rx="6" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="537" y="104" text-anchor="middle" style="font-size:10px;font-weight:500;fill:#085041;font-family:var(--font-sans)">Group 3: ID 2801–3500</text>
+<text x="537" y="118" text-anchor="middle" style="font-size:9px;fill:#0F6E56;font-family:var(--font-sans)">Page 5 (1 leaf)</text>
+<line x1="100" y1="124" x2="84"  y2="172" stroke="var(--color-border-secondary)" stroke-width="0.7" marker-end="url(#ar2)"/>
+<line x1="186" y1="124" x2="200" y2="172" stroke="var(--color-border-secondary)" stroke-width="0.7" marker-end="url(#ar2)"/>
+<line x1="295" y1="124" x2="310" y2="172" stroke="var(--color-border-secondary)" stroke-width="0.7" marker-end="url(#ar2)"/>
+<line x1="385" y1="124" x2="396" y2="172" stroke="var(--color-border-secondary)" stroke-width="0.7" marker-end="url(#ar2)"/>
+<line x1="537" y1="124" x2="540" y2="172" stroke="var(--color-border-secondary)" stroke-width="0.7" marker-end="url(#ar2)"/>
+<rect x="34"  y="172" width="106" height="54" rx="5" fill="#A32D2D" stroke="#791F1F" stroke-width="1.2"/>
+<text x="87"  y="191" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#fff;font-family:var(--font-sans)">NCI Leaf 1</text>
+<text x="87"  y="205" text-anchor="middle" style="font-size:8px;fill:#F7C1C1;font-family:var(--font-sans)">ID 1–700</text>
+<text x="87"  y="218" text-anchor="middle" style="font-size:8px;fill:#F7C1C1;font-family:var(--font-sans)">KEY + PTR</text>
+<rect x="162" y="172" width="106" height="54" rx="5" fill="#A32D2D" stroke="#791F1F" stroke-width="1.2"/>
+<text x="215" y="191" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#fff;font-family:var(--font-sans)">NCI Leaf 2</text>
+<text x="215" y="205" text-anchor="middle" style="font-size:8px;fill:#F7C1C1;font-family:var(--font-sans)">ID 701–1400</text>
+<text x="215" y="218" text-anchor="middle" style="font-size:8px;fill:#F7C1C1;font-family:var(--font-sans)">KEY + PTR</text>
+<rect x="290" y="172" width="106" height="54" rx="5" fill="#A32D2D" stroke="#791F1F" stroke-width="1.2"/>
+<text x="343" y="191" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#fff;font-family:var(--font-sans)">NCI Leaf 3</text>
+<text x="343" y="205" text-anchor="middle" style="font-size:8px;fill:#F7C1C1;font-family:var(--font-sans)">ID 1401–2100</text>
+<text x="343" y="218" text-anchor="middle" style="font-size:8px;fill:#F7C1C1;font-family:var(--font-sans)">KEY + PTR</text>
+<rect x="418" y="172" width="106" height="54" rx="5" fill="#A32D2D" stroke="#791F1F" stroke-width="1.2"/>
+<text x="471" y="191" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#fff;font-family:var(--font-sans)">NCI Leaf 4</text>
+<text x="471" y="205" text-anchor="middle" style="font-size:8px;fill:#F7C1C1;font-family:var(--font-sans)">ID 2101–2800</text>
+<text x="471" y="218" text-anchor="middle" style="font-size:8px;fill:#F7C1C1;font-family:var(--font-sans)">KEY + PTR</text>
+<rect x="524" y="172" width="106" height="54" rx="5" fill="#A32D2D" stroke="#791F1F" stroke-width="1.2"/>
+<text x="577" y="191" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#fff;font-family:var(--font-sans)">NCI Leaf 5</text>
+<text x="577" y="205" text-anchor="middle" style="font-size:8px;fill:#F7C1C1;font-family:var(--font-sans)">ID 2801–3500</text>
+<text x="577" y="218" text-anchor="middle" style="font-size:8px;fill:#F7C1C1;font-family:var(--font-sans)">KEY + PTR</text>
+<line x1="140" y1="199" x2="160" y2="199" stroke="#791F1F" stroke-width="0.8" stroke-dasharray="3 2" marker-end="url(#ar2)"/>
+<line x1="268" y1="199" x2="288" y2="199" stroke="#791F1F" stroke-width="0.8" stroke-dasharray="3 2" marker-end="url(#ar2)"/>
+<line x1="396" y1="199" x2="416" y2="199" stroke="#791F1F" stroke-width="0.8" stroke-dasharray="3 2" marker-end="url(#ar2)"/>
+<line x1="522" y1="199" x2="522" y2="199" stroke="#791F1F" stroke-width="0.8" stroke-dasharray="3 2" marker-end="url(#ar2)"/>
+<text x="340" y="244" text-anchor="middle" style="font-size:10px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">5 NCI leaf pages. Red = KEY + ROW POINTER only (Key Lookup needed for full data)</text>
+</svg>`,
+
+// STEP 6
+`<div class="section-header" style="background:#E6F1FB;color:#0C447C">CLUSTERED INDEX — Search: WHERE CustomerID = 2500</div>
+<div class="step"><div class="snum" style="background:#185FA5">1</div>
+<div class="card" style="background:#E6F1FB;color:#0C447C;flex:1;margin-bottom:0"><strong>Root (1 I/O):</strong> 2500 &gt; 1601 → 2500 &lt; 3601 → middle group pointer</div></div>
+<div class="step"><div class="snum" style="background:#185FA5">2</div>
+<div class="card" style="background:#E6F1FB;color:#0C447C;flex:1;margin-bottom:0"><strong>Intermediate (1 I/O):</strong> Group 2 (1601–3600) → exact leaf page 7 pointer</div></div>
+<div class="step"><div class="snum" style="background:#27500A">3</div>
+<div class="card" style="background:#EAF3DE;color:#27500A;flex:1;margin-bottom:0"><strong>Leaf page 7 (1 I/O):</strong> CustomerID=2500 → Name, City, Score, Country எல்லாமே இங்கேயே! <strong>DONE!</strong></div></div>
+<div class="card" style="background:#EAF3DE;color:#27500A;text-align:center">Total: <strong>3 I/O reads</strong>. No extra step.</div>
+<div class="divider"></div>
+<div class="section-header" style="background:#E1F5EE;color:#085041">NON-CLUSTERED INDEX — Search: WHERE Country='India' AND CustomerID = 2000</div>
+<div class="step"><div class="snum" style="background:#0F6E56">1</div>
+<div class="card" style="background:#E1F5EE;color:#085041;flex:1;margin-bottom:0"><strong>Filter check:</strong> Country='India' ✓ → NCI eligible!</div></div>
+<div class="step"><div class="snum" style="background:#0F6E56">2</div>
+<div class="card" style="background:#E1F5EE;color:#085041;flex:1;margin-bottom:0"><strong>NCI Root (1 I/O):</strong> 2000 &gt; 1401 → 2000 &lt; 2801 → middle group pointer</div></div>
+<div class="step"><div class="snum" style="background:#0F6E56">3</div>
+<div class="card" style="background:#E1F5EE;color:#085041;flex:1;margin-bottom:0"><strong>NCI Intermediate (1 I/O):</strong> Group 2 → exact NCI leaf page pointer</div></div>
+<div class="step"><div class="snum" style="background:#0F6E56">4</div>
+<div class="card" style="background:#E1F5EE;color:#085041;flex:1;margin-bottom:0"><strong>NCI Leaf (1 I/O):</strong> CustomerID=2000, Score=88, row pointer. ஆனா Name, City இல்ல!</div></div>
+<div class="step"><div class="snum" style="background:#A32D2D">5</div>
+<div class="card" style="background:#FCEBEB;color:#791F1F;flex:1;margin-bottom:0"><strong>Key Lookup (1 I/O):</strong> Row pointer → Clustered Index → full row → Name=Ravi K., City=Bangalore ✓</div></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:.25rem">
+  <div class="card" style="background:#E1F5EE;color:#085041;text-align:center;margin-bottom:0">NCI Total: <strong>4 I/O reads</strong></div>
+  <div class="card" style="background:#E6F1FB;color:#0C447C;text-align:center;margin-bottom:0">CI Total: <strong>3 I/O reads</strong></div>
+</div>`
+];
+
+const labels = ['Step 1: Table & Index','Step 2: Sort & Filter','Step 3: Leaf Pages','Step 4: Root Keys','Step 5: B-Tree','Step 6: Search'];
+
+const tabBar = document.getElementById('tabs-bar');
+labels.forEach((lbl,i) => {
+  const btn = document.createElement('button');
+  btn.className = 'tab' + (i===0?' on':'');
+  btn.textContent = lbl;
+  btn.onclick = () => {
+    document.querySelectorAll('.tab').forEach((b,j) => b.classList.toggle('on', j===i));
+    document.getElementById('content').innerHTML = steps[i];
+  };
+  tabBar.appendChild(btn);
+});
+
+document.getElementById('content').innerHTML = steps[0];
+</script>
+</body>
+</html>

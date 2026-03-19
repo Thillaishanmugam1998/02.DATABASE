@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Filtered Index B-Tree Interactive</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+    --color-bg:            #ffffff;
+    --color-bg-secondary:  #f5f5f0;
+    --color-bg-tertiary:   #eeede8;
+    --color-text-primary:  #1a1a18;
+    --color-text-secondary:#6b6b67;
+    --color-text-tertiary: #9c9a92;
+    --color-border:        rgba(0,0,0,0.12);
+    --color-border-secondary: rgba(0,0,0,0.22);
+    --radius-md: 8px;
+    --radius-lg: 12px;
+  }
+
+  @media (prefers-color-scheme: dark){
+    :root {
+      --color-bg:            #1a1a18;
+      --color-bg-secondary:  #242422;
+      --color-bg-tertiary:   #2c2c2a;
+      --color-text-primary:  #e8e6de;
+      --color-text-secondary:#a0a098;
+      --color-text-tertiary: #6b6b67;
+      --color-border:        rgba(255,255,255,0.12);
+      --color-border-secondary: rgba(255,255,255,0.22);
+    }
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background: var(--color-bg);
+    color: var(--color-text-primary);
+    min-height: 100vh;
+    padding: 2rem;
+  }
+
+  h1 {
+    font-size: 20px; font-weight: 500;
+    color: var(--color-text-primary);
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    font-size: 13px; color: var(--color-text-secondary);
+    margin-bottom: 1.5rem;
+  }
+
+  .section-title {
+    font-size: 12px; font-weight: 500;
+    color: var(--color-text-secondary);
+    margin-bottom: 8px; letter-spacing: .3px;
+    text-transform: uppercase;
+  }
+
+  /* DATA TABLE */
+  .data-table { border-collapse: collapse; width: 100%; font-size: 13px; margin-bottom: 1.25rem; }
+  .data-table th {
+    padding: 8px 12px;
+    background: var(--color-bg-secondary);
+    border: 0.5px solid var(--color-border);
+    color: var(--color-text-secondary);
+    text-align: left; font-weight: 500;
+  }
+  .data-table td {
+    padding: 8px 12px;
+    border: 0.5px solid var(--color-border);
+    transition: background .3s;
+  }
+  .data-table tr.hl-row td { background: #E1F5EE !important; }
+  .data-table tr.dim-row td { opacity: .35; }
+
+  .country-pill {
+    display: inline-block; padding: 2px 9px;
+    border-radius: 20px; font-size: 11px; font-weight: 500;
+  }
+
+  /* INDEX INFO BAR */
+  .index-bar {
+    background: #E1F5EE;
+    border-radius: var(--radius-md);
+    padding: .75rem 1rem;
+    font-size: 12px; color: #085041;
+    margin-bottom: 1.25rem;
+    font-family: var(--font-mono);
+    border: 0.5px solid #0F6E56;
+  }
+  .index-bar .note {
+    font-family: var(--font-sans);
+    margin-top: 5px; color: #085041; font-size: 11px;
+  }
+
+  /* QUERY BUTTONS */
+  .query-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1.25rem; }
+  .q-btn {
+    padding: 10px 12px; font-size: 11px; font-family: var(--font-mono);
+    border: 0.5px solid var(--color-border-secondary);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    cursor: pointer; text-align: left; line-height: 1.6;
+    transition: all .2s;
+  }
+  .q-btn:hover { border-color: #0F6E56; background: #E1F5EE20; }
+  .q-btn.active { border-color: #0F6E56; background: #E1F5EE; color: #085041; font-weight: 500; }
+  .q-btn .q-label {
+    font-size: 11px; color: var(--color-text-secondary);
+    display: block; margin-bottom: 4px;
+    font-family: var(--font-sans); font-weight: 500;
+  }
+  .q-btn.active .q-label { color: #0F6E56; }
+
+  /* BTREE */
+  #btree-wrap { margin-bottom: .5rem; }
+  #btree-svg { width: 100%; display: block; }
+
+  /* NODE glow */
+  @keyframes nodeGlow {
+    0%   { filter: drop-shadow(0 0 0px #1D9E75); }
+    50%  { filter: drop-shadow(0 0 12px #1D9E75); }
+    100% { filter: drop-shadow(0 0 5px #1D9E75); }
+  }
+  @keyframes edgeFlow {
+    0%   { stroke-dashoffset: 24; opacity: .3; }
+    100% { stroke-dashoffset: 0;  opacity: 1; }
+  }
+
+  /* STEP LOG */
+  #step-log {
+    margin: .5rem 0;
+    min-height: 64px;
+    font-size: 12px;
+    line-height: 1.9;
+    color: var(--color-text-secondary);
+  }
+  .step-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    margin-bottom: 3px; opacity: 0; transform: translateY(4px);
+    transition: all .35s;
+  }
+  .step-item.show { opacity: 1; transform: translateY(0); }
+  .step-num {
+    background: #0F6E56; color: #fff;
+    border-radius: 50%; width: 18px; height: 18px;
+    font-size: 10px; display: flex; align-items: center;
+    justify-content: center; flex-shrink: 0; margin-top: 1px;
+    font-weight: 600;
+  }
+
+  /* RESULT PANEL */
+  #result-panel {
+    border-radius: var(--radius-md);
+    padding: .85rem 1.1rem;
+    font-size: 13px;
+    min-height: 52px;
+    border: 0.5px solid var(--color-border);
+    background: var(--color-bg-secondary);
+    color: var(--color-text-tertiary);
+    transition: background .4s, color .4s;
+    line-height: 1.6;
+  }
+
+  .btree-header {
+    display: flex; align-items: baseline; gap: 8px;
+    margin-bottom: 6px;
+  }
+  #btree-label {
+    font-size: 12px; color: #0F6E56; font-weight: 500;
+  }
+
+  .reset-btn {
+    margin-left: auto; padding: 4px 14px; font-size: 11px;
+    border: 0.5px solid var(--color-border-secondary);
+    border-radius: 20px; background: transparent;
+    color: var(--color-text-secondary); cursor: pointer;
+    transition: all .2s;
+  }
+  .reset-btn:hover { background: var(--color-bg-tertiary); }
+</style>
+</head>
+<body>
+
+<h1>Filtered Index — B-Tree Interactive</h1>
+<p class="subtitle">Query பண்ணு, B-Tree-ல neon glow animation பாரு</p>
+
+<!-- SAMPLE DATA -->
+<div class="section-title">Sample Data — Customers table</div>
+<table class="data-table" id="data-tbl">
+  <thead><tr>
+    <th>CustomerID</th><th>Name</th><th>Country</th><th>Score</th><th>Status</th>
+  </tr></thead>
+  <tbody id="data-body"></tbody>
+</table>
+
+<!-- INDEX INFO -->
+<div class="index-bar">
+  <span style="color:#A32D2D">CREATE</span>
+  NONCLUSTERED INDEX idx_India
+  <span style="color:#A32D2D">ON</span>
+  Customers (CustomerID, Score)
+  <span style="color:#0F6E56">WHERE Country = 'India'</span>
+  <div class="note">→ India 6 rows மட்டும் index-ல உள்ளது. B-Tree sorted by (CustomerID, Score)</div>
+</div>
+
+<!-- QUERY BUTTONS -->
+<div class="section-title">Query select பண்ணு — B-Tree animation பாரு</div>
+<div class="query-grid" id="query-grid"></div>
+
+<!-- BTREE -->
+<div class="btree-header">
+  <div class="section-title" style="margin-bottom:0">Filtered Index B-Tree</div>
+  <span id="btree-label"></span>
+  <button class="reset-btn" onclick="resetAll()">Reset</button>
+</div>
+<div id="btree-wrap">
+  <svg id="btree-svg" viewBox="0 0 680 310"></svg>
+</div>
+
+<!-- STEP LOG -->
+<div id="step-log"></div>
+
+<!-- RESULT -->
+<div id="result-panel">← Query select பண்ணி animation பாரு</div>
+
+<script>
+const customers = [
+  {id:'C001', name:'Arjun M.',   country:'India', score:92, status:'Active'},
+  {id:'C002', name:'Priya S.',   country:'India', score:78, status:'Active'},
+  {id:'C003', name:'Ravi K.',    country:'USA',   score:85, status:'Active'},
+  {id:'C004', name:'Sneha L.',   country:'India', score:95, status:'Active'},
+  {id:'C005', name:'Karan T.',   country:'China', score:70, status:'Inactive'},
+  {id:'C006', name:'Meera R.',   country:'India', score:88, status:'Active'},
+  {id:'C007', name:'John D.',    country:'USA',   score:91, status:'Active'},
+  {id:'C008', name:'Fatima Z.',  country:'India', score:74, status:'Inactive'},
+  {id:'C009', name:'Li W.',      country:'China', score:83, status:'Active'},
+  {id:'C010', name:'Divya P.',   country:'India', score:96, status:'Active'},
+];
+
+const countryStyle = {
+  India: ['#E1F5EE','#085041'],
+  USA:   ['#E6F1FB','#0C447C'],
+  China: ['#FAEEDA','#633806'],
+};
+const statusStyle = {
+  Active:   ['#EAF3DE','#27500A'],
+  Inactive: ['#F1EFE8','#5F5E5A'],
+};
+
+// Build data table
+const tbody = document.getElementById('data-body');
+customers.forEach(r => {
+  const [cbg,cfg] = countryStyle[r.country];
+  const [sbg,sfg] = statusStyle[r.status];
+  const tr = document.createElement('tr');
+  tr.id = 'row-'+r.id;
+  tr.innerHTML = `
+    <td style="font-family:var(--font-mono);font-weight:500">${r.id}</td>
+    <td>${r.name}</td>
+    <td><span class="country-pill" style="background:${cbg};color:${cfg}">${r.country}</span></td>
+    <td style="font-weight:500">${r.score}</td>
+    <td><span class="country-pill" style="background:${sbg};color:${sfg}">${r.status}</span></td>`;
+  tbody.appendChild(tr);
+});
+
+const queries = [
+  {
+    label:'Q1 — Exact CustomerID (India)',
+    sql:`WHERE Country='India'\nAND CustomerID='C004'`,
+    filter: r => r.country==='India' && r.id==='C004',
+    usesIndex: true,
+    path: ['root','im-m','l-C004'],
+    steps:[
+      'Filter check: Country = India → Filtered Index eligible!',
+      'Root page seek: C004 falls in middle range (C004–C006)',
+      'Intermediate page: C004 range confirm → go to leaf',
+      'Leaf found: C004, Score:95 → Row pointer → fetch full row',
+    ]
+  },
+  {
+    label:'Q2 — Score range (India)',
+    sql:`WHERE Country='India'\nAND Score > 85`,
+    filter: r => r.country==='India' && r.score > 85,
+    usesIndex: true,
+    path: ['root','im-m','l-C004','l-C006','im-r','l-C010'],
+    steps:[
+      'Filter check: Country = India → Filtered Index eligible!',
+      'Root page seek: Score>85 → scan relevant range nodes',
+      'Intermediate: C001–C003 skip (score<85), C004+ check',
+      'Leaves matched: C004(95), C006(88), C010(96) → 3 rows',
+    ]
+  },
+  {
+    label:'Q3 — USA query (No Index!)',
+    sql:`WHERE Country='USA'\nAND Score > 80`,
+    filter: r => r.country==='USA' && r.score > 80,
+    usesIndex: false,
+    path: [],
+    steps:[
+      'Filter check: Country = USA ≠ India → Index SKIP!',
+      'Filtered Index has only India rows — USA not in B-Tree',
+      'Optimizer: No usable index → Full Table Scan',
+      'Scan all 10 rows → C003(85), C007(91) matched → 2 rows',
+    ]
+  },
+  {
+    label:'Q4 — All India Active customers',
+    sql:`WHERE Country='India'\nAND Status='Active'`,
+    filter: r => r.country==='India' && r.status==='Active',
+    usesIndex: true,
+    path: ['root','im-l','l-C001','l-C002','im-m','l-C004','l-C006','im-r','l-C010'],
+    steps:[
+      'Filter check: Country = India → Filtered Index eligible!',
+      'Root page: scan all India leaf ranges',
+      'Intermediate + Leaves: traverse all 6 India rows',
+      'Filter Status=Active: C001,C002,C004,C006,C010 → 5 rows',
+    ]
+  },
+];
+
+const qgrid = document.getElementById('query-grid');
+queries.forEach((q,i)=>{
+  const btn = document.createElement('button');
+  btn.className = 'q-btn';
+  btn.innerHTML = `<span class="q-label">${q.label}</span>${q.sql.replace(/\n/,'<br>')}`;
+  btn.onclick = () => runQuery(i, btn);
+  qgrid.appendChild(btn);
+});
+
+// ─── B-TREE SVG ───
+const svg = document.getElementById('btree-svg');
+const NS = 'http://www.w3.org/2000/svg';
+
+const nodes = {
+  'root':   { x:160, y:16,  w:360, h:44, label:'C002, Score:78  |  C008, Score:74', sub:'Root page', type:'root' },
+  'im-l':   { x:44,  y:100, w:186, h:36, label:'C001 – C002',    sub:'Score 78–92', type:'inter' },
+  'im-m':   { x:247, y:100, w:186, h:36, label:'C004 – C006',    sub:'Score 88–95', type:'inter' },
+  'im-r':   { x:433, y:100, w:186, h:36, label:'C008 – C010',    sub:'Score 74–96', type:'inter' },
+  'l-C001': { x:24,  y:196, w:100, h:58, label:'C001', sub:'Score:92\n→ Row C001', type:'leaf' },
+  'l-C002': { x:132, y:196, w:100, h:58, label:'C002', sub:'Score:78\n→ Row C002', type:'leaf' },
+  'l-C004': { x:240, y:196, w:100, h:58, label:'C004', sub:'Score:95\n→ Row C004', type:'leaf' },
+  'l-C006': { x:348, y:196, w:100, h:58, label:'C006', sub:'Score:88\n→ Row C006', type:'leaf' },
+  'l-C008': { x:456, y:196, w:100, h:58, label:'C008', sub:'Score:74\n→ Row C008', type:'leaf' },
+  'l-C010': { x:564, y:196, w:100, h:58, label:'C010', sub:'Score:96\n→ Row C010', type:'leaf' },
+};
+
+const edges = [
+  ['root','im-l'],['root','im-m'],['root','im-r'],
+  ['im-l','l-C001'],['im-l','l-C002'],
+  ['im-m','l-C004'],['im-m','l-C006'],
+  ['im-r','l-C008'],['im-r','l-C010'],
+];
+const leafChain = [
+  ['l-C001','l-C002'],['l-C002','l-C004'],
+  ['l-C004','l-C006'],['l-C006','l-C008'],['l-C008','l-C010']
+];
+
+function nodeColors(type, active){
+  if(active){
+    if(type==='root')  return {fill:'#0F6E56',stroke:'#085041',text:'#fff',sub:'#9FE1CB'};
+    if(type==='inter') return {fill:'#1D9E75',stroke:'#0F6E56',text:'#fff',sub:'#9FE1CB'};
+    return                    {fill:'#E1F5EE',stroke:'#0F6E56',text:'#085041',sub:'#0F6E56'};
+  }
+  return {fill:'var(--color-bg-secondary)',stroke:'var(--color-border)',text:'var(--color-text-secondary)',sub:'var(--color-text-tertiary)'};
+}
+
+function buildTree(){
+  svg.innerHTML='';
+  const defs=document.createElementNS(NS,'defs');
+  defs.innerHTML=`<marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>`;
+  svg.appendChild(defs);
+
+  [['Root',30],['Intermediate',118],['Leaf pages',220]].forEach(([lbl,y])=>{
+    const t=document.createElementNS(NS,'text');
+    t.setAttribute('x','4'); t.setAttribute('y',y);
+    t.setAttribute('style','font-size:9px;fill:var(--color-text-tertiary);font-family:var(--font-sans)');
+    t.textContent=lbl; svg.appendChild(t);
+  });
+
+  edges.forEach(([a,b])=>{
+    const na=nodes[a],nb=nodes[b];
+    const line=document.createElementNS(NS,'line');
+    line.setAttribute('x1',na.x+na.w/2); line.setAttribute('y1',na.y+na.h);
+    line.setAttribute('x2',nb.x+nb.w/2); line.setAttribute('y2',nb.y);
+    line.setAttribute('stroke','var(--color-border)');
+    line.setAttribute('stroke-width','0.8');
+    line.setAttribute('marker-end','url(#ar)');
+    line.id='edge-'+a+'-'+b;
+    svg.appendChild(line);
+  });
+
+  leafChain.forEach(([a,b])=>{
+    const na=nodes[a],nb=nodes[b];
+    const line=document.createElementNS(NS,'line');
+    line.setAttribute('x1',na.x+na.w); line.setAttribute('y1',na.y+na.h/2);
+    line.setAttribute('x2',nb.x);      line.setAttribute('y2',nb.y+nb.h/2);
+    line.setAttribute('stroke','var(--color-border)');
+    line.setAttribute('stroke-width','0.6');
+    line.setAttribute('stroke-dasharray','3 2');
+    line.setAttribute('marker-end','url(#ar)');
+    svg.appendChild(line);
+  });
+
+  // root divider
+  const rn=nodes['root'];
+  const div=document.createElementNS(NS,'line');
+  div.setAttribute('x1',rn.x+rn.w/2); div.setAttribute('y1',rn.y);
+  div.setAttribute('x2',rn.x+rn.w/2); div.setAttribute('y2',rn.y+rn.h);
+  div.setAttribute('stroke','var(--color-border)'); div.setAttribute('stroke-width','0.6');
+  svg.appendChild(div);
+
+  Object.entries(nodes).forEach(([id,n])=>{
+    const g=document.createElementNS(NS,'g');
+    g.id='node-'+id;
+    const c=nodeColors(n.type,false);
+    const rect=document.createElementNS(NS,'rect');
+    rect.setAttribute('x',n.x); rect.setAttribute('y',n.y);
+    rect.setAttribute('width',n.w); rect.setAttribute('height',n.h);
+    rect.setAttribute('rx','7');
+    rect.setAttribute('fill',c.fill); rect.setAttribute('stroke',c.stroke);
+    rect.setAttribute('stroke-width','0.8');
+    rect.id='rect-'+id; g.appendChild(rect);
+
+    const t1=document.createElementNS(NS,'text');
+    t1.setAttribute('x',n.x+n.w/2);
+    t1.setAttribute('y',n.type==='leaf'?n.y+20:n.y+n.h/2-5);
+    t1.setAttribute('text-anchor','middle');
+    t1.setAttribute('dominant-baseline','central');
+    t1.setAttribute('style',`font-size:10px;font-weight:500;fill:${c.text};font-family:var(--font-sans)`);
+    t1.id='t1-'+id; t1.textContent=n.label; g.appendChild(t1);
+
+    const subLines=n.sub.split('\n');
+    subLines.forEach((sl,si)=>{
+      const t2=document.createElementNS(NS,'text');
+      t2.setAttribute('x',n.x+n.w/2);
+      t2.setAttribute('y',n.type==='leaf'?n.y+34+si*13:n.y+n.h/2+9);
+      t2.setAttribute('text-anchor','middle');
+      t2.setAttribute('style',`font-size:9px;fill:${c.sub};font-family:var(--font-sans)`);
+      t2.id='t2-'+id+'-'+si; t2.textContent=sl; g.appendChild(t2);
+    });
+    svg.appendChild(g);
+  });
+}
+
+function resetTree(){
+  Object.entries(nodes).forEach(([id,n])=>{
+    const c=nodeColors(n.type,false);
+    const rect=document.getElementById('rect-'+id);
+    if(rect){rect.setAttribute('fill',c.fill);rect.setAttribute('stroke',c.stroke);rect.setAttribute('stroke-width','0.8');rect.style.filter='';}
+    ['t1-'+id,'t2-'+id+'-0','t2-'+id+'-1'].forEach(tid=>{
+      const t=document.getElementById(tid);
+      if(t) t.setAttribute('fill',c.text);
+    });
+  });
+  edges.forEach(([a,b])=>{
+    const e=document.getElementById('edge-'+a+'-'+b);
+    if(e){e.setAttribute('stroke','var(--color-border)');e.setAttribute('stroke-width','0.8');e.style.animation='';e.removeAttribute('stroke-dasharray');}
+  });
+  customers.forEach(r=>{
+    const tr=document.getElementById('row-'+r.id);
+    if(tr) tr.className='';
+  });
+}
+
+function resetAll(){
+  resetTree();
+  document.getElementById('step-log').innerHTML='';
+  document.getElementById('result-panel').style.background='var(--color-bg-secondary)';
+  document.getElementById('result-panel').style.color='var(--color-text-tertiary)';
+  document.getElementById('result-panel').textContent='← Query select பண்ணி animation பாரு';
+  document.getElementById('btree-label').textContent='';
+  document.querySelectorAll('.q-btn').forEach(b=>b.classList.remove('active'));
+}
+
+function glowNode(id,delay){
+  return new Promise(res=>{
+    setTimeout(()=>{
+      const n=nodes[id];
+      const c=nodeColors(n.type,true);
+      const rect=document.getElementById('rect-'+id);
+      if(rect){
+        rect.setAttribute('fill',c.fill);
+        rect.setAttribute('stroke',c.stroke);
+        rect.setAttribute('stroke-width','1.8');
+        rect.style.filter='drop-shadow(0 0 10px #1D9E75)';
+        rect.style.animation='nodeGlow .6s ease forwards';
+      }
+      ['t1-'+id,'t2-'+id+'-0','t2-'+id+'-1'].forEach(tid=>{
+        const t=document.getElementById(tid);
+        if(t) t.setAttribute('fill',c.text);
+      });
+      res();
+    },delay);
+  });
+}
+
+function glowEdge(from,to,delay){
+  return new Promise(res=>{
+    setTimeout(()=>{
+      const e=document.getElementById('edge-'+from+'-'+to);
+      if(e){
+        e.setAttribute('stroke','#1D9E75');
+        e.setAttribute('stroke-width','2.2');
+        e.setAttribute('stroke-dasharray','6 3');
+        e.style.animation='edgeFlow .5s ease forwards';
+      }
+      res();
+    },delay);
+  });
+}
+
+function addStep(text,idx){
+  const log=document.getElementById('step-log');
+  const div=document.createElement('div');
+  div.className='step-item';
+  div.innerHTML=`<span class="step-num">${idx+1}</span><span>${text}</span>`;
+  log.appendChild(div);
+  setTimeout(()=>div.classList.add('show'),60);
+}
+
+let animRunning=false;
+
+async function runQuery(qi,btn){
+  if(animRunning) return;
+  animRunning=true;
+  document.querySelectorAll('.q-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  resetTree();
+  document.getElementById('step-log').innerHTML='';
+  document.getElementById('result-panel').style.background='var(--color-bg-secondary)';
+  document.getElementById('result-panel').style.color='var(--color-text-tertiary)';
+  document.getElementById('result-panel').textContent='Running query...';
+  document.getElementById('btree-label').textContent='';
+
+  const q=queries[qi];
+  const resultRows=customers.filter(q.filter);
+
+  if(!q.usesIndex){
+    document.getElementById('btree-label').textContent='— Index SKIP! Full Table Scan';
+    let delay=0;
+    for(let i=0;i<customers.length;i++){
+      const r=customers[i];
+      await new Promise(res=>setTimeout(()=>{
+        document.querySelectorAll('#data-tbl tbody tr').forEach(t=>t.classList.remove('hl-row'));
+        const tr=document.getElementById('row-'+r.id);
+        if(tr) tr.classList.add('hl-row');
+        if(i<q.steps.length) addStep(q.steps[i],i);
+        res();
+      },delay));
+      delay+=280;
+    }
+    await new Promise(res=>setTimeout(res,350));
+    customers.forEach(r=>{
+      const tr=document.getElementById('row-'+r.id);
+      if(tr) tr.classList.remove('hl-row');
+    });
+    resultRows.forEach(r=>{
+      const tr=document.getElementById('row-'+r.id);
+      if(tr) tr.classList.add('hl-row');
+    });
+    document.getElementById('result-panel').style.background='#FAEEDA';
+    document.getElementById('result-panel').style.color='#633806';
+    document.getElementById('result-panel').textContent=`Full Table Scan — ${customers.length} rows scanned. Result: ${resultRows.map(r=>r.id+' ('+r.name+')').join(', ')} [${resultRows.length} rows]`;
+  } else {
+    document.getElementById('btree-label').textContent='— Index Seek in progress...';
+    let delay=0;
+    const path=q.path;
+    for(let i=0;i<path.length;i++){
+      const nodeId=path[i];
+      if(i<q.steps.length) await new Promise(res=>setTimeout(()=>{addStep(q.steps[i],i);res();},delay));
+      await glowNode(nodeId,delay+120);
+      if(i+1<path.length){
+        const next=path[i+1];
+        const ek='edge-'+nodeId+'-'+next;
+        const e=document.getElementById(ek);
+        if(e) await glowEdge(nodeId,next,delay+280);
+      }
+      delay+=620;
+    }
+    await new Promise(res=>setTimeout(()=>{
+      resultRows.forEach(r=>{
+        const tr=document.getElementById('row-'+r.id);
+        if(tr) tr.classList.add('hl-row');
+      });
+      document.getElementById('btree-label').textContent='— Seek complete!';
+      document.getElementById('result-panel').style.background='#E1F5EE';
+      document.getElementById('result-panel').style.color='#085041';
+      document.getElementById('result-panel').textContent=`Index Seek complete! ${q.path.filter(p=>p.startsWith('l-')).length} leaf pages touched. Result: ${resultRows.map(r=>r.id+' ('+r.name+', Score:'+r.score+')').join(' | ')} [${resultRows.length} rows]`;
+      res();
+    },delay));
+  }
+  animRunning=false;
+}
+
+buildTree();
+</script>
+</body>
+</html>

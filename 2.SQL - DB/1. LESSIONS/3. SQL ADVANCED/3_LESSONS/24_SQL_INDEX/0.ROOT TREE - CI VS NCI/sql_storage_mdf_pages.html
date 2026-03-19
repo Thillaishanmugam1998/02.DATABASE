@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SQL Server Storage — MDF, Pages & Tables</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', Consolas, monospace;
+  --color-bg:            #ffffff;
+  --color-bg-secondary:  #f5f5f0;
+  --color-bg-tertiary:   #eeede8;
+  --color-text-primary:  #1a1a18;
+  --color-text-secondary:#6b6b67;
+  --color-text-tertiary: #9c9a92;
+  --color-border:        rgba(0,0,0,0.12);
+  --color-border-secondary: rgba(0,0,0,0.22);
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg:            #1a1a18;
+    --color-bg-secondary:  #242422;
+    --color-bg-tertiary:   #2c2c2a;
+    --color-text-primary:  #e8e6de;
+    --color-text-secondary:#a0a098;
+    --color-text-tertiary: #6b6b67;
+    --color-border:        rgba(255,255,255,0.12);
+    --color-border-secondary: rgba(255,255,255,0.22);
+  }
+}
+body {
+  font-family: var(--font-sans);
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  padding: 2rem;
+  line-height: 1.5;
+}
+h1 { font-size: 20px; font-weight: 500; margin-bottom: 4px; }
+.subtitle { font-size: 13px; color: var(--color-text-secondary); margin-bottom: 1.5rem; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1rem; }
+.tab {
+  padding: 6px 13px; font-size: 12px;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: 20px; background: transparent;
+  color: var(--color-text-secondary); cursor: pointer;
+  white-space: nowrap; transition: all .2s;
+}
+.tab.on { background: #E6F1FB; color: #0C447C; border-color: #185FA5; font-weight: 500; }
+.panel { display: none; }
+.panel.on { display: block; }
+table { border-collapse: collapse; width: 100%; font-size: 12px; }
+th { padding: 7px 10px; background: var(--color-bg-secondary); border: 0.5px solid var(--color-border); color: var(--color-text-secondary); text-align: left; }
+td { padding: 7px 10px; border: 0.5px solid var(--color-border); }
+.card { border-radius: var(--radius-md); padding: .65rem 1rem; font-size: 12px; margin-bottom: 8px; line-height: 1.6; }
+.pill { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+.divider { height: 2px; background: var(--color-border); margin: 1rem 0; border-radius: 2px; }
+.step { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 8px; }
+.snum { border-radius: 50%; width: 24px; height: 24px; min-width: 24px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; color: #fff; }
+code { font-size: 11px; background: var(--color-bg-secondary); padding: 1px 5px; border-radius: 4px; font-family: var(--font-mono); }
+</style>
+</head>
+<body>
+
+<h1>SQL Server Storage Architecture</h1>
+<p class="subtitle">MDF file → Extents → Pages → Rows — 5 tables × 100 rows உதாரணம்</p>
+
+<div class="tabs" id="tbr"></div>
+<div id="content"></div>
+
+<script>
+const steps = [
+
+// STEP 1
+`<div class="card" style="background:#E6F1FB;color:#0C447C;margin-bottom:1rem">
+  <strong>SQL Server Storage Hierarchy — 4 levels:</strong><br>
+  Database (.mdf file) → Extents (64KB) → Pages (8KB) → Rows (actual data)
+</div>
+<svg width="100%" viewBox="0 0 680 400" style="display:block">
+<defs><marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect x="20" y="14" width="640" height="370" rx="14" fill="#E6F1FB" stroke="#185FA5" stroke-width="1.5"/>
+<text x="40" y="36" style="font-size:12px;font-weight:500;fill:#0C447C;font-family:var(--font-sans)">MyDatabase.mdf  (Physical file on disk — C:\SQLData\)</text>
+<rect x="36" y="46" width="608" height="160" rx="10" fill="#EEEDFE" stroke="#534AB7" stroke-width="1"/>
+<text x="52" y="64" style="font-size:11px;font-weight:500;fill:#3C3489;font-family:var(--font-sans)">Extents — 64KB each (1 extent = 8 pages)</text>
+<rect x="52"  y="72" width="130" height="120" rx="7" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+<text x="117" y="90" text-anchor="middle" style="font-size:10px;font-weight:500;fill:#0C447C;font-family:var(--font-sans)">Extent 1</text>
+<rect x="196" y="72" width="130" height="120" rx="7" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+<text x="261" y="90" text-anchor="middle" style="font-size:10px;font-weight:500;fill:#0C447C;font-family:var(--font-sans)">Extent 2</text>
+<rect x="340" y="72" width="130" height="120" rx="7" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+<text x="405" y="90" text-anchor="middle" style="font-size:10px;font-weight:500;fill:#0C447C;font-family:var(--font-sans)">Extent 3</text>
+<text x="510" y="132" text-anchor="middle" style="font-size:22px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">···</text>
+<text x="510" y="152" text-anchor="middle" style="font-size:10px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">more extents</text>
+<rect x="58"  y="96" width="54" height="36" rx="4" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.8"/>
+<text x="85"  y="109" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#27500A;font-family:var(--font-sans)">Page 1</text>
+<text x="85"  y="122" text-anchor="middle" style="font-size:8px;fill:#3B6D11;font-family:var(--font-sans)">8KB</text>
+<rect x="118" y="96" width="54" height="36" rx="4" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.8"/>
+<text x="145" y="109" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#27500A;font-family:var(--font-sans)">Page 2</text>
+<text x="145" y="122" text-anchor="middle" style="font-size:8px;fill:#3B6D11;font-family:var(--font-sans)">8KB</text>
+<rect x="58"  y="140" width="54" height="36" rx="4" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.8"/>
+<text x="85"  y="153" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#27500A;font-family:var(--font-sans)">Page 3</text>
+<text x="85"  y="166" text-anchor="middle" style="font-size:8px;fill:#3B6D11;font-family:var(--font-sans)">8KB</text>
+<rect x="118" y="140" width="54" height="36" rx="4" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.8"/>
+<text x="145" y="153" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#27500A;font-family:var(--font-sans)">Page 4–8</text>
+<text x="145" y="166" text-anchor="middle" style="font-size:8px;fill:#3B6D11;font-family:var(--font-sans)">8KB each</text>
+<rect x="202" y="96" width="54" height="36" rx="4" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.8"/>
+<text x="229" y="109" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#633806;font-family:var(--font-sans)">Page 9</text>
+<text x="229" y="122" text-anchor="middle" style="font-size:8px;fill:#854F0B;font-family:var(--font-sans)">8KB</text>
+<rect x="262" y="96" width="54" height="36" rx="4" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.8"/>
+<text x="289" y="109" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#633806;font-family:var(--font-sans)">Page 10</text>
+<text x="289" y="122" text-anchor="middle" style="font-size:8px;fill:#854F0B;font-family:var(--font-sans)">8KB</text>
+<rect x="202" y="140" width="114" height="36" rx="4" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.8"/>
+<text x="259" y="153" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#633806;font-family:var(--font-sans)">Pages 11–16</text>
+<text x="259" y="166" text-anchor="middle" style="font-size:8px;fill:#854F0B;font-family:var(--font-sans)">8KB each</text>
+<rect x="36" y="222" width="608" height="148" rx="10" fill="#EAF3DE" stroke="#3B6D11" stroke-width="1"/>
+<text x="52" y="240" style="font-size:11px;font-weight:500;fill:#27500A;font-family:var(--font-sans)">Zoom in: Page 1 (8KB) — Customers table rows inside</text>
+<rect x="52"  y="248" width="120" height="50" rx="5" fill="#ffffff" stroke="#3B6D11" stroke-width="0.8"/>
+<text x="112" y="267" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#27500A;font-family:var(--font-sans)">Row 1 (CustomerID=1)</text>
+<text x="112" y="280" text-anchor="middle" style="font-size:8px;fill:#3B6D11;font-family:var(--font-sans)">Arjun | Chennai | 92</text>
+<text x="112" y="291" text-anchor="middle" style="font-size:8px;fill:#3B6D11;font-family:var(--font-sans)">India | Active | ~100B</text>
+<rect x="180" y="248" width="120" height="50" rx="5" fill="#ffffff" stroke="#3B6D11" stroke-width="0.8"/>
+<text x="240" y="267" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#27500A;font-family:var(--font-sans)">Row 2 (CustomerID=2)</text>
+<text x="240" y="280" text-anchor="middle" style="font-size:8px;fill:#3B6D11;font-family:var(--font-sans)">Priya | Mumbai | 78</text>
+<text x="240" y="291" text-anchor="middle" style="font-size:8px;fill:#3B6D11;font-family:var(--font-sans)">India | Active | ~100B</text>
+<rect x="308" y="248" width="120" height="50" rx="5" fill="#ffffff" stroke="#3B6D11" stroke-width="0.8"/>
+<text x="368" y="267" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#27500A;font-family:var(--font-sans)">Row 3 (CustomerID=3)</text>
+<text x="368" y="280" text-anchor="middle" style="font-size:8px;fill:#3B6D11;font-family:var(--font-sans)">Ravi | Delhi | 85</text>
+<text x="368" y="291" text-anchor="middle" style="font-size:8px;fill:#3B6D11;font-family:var(--font-sans)">India | Active | ~100B</text>
+<text x="480" y="278" text-anchor="middle" style="font-size:18px;fill:var(--color-text-tertiary)">···</text>
+<text x="480" y="295" text-anchor="middle" style="font-size:9px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">~397 more rows</text>
+<text x="340" y="340" text-anchor="middle" style="font-size:10px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">1 page = 8KB = ~400 rows. 1 extent = 8 pages = ~3200 rows. MDF = all extents.</text>
+<text x="340" y="356" text-anchor="middle" style="font-size:10px;fill:#0C447C;font-weight:500;font-family:var(--font-sans)">MDF → Extents → Pages → Rows. எல்லாமே ஒரே .mdf file-க்குள்ளே!</text>
+</svg>`,
+
+// STEP 2
+`<div class="card" style="background:#E6F1FB;color:#0C447C;margin-bottom:1rem">
+  <strong>5 Tables × 100 rows each = 500 rows total. எல்லாமே ஒரே MDF file-ல!</strong><br>
+  ஒவ்வொரு table-உம் அதற்கு allocate ஆன pages-ல store ஆகும். Tables mix ஆகல — ஒவ்வொரு table-க்கும் தனி pages.
+</div>
+<svg width="100%" viewBox="0 0 680 430" style="display:block;margin-bottom:.75rem">
+<defs><marker id="ar2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect x="10" y="10" width="660" height="410" rx="14" fill="#E6F1FB" stroke="#185FA5" stroke-width="2"/>
+<text x="30" y="32" style="font-size:12px;font-weight:500;fill:#0C447C;font-family:var(--font-sans)">MyDatabase.mdf — C:\SQLData\MyDatabase.mdf</text>
+<text x="30" y="48" style="font-size:10px;fill:#185FA5;font-family:var(--font-sans)">Total size = sum of all pages. 5 tables × 100 rows = ~2 pages total (100 rows &lt;&lt; 400 per page)</text>
+<rect x="26" y="58" width="186" height="160" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="1.2"/>
+<text x="119" y="76" text-anchor="middle" style="font-size:11px;font-weight:500;fill:#27500A;font-family:var(--font-sans)">Customers table</text>
+<text x="119" y="90" text-anchor="middle" style="font-size:10px;fill:#3B6D11;font-family:var(--font-sans)">100 rows</text>
+<rect x="36"  y="98" width="166" height="46" rx="5" fill="#fff" stroke="#3B6D11" stroke-width="0.8"/>
+<text x="119" y="114" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#27500A;font-family:var(--font-sans)">Page 1 (8KB)</text>
+<text x="119" y="127" text-anchor="middle" style="font-size:8px;fill:#3B6D11;font-family:var(--font-sans)">Rows 1–100 (all fit 1 page!)</text>
+<text x="119" y="138" text-anchor="middle" style="font-size:8px;fill:#3B6D11;font-family:var(--font-sans)">100 × ~80B = 8000B ≈ 1 page</text>
+<rect x="36" y="152" width="166" height="30" rx="5" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5" stroke-dasharray="3 2"/>
+<text x="119" y="171" text-anchor="middle" style="font-size:8px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">Page 2 (reserved, empty for now)</text>
+<text x="119" y="208" text-anchor="middle" style="font-size:9px;fill:#27500A;font-family:var(--font-sans)">Object ID: 12345</text>
+<rect x="224" y="58" width="186" height="160" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="1.2"/>
+<text x="317" y="76" text-anchor="middle" style="font-size:11px;font-weight:500;fill:#633806;font-family:var(--font-sans)">Orders table</text>
+<text x="317" y="90" text-anchor="middle" style="font-size:10px;fill:#854F0B;font-family:var(--font-sans)">100 rows</text>
+<rect x="234" y="98" width="166" height="46" rx="5" fill="#fff" stroke="#854F0B" stroke-width="0.8"/>
+<text x="317" y="114" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#633806;font-family:var(--font-sans)">Page 3 (8KB)</text>
+<text x="317" y="127" text-anchor="middle" style="font-size:8px;fill:#854F0B;font-family:var(--font-sans)">Rows 1–100 (all fit 1 page!)</text>
+<text x="317" y="138" text-anchor="middle" style="font-size:8px;fill:#854F0B;font-family:var(--font-sans)">Orders table data here</text>
+<rect x="234" y="152" width="166" height="30" rx="5" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5" stroke-dasharray="3 2"/>
+<text x="317" y="171" text-anchor="middle" style="font-size:8px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">Page 4 (reserved, empty)</text>
+<text x="317" y="208" text-anchor="middle" style="font-size:9px;fill:#633806;font-family:var(--font-sans)">Object ID: 23456</text>
+<rect x="422" y="58" width="186" height="160" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="1.2"/>
+<text x="515" y="76" text-anchor="middle" style="font-size:11px;font-weight:500;fill:#3C3489;font-family:var(--font-sans)">Products table</text>
+<text x="515" y="90" text-anchor="middle" style="font-size:10px;fill:#534AB7;font-family:var(--font-sans)">100 rows</text>
+<rect x="432" y="98" width="166" height="46" rx="5" fill="#fff" stroke="#534AB7" stroke-width="0.8"/>
+<text x="515" y="114" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#3C3489;font-family:var(--font-sans)">Page 5 (8KB)</text>
+<text x="515" y="127" text-anchor="middle" style="font-size:8px;fill:#534AB7;font-family:var(--font-sans)">Rows 1–100 (all fit 1 page!)</text>
+<text x="515" y="138" text-anchor="middle" style="font-size:8px;fill:#534AB7;font-family:var(--font-sans)">Products table data here</text>
+<rect x="432" y="152" width="166" height="30" rx="5" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5" stroke-dasharray="3 2"/>
+<text x="515" y="171" text-anchor="middle" style="font-size:8px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">Page 6 (reserved)</text>
+<text x="515" y="208" text-anchor="middle" style="font-size:9px;fill:#3C3489;font-family:var(--font-sans)">Object ID: 34567</text>
+<rect x="26"  y="232" width="296" height="130" rx="8" fill="#FCEBEB" stroke="#A32D2D" stroke-width="1.2"/>
+<text x="174" y="250" text-anchor="middle" style="font-size:11px;font-weight:500;fill:#791F1F;font-family:var(--font-sans)">Employees table</text>
+<text x="174" y="264" text-anchor="middle" style="font-size:10px;fill:#A32D2D;font-family:var(--font-sans)">100 rows</text>
+<rect x="36" y="272" width="276" height="40" rx="5" fill="#fff" stroke="#A32D2D" stroke-width="0.8"/>
+<text x="174" y="288" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#791F1F;font-family:var(--font-sans)">Page 7 (8KB) — Rows 1–100</text>
+<text x="174" y="302" text-anchor="middle" style="font-size:8px;fill:#A32D2D;font-family:var(--font-sans)">Object ID: 45678</text>
+<rect x="36" y="318" width="276" height="28" rx="5" fill="#FCEBEB" stroke="#A32D2D" stroke-width="0.5" stroke-dasharray="3 2"/>
+<text x="174" y="335" text-anchor="middle" style="font-size:8px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">Page 8 (reserved)</text>
+<rect x="334" y="232" width="296" height="130" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1.2"/>
+<text x="482" y="250" text-anchor="middle" style="font-size:11px;font-weight:500;fill:#085041;font-family:var(--font-sans)">Inventory table</text>
+<text x="482" y="264" text-anchor="middle" style="font-size:10px;fill:#0F6E56;font-family:var(--font-sans)">100 rows</text>
+<rect x="344" y="272" width="276" height="40" rx="5" fill="#fff" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="482" y="288" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#085041;font-family:var(--font-sans)">Page 9 (8KB) — Rows 1–100</text>
+<text x="482" y="302" text-anchor="middle" style="font-size:8px;fill:#0F6E56;font-family:var(--font-sans)">Object ID: 56789</text>
+<rect x="344" y="318" width="276" height="28" rx="5" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5" stroke-dasharray="3 2"/>
+<text x="482" y="335" text-anchor="middle" style="font-size:8px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">Page 10 (reserved)</text>
+<rect x="26" y="376" width="608" height="34" rx="6" fill="var(--color-bg-secondary)" stroke="var(--color-border-secondary)" stroke-width="0.8" stroke-dasharray="4 2"/>
+<text x="340" y="390" text-anchor="middle" style="font-size:10px;fill:var(--color-text-secondary);font-family:var(--font-sans)">System pages: PFS, GAM, SGAM, IAM — SQL Server internal metadata (page tracking)</text>
+<text x="340" y="403" text-anchor="middle" style="font-size:9px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">Page 0, 1, 2, 3 (system reserved — automatically managed)</text>
+</svg>`,
+
+// STEP 3
+`<div class="card" style="background:#EAF3DE;color:#27500A;margin-bottom:1rem">
+  <strong>1 Page (8KB) = 8192 bytes. இதுக்குள்ள என்ன இருக்கு?</strong>
+</div>
+<svg width="100%" viewBox="0 0 680 360" style="display:block;margin-bottom:.75rem">
+<rect x="60" y="10" width="560" height="340" rx="10" fill="#EAF3DE" stroke="#3B6D11" stroke-width="1.5"/>
+<text x="340" y="28" text-anchor="middle" style="font-size:12px;font-weight:500;fill:#27500A;font-family:var(--font-sans)">1 Page = 8192 bytes (8KB)</text>
+<rect x="76" y="36" width="528" height="44" rx="6" fill="#27500A" stroke="#3B6D11" stroke-width="0.8"/>
+<text x="340" y="55" text-anchor="middle" style="font-size:10px;font-weight:500;fill:#fff;font-family:var(--font-sans)">Page Header — 96 bytes</text>
+<text x="340" y="70" text-anchor="middle" style="font-size:9px;fill:#9FE1CB;font-family:var(--font-sans)">Page ID | Object ID (which table) | Row count | Free space | Next/Prev page pointer</text>
+<rect x="76" y="88" width="528" height="190" rx="6" fill="#ffffff" stroke="#3B6D11" stroke-width="0.8"/>
+<text x="340" y="106" text-anchor="middle" style="font-size:10px;font-weight:500;fill:#27500A;font-family:var(--font-sans)">Data rows area — ~8000 bytes</text>
+<rect x="86"  y="114" width="508" height="26" rx="3" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+<text x="100" y="131" style="font-size:9px;font-weight:500;fill:#27500A;font-family:var(--font-sans)">Row 1:</text>
+<text x="148" y="131" style="font-size:9px;fill:#3B6D11;font-family:var(--font-mono)">ID=1 | Arjun M. | Chennai | Score=92 | India | Active</text>
+<rect x="86"  y="144" width="508" height="26" rx="3" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+<text x="100" y="161" style="font-size:9px;font-weight:500;fill:#27500A;font-family:var(--font-sans)">Row 2:</text>
+<text x="148" y="161" style="font-size:9px;fill:#3B6D11;font-family:var(--font-mono)">ID=2 | Priya S. | Mumbai  | Score=78 | India | Active</text>
+<rect x="86"  y="174" width="508" height="26" rx="3" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+<text x="100" y="191" style="font-size:9px;font-weight:500;fill:#27500A;font-family:var(--font-sans)">Row 3:</text>
+<text x="148" y="191" style="font-size:9px;fill:#3B6D11;font-family:var(--font-mono)">ID=3 | Meera R. | Delhi   | Score=95 | India | Inactive</text>
+<rect x="86"  y="204" width="508" height="26" rx="3" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+<text x="100" y="221" style="font-size:9px;font-weight:500;fill:#27500A;font-family:var(--font-sans)">Row 4:</text>
+<text x="148" y="221" style="font-size:9px;fill:#3B6D11;font-family:var(--font-mono)">ID=4 | Ravi K. | Bangalore| Score=88 | India | Active</text>
+<text x="340" y="252" text-anchor="middle" style="font-size:16px;fill:var(--color-text-tertiary)">···</text>
+<text x="340" y="268" text-anchor="middle" style="font-size:9px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">96 more rows (100 total in this page)</text>
+<rect x="76" y="286" width="528" height="36" rx="6" fill="#185FA5" stroke="#0C447C" stroke-width="0.8"/>
+<text x="340" y="301" text-anchor="middle" style="font-size:10px;font-weight:500;fill:#fff;font-family:var(--font-sans)">Row Offset Array — bottom of page</text>
+<text x="340" y="315" text-anchor="middle" style="font-size:9px;fill:#B5D4F4;font-family:var(--font-sans)">Each row-ஓட byte position store ஆகும் — SQL Server quickly rows-ஐ locate பண்ண use பண்ணும்</text>
+</svg>
+<div class="card" style="background:#E6F1FB;color:#0C447C">
+  <strong>Page Header-ல Object ID இருக்கு</strong> — இதை வச்சு SQL Server "இந்த page எந்த table-ஓடது" னு identify பண்ணும். Customers = 12345, Orders = 23456. Mixed ஆகல!
+</div>`,
+
+// STEP 4
+`<div class="card" style="background:#E6F1FB;color:#0C447C;margin-bottom:.75rem">
+  <strong>5 tables × 100 rows each — exact page calculation:</strong>
+</div>
+<table style="margin-bottom:1rem">
+  <thead><tr>
+    <th>Table name</th><th>Rows</th><th>Row size</th><th>Total data</th><th>Pages needed</th><th>Page numbers</th>
+  </tr></thead>
+  <tbody>
+    <tr style="background:#EAF3DE40">
+      <td style="font-weight:500;color:#27500A">Customers</td><td>100</td>
+      <td style="font-family:var(--font-mono)">~80 bytes</td>
+      <td style="font-family:var(--font-mono)">8,000 bytes</td>
+      <td><span class="pill" style="background:#EAF3DE;color:#27500A">1 page</span></td>
+      <td style="font-family:var(--font-mono);font-size:11px">Page 1</td>
+    </tr>
+    <tr>
+      <td style="font-weight:500;color:#633806">Orders</td><td>100</td>
+      <td style="font-family:var(--font-mono)">~120 bytes</td>
+      <td style="font-family:var(--font-mono)">12,000 bytes</td>
+      <td><span class="pill" style="background:#FAEEDA;color:#633806">2 pages</span></td>
+      <td style="font-family:var(--font-mono);font-size:11px">Pages 3–4</td>
+    </tr>
+    <tr style="background:#EEEDFE40">
+      <td style="font-weight:500;color:#3C3489">Products</td><td>100</td>
+      <td style="font-family:var(--font-mono)">~100 bytes</td>
+      <td style="font-family:var(--font-mono)">10,000 bytes</td>
+      <td><span class="pill" style="background:#EEEDFE;color:#3C3489">2 pages</span></td>
+      <td style="font-family:var(--font-mono);font-size:11px">Pages 5–6</td>
+    </tr>
+    <tr>
+      <td style="font-weight:500;color:#791F1F">Employees</td><td>100</td>
+      <td style="font-family:var(--font-mono)">~90 bytes</td>
+      <td style="font-family:var(--font-mono)">9,000 bytes</td>
+      <td><span class="pill" style="background:#FCEBEB;color:#791F1F">2 pages</span></td>
+      <td style="font-family:var(--font-mono);font-size:11px">Pages 7–8</td>
+    </tr>
+    <tr style="background:#E1F5EE40">
+      <td style="font-weight:500;color:#085041">Inventory</td><td>100</td>
+      <td style="font-family:var(--font-mono)">~70 bytes</td>
+      <td style="font-family:var(--font-mono)">7,000 bytes</td>
+      <td><span class="pill" style="background:#E1F5EE;color:#085041">1 page</span></td>
+      <td style="font-family:var(--font-mono);font-size:11px">Page 9</td>
+    </tr>
+    <tr style="background:var(--color-bg-secondary)">
+      <td style="font-weight:500">System pages</td><td>—</td><td>—</td><td>—</td>
+      <td><span class="pill" style="background:var(--color-bg-secondary);color:var(--color-text-secondary)">~4 pages</span></td>
+      <td style="font-family:var(--font-mono);font-size:11px">Pages 0–3</td>
+    </tr>
+    <tr style="background:#E6F1FB">
+      <td style="font-weight:500;color:#0C447C">TOTAL</td>
+      <td style="font-weight:500">500</td><td>—</td>
+      <td style="font-family:var(--font-mono);color:#0C447C">~46,000 bytes</td>
+      <td><span class="pill" style="background:#E6F1FB;color:#0C447C">~13 pages</span></td>
+      <td style="font-size:11px;color:#185FA5">~104 KB total MDF</td>
+    </tr>
+  </tbody>
+</table>
+<div class="card" style="background:#FAEEDA;color:#633806">
+  <strong>Real SQL Server-ல minimum MDF size = 8MB</strong> (even for tiny databases). SQL Server pre-allocates space. உன் 500 rows data = ~46KB. ஆனா MDF = 8MB minimum. Extra space = future growth-க்கு reserved.
+</div>`,
+
+// STEP 5
+`<div class="card" style="background:#E6F1FB;color:#0C447C;margin-bottom:1rem">
+  <strong>உன் exact doubts-க்கு answers:</strong>
+</div>
+<div class="step"><div class="snum" style="background:#185FA5">Q1</div>
+<div class="card" style="background:#E6F1FB;color:#0C447C;flex:1;margin-bottom:0">
+  <strong>Pages-ல table records இருக்கா?</strong><br>
+  ஆமா! Table data = pages-ல தான் store ஆகும். Customers table-ஓட 100 rows = Page 1-ல. Orders table-ஓட 100 rows = Page 3-ல. ஒவ்வொரு page-உம் ஒரே table-ஓட data மட்டும் hold பண்ணும்.
+</div></div>
+<div class="step"><div class="snum" style="background:#185FA5">Q2</div>
+<div class="card" style="background:#E6F1FB;color:#0C447C;flex:1;margin-bottom:0">
+  <strong>Pages MDF-க்குள்ளே இருக்கா?</strong><br>
+  ஆமா! Pages = MDF file-க்குள்ளே physically store ஆகும். MDF = database-ஓட primary data file. எல்லா table data, index data, system metadata — எல்லாமே இந்த ஒரே .mdf file-ல இருக்கும்.
+</div></div>
+<div class="step"><div class="snum" style="background:#27500A">Q3</div>
+<div class="card" style="background:#EAF3DE;color:#27500A;flex:1;margin-bottom:0">
+  <strong>5 tables mix ஆகுமா ஒரே page-ல?</strong><br>
+  இல்ல! ஒவ்வொரு table-க்கும் தனி pages allocate ஆகும். Page header-ல Object ID இருக்கு — எந்த table-ஓடது னு clearly mark ஆகும்.
+</div></div>
+<div class="step"><div class="snum" style="background:#534AB7">Q4</div>
+<div class="card" style="background:#EEEDFE;color:#3C3489;flex:1;margin-bottom:0">
+  <strong>Index data எங்க போகும்?</strong><br>
+  Index data-உம் MDF-ல pages-ல தான் store ஆகும்! Clustered Index leaf pages = table data pages. NCI leaf pages = separate pages in MDF, but different Object ID.
+</div></div>
+<div class="divider"></div>
+<table>
+  <thead><tr><th>Concept</th><th>What it is</th><th>Where it lives</th></tr></thead>
+  <tbody>
+    <tr><td style="font-weight:500">Row</td><td style="font-size:11px">Single record — 1 customer</td><td style="font-size:11px">Inside a page</td></tr>
+    <tr style="background:var(--color-bg-secondary)"><td style="font-weight:500">Page</td><td style="font-size:11px">8KB unit — ~400 rows</td><td style="font-size:11px">Inside an extent, inside MDF</td></tr>
+    <tr><td style="font-weight:500">Extent</td><td style="font-size:11px">64KB = 8 pages</td><td style="font-size:11px">Inside MDF file</td></tr>
+    <tr style="background:var(--color-bg-secondary)"><td style="font-weight:500">MDF file</td><td style="font-size:11px">Primary database file</td><td style="font-size:11px">C:\SQLData\ on disk</td></tr>
+    <tr><td style="font-weight:500">LDF file</td><td style="font-size:11px">Transaction log file</td><td style="font-size:11px">Separate file — C:\SQLData\*.ldf</td></tr>
+    <tr style="background:var(--color-bg-secondary)"><td style="font-weight:500">NDF file</td><td style="font-size:11px">Secondary data file (optional)</td><td style="font-size:11px">Extra MDF when DB grows large</td></tr>
+  </tbody>
+</table>`
+];
+
+const labels = ['1. Storage hierarchy','2. 5 tables in MDF','3. Page internals','4. Page calculation','5. Your doubts answered'];
+
+const tb = document.getElementById('tbr');
+labels.forEach((l,i) => {
+  const b = document.createElement('button');
+  b.className = 'tab' + (i===0?' on':'');
+  b.textContent = l;
+  b.onclick = () => {
+    document.querySelectorAll('.tab').forEach((x,j) => x.classList.toggle('on', j===i));
+    document.getElementById('content').innerHTML = steps[i];
+  };
+  tb.appendChild(b);
+});
+document.getElementById('content').innerHTML = steps[0];
+</script>
+</body>
+</html>
