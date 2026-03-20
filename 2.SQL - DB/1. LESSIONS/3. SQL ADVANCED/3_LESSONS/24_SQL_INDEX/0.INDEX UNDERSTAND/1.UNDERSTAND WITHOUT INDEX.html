@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL Server Internals – Pages, Heap & Full Table Scan</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2333;
+    --border: #30363d;
+    --accent: #58c4dc;
+    --accent2: #f78166;
+    --accent3: #56d364;
+    --accent4: #e3b341;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --page-color: #1c3a5e;
+    --page-header: #0d2847;
+    --scan-color: #f78166;
+    --found-color: #56d364;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── HERO TITLE ── */
+  .hero {
+    text-align: center;
+    padding: 48px 24px 32px;
+    position: relative;
+  }
+  .hero::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 200px; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  }
+  .hero h1 {
+    font-size: clamp(1.8rem, 4vw, 3rem);
+    font-weight: 800;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .hero p { color: var(--text-muted); margin-top: 8px; font-family: 'JetBrains Mono', monospace; font-size: .85rem; }
+
+  /* ── SECTIONS ── */
+  .section {
+    max-width: 1200px; margin: 0 auto; padding: 40px 24px;
+  }
+  .section-title {
+    display: flex; align-items: center; gap: 12px;
+    font-size: 1.25rem; font-weight: 700; margin-bottom: 24px;
+  }
+  .section-title .badge {
+    background: var(--accent); color: var(--bg);
+    padding: 2px 10px; border-radius: 4px; font-size: .75rem;
+    font-family: 'JetBrains Mono', monospace; letter-spacing: 1px;
+  }
+  .divider {
+    border: none; border-top: 1px solid var(--border);
+    max-width: 1200px; margin: 0 auto;
+  }
+
+  /* ── CONCEPT CARDS ── */
+  .concept-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;
+  }
+  .concept-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px;
+    transition: transform .2s, border-color .2s;
+  }
+  .concept-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+  .concept-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+  .concept-card p { font-size: .85rem; color: var(--text-muted); line-height: 1.6; }
+  .icon { font-size: 1.4rem; }
+
+  /* ── DATA FILE DIAGRAM ── */
+  .datafile-wrap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 24px;
+  }
+  .datafile-title {
+    font-family: 'JetBrains Mono', monospace; font-size: .9rem;
+    color: var(--accent); margin-bottom: 20px; display: flex; align-items: center; gap: 8px;
+  }
+  .pages-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px;
+  }
+  .page-type {
+    background: var(--surface2); border: 1px dashed var(--border);
+    border-radius: 10px; padding: 14px 12px; text-align: center;
+  }
+  .page-type .pt-label { font-size: .7rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; margin-bottom: 10px; }
+  .mini-page {
+    background: var(--page-color); border: 1px solid #2a5080;
+    border-radius: 5px; height: 28px; margin: 4px 4px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .mini-page span { font-size: .55rem; color: #8ac; font-family: 'JetBrains Mono', monospace; }
+  .page-type-name { font-size: .8rem; font-weight: 700; margin-top: 8px; }
+
+  /* ── DATA PAGE ANATOMY ── */
+  .anatomy-wrap {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start;
+  }
+  @media(max-width:700px) { .anatomy-wrap { grid-template-columns: 1fr; } }
+
+  .page-anatomy {
+    background: var(--surface); border: 2px solid var(--accent);
+    border-radius: 12px; overflow: hidden; font-family: 'JetBrains Mono', monospace;
+  }
+  .pa-header {
+    background: var(--page-header); padding: 10px 16px;
+    font-size: .8rem; color: var(--accent); font-weight: 700;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .pa-size { background: var(--accent4); color: var(--bg); padding: 2px 8px; border-radius: 4px; font-size: .7rem; }
+  .pa-rows { padding: 0; }
+  .pa-row {
+    display: grid; grid-template-columns: 70px 1fr 60px;
+    padding: 8px 16px; border-bottom: 1px solid var(--border); font-size: .75rem;
+    align-items: center; transition: background .15s;
+  }
+  .pa-row:hover { background: var(--surface2); }
+  .pa-row .slot { color: var(--accent2); font-weight: 700; }
+  .pa-row .data { color: var(--text); }
+  .pa-row .offset { color: var(--text-muted); text-align: right; }
+  .pa-freespace {
+    padding: 12px 16px; text-align: center; font-size: .7rem;
+    color: var(--text-muted); border-bottom: 1px solid var(--border);
+    letter-spacing: 2px;
+  }
+  .pa-offsetarray {
+    display: flex; padding: 8px 16px; gap: 6px; justify-content: flex-end; flex-wrap: wrap;
+  }
+  .offset-box {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 4px; padding: 4px 8px; font-size: .65rem; color: var(--accent4);
+  }
+
+  .anatomy-info { display: flex; flex-direction: column; gap: 12px; }
+  .info-item {
+    background: var(--surface); border-left: 3px solid var(--accent);
+    padding: 12px 16px; border-radius: 0 8px 8px 0;
+  }
+  .info-item h4 { font-size: .85rem; font-weight: 700; margin-bottom: 4px; }
+  .info-item p { font-size: .78rem; color: var(--text-muted); line-height: 1.5; }
+
+  /* ── HEAP SECTION ── */
+  .heap-wrap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 24px;
+  }
+  .heap-tag {
+    display: inline-block;
+    background: linear-gradient(135deg, var(--accent), #3a9bb8);
+    color: var(--bg); padding: 4px 16px; border-radius: 20px;
+    font-weight: 800; font-size: 1.1rem; margin-bottom: 20px; letter-spacing: 2px;
+  }
+  .heap-pages {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px;
+    margin-bottom: 16px;
+  }
+  .heap-page {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden; transition: border-color .2s;
+  }
+  .heap-page.scanning { border-color: var(--scan-color); animation: pulse-scan .5s ease-in-out; }
+  .heap-page.found { border-color: var(--found-color); }
+  @keyframes pulse-scan {
+    0%,100% { box-shadow: 0 0 0 0 transparent; }
+    50% { box-shadow: 0 0 12px 2px rgba(247,129,102,.4); }
+  }
+  .hp-header {
+    background: var(--page-header); padding: 6px 10px;
+    font-family: 'JetBrains Mono', monospace; font-size: .75rem; color: var(--accent);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .hp-header .scan-badge {
+    background: var(--scan-color); color: var(--bg);
+    padding: 1px 6px; border-radius: 3px; font-size: .6rem; font-weight: 700;
+    display: none;
+  }
+  .heap-page.scanning .scan-badge { display: block; }
+  .hp-rows { padding: 6px 10px; }
+  .hp-row {
+    font-family: 'JetBrains Mono', monospace; font-size: .68rem;
+    padding: 3px 0; color: var(--text-muted); display: flex; justify-content: space-between;
+    border-radius: 3px; padding: 3px 4px;
+    transition: background .15s, color .15s;
+  }
+  .hp-row.scanning { background: rgba(247,129,102,.15); color: var(--scan-color); }
+  .hp-row.found { background: rgba(86,211,100,.2); color: var(--found-color); font-weight: 700; }
+
+  /* ── SCAN DEMO ── */
+  .scan-controls {
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 20px;
+  }
+  .btn {
+    background: var(--accent); color: var(--bg);
+    border: none; padding: 8px 20px; border-radius: 8px;
+    font-family: 'Syne', sans-serif; font-weight: 700; font-size: .85rem;
+    cursor: pointer; transition: opacity .2s, transform .1s;
+  }
+  .btn:hover { opacity: .85; }
+  .btn:active { transform: scale(.97); }
+  .btn.secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn.danger { background: var(--accent2); }
+
+  .scan-status {
+    font-family: 'JetBrains Mono', monospace; font-size: .8rem;
+    color: var(--accent4); padding: 8px 16px; background: var(--surface2);
+    border-radius: 8px; border: 1px solid var(--border); flex: 1;
+    min-width: 200px;
+  }
+  .search-input-wrap { display: flex; gap: 8px; align-items: center; }
+  .search-input {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 8px 14px; border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: .85rem;
+    width: 80px;
+  }
+  .search-input:focus { outline: none; border-color: var(--accent); }
+
+  .scan-legend {
+    display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: .75rem; color: var(--text-muted); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  /* ── RESULT BOX ── */
+  .result-box {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px; margin-top: 16px;
+    font-family: 'JetBrains Mono', monospace; font-size: .8rem;
+    min-height: 56px; transition: border-color .3s;
+  }
+  .result-box.success { border-color: var(--found-color); }
+  .result-box.not-found { border-color: var(--accent2); }
+  .result-label { font-size: .65rem; color: var(--text-muted); margin-bottom: 6px; letter-spacing: 1px; }
+  .result-value { color: var(--found-color); font-weight: 700; font-size: .9rem; }
+  .result-value.notfound { color: var(--accent2); }
+
+  /* stats */
+  .stats-row {
+    display: flex; gap: 16px; flex-wrap: wrap; margin-top: 16px;
+  }
+  .stat-chip {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 14px; font-family: 'JetBrains Mono', monospace;
+    font-size: .75rem;
+  }
+  .stat-chip span { color: var(--accent4); font-weight: 700; }
+
+  /* footer note */
+  .note {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-left: 4px solid var(--accent4);
+    border-radius: 0 8px 8px 0; padding: 12px 16px;
+    font-size: .8rem; color: var(--text-muted); line-height: 1.6;
+    margin-top: 16px;
+  }
+  .note strong { color: var(--accent4); }
+
+  footer { text-align: center; padding: 32px 16px; color: var(--text-muted); font-size: .75rem; font-family: 'JetBrains Mono', monospace; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>SQL Server Internals</h1>
+  <p>// Pages · Heap · Data File · Full Table Scan — Visual Guide</p>
+</div>
+
+<!-- SECTION 1: CONCEPTS -->
+<div class="section">
+  <div class="section-title">
+    <span class="badge">01</span> Core Concepts
+  </div>
+  <div class="concept-grid">
+    <div class="concept-card">
+      <h3><span class="icon">📄</span> Page</h3>
+      <p>The <strong>smallest unit</strong> of data storage in SQL Server. Each page is exactly <strong>8 KB</strong>. SQL Server reads and writes entire pages — never partial ones.</p>
+    </div>
+    <div class="concept-card">
+      <h3><span class="icon">🗂️</span> Data Page</h3>
+      <p>Stores actual <strong>row data</strong> from your tables. Contains a header (96 bytes), rows, free space, and an offset array at the bottom.</p>
+    </div>
+    <div class="concept-card">
+      <h3><span class="icon">🔍</span> Index Page</h3>
+      <p>Stores <strong>index entries</strong> — pointers that help SQL Server jump directly to the right data page instead of scanning every page.</p>
+    </div>
+    <div class="concept-card">
+      <h3><span class="icon">💾</span> Data File (.mdf)</h3>
+      <p>The main file on disk where SQL Server stores all pages — data pages + index pages. One <strong>.mdf</strong> file per database (primary).</p>
+    </div>
+    <div class="concept-card">
+      <h3><span class="icon">🏔️</span> Heap</h3>
+      <p>A table stored <strong>WITHOUT a Clustered Index</strong>. Rows are inserted in any order, scattered across pages. Fast writes, slow targeted reads.</p>
+    </div>
+    <div class="concept-card">
+      <h3><span class="icon">🔎</span> Full Table Scan</h3>
+      <p>When there is no usable index, SQL Server reads <strong>every page, every row</strong> from start to finish until the match is found.</p>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- SECTION 2: DATA FILE STRUCTURE -->
+<div class="section">
+  <div class="section-title">
+    <span class="badge">02</span> Data File (.mdf) Structure
+  </div>
+  <div class="datafile-wrap">
+    <div class="datafile-title">💾 YourDatabase.mdf</div>
+    <div class="pages-grid">
+      <div class="page-type">
+        <div class="pt-label">FOR TABLE: Customers</div>
+        <div class="mini-page"><span>Page 1:100</span></div>
+        <div class="mini-page"><span>Page 1:101</span></div>
+        <div class="mini-page"><span>Page 1:102</span></div>
+        <div class="page-type-name" style="color:var(--accent)">Data Pages</div>
+      </div>
+      <div class="page-type">
+        <div class="pt-label">FOR TABLE: Orders</div>
+        <div class="mini-page"><span>Page 2:50</span></div>
+        <div class="mini-page"><span>Page 2:51</span></div>
+        <div class="mini-page"><span>Page 2:52</span></div>
+        <div class="page-type-name" style="color:var(--accent)">Data Pages</div>
+      </div>
+      <div class="page-type">
+        <div class="pt-label">FOR TABLE: Products</div>
+        <div class="mini-page"><span>Page 3:80</span></div>
+        <div class="mini-page"><span>Page 3:81</span></div>
+        <div class="page-type-name" style="color:var(--accent)">Data Pages</div>
+      </div>
+      <div class="page-type">
+        <div class="pt-label">FOR INDEX: IX_Cust_ID</div>
+        <div class="mini-page"><span>Page 4:10</span></div>
+        <div class="mini-page"><span>Page 4:11</span></div>
+        <div class="page-type-name" style="color:var(--accent3)">Index Pages</div>
+      </div>
+    </div>
+    <div class="note" style="margin-top:16px">
+      <strong>Key Insight:</strong> SQL Server always reads/writes in full 8 KB pages. Even if you want 1 row, the entire page is loaded into memory (Buffer Pool). The page number format is <code>FileID:PageID</code> — e.g., <code>1:100</code> means File 1, Page 100.
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- SECTION 3: PAGE ANATOMY -->
+<div class="section">
+  <div class="section-title">
+    <span class="badge">03</span> Data Page Anatomy (8 KB = 8192 bytes)
+  </div>
+  <div class="anatomy-wrap">
+    <div class="page-anatomy">
+      <div class="pa-header">
+        <span>📄 Page 1:150 — Customers</span>
+        <span class="pa-size">8 KB</span>
+      </div>
+      <div class="pa-row" style="background:var(--page-header); color:var(--accent); font-weight:700">
+        <span class="slot">HEADER</span>
+        <span class="data">PageID, TableID, PrevPage, NextPage…</span>
+        <span class="offset">0–96</span>
+      </div>
+      <div class="pa-rows" id="anatomy-rows">
+        <div class="pa-row">
+          <span class="slot">Row 1</span><span class="data">1, Bob, USA</span><span class="offset">96</span>
+        </div>
+        <div class="pa-row">
+          <span class="slot">Row 2</span><span class="data">2, Anna, Germany</span><span class="offset">118</span>
+        </div>
+        <div class="pa-row">
+          <span class="slot">Row 3</span><span class="data">3, Lisa, Italy</span><span class="offset">140</span>
+        </div>
+      </div>
+      <div class="pa-freespace">· · · FREE SPACE · · ·</div>
+      <div style="padding:8px 16px; font-size:.7rem; color:var(--text-muted); font-family:'JetBrains Mono',monospace;">Offset Array (slot array — grows from bottom up)</div>
+      <div class="pa-offsetarray">
+        <div class="offset-box">Slot 3 → 140</div>
+        <div class="offset-box">Slot 2 → 118</div>
+        <div class="offset-box">Slot 1 → 96</div>
+      </div>
+    </div>
+    <div class="anatomy-info">
+      <div class="info-item" style="border-color:var(--accent)">
+        <h4>🔵 Header (96 bytes)</h4>
+        <p>Contains metadata: page number, object ID it belongs to, pointers to prev/next page in linked list, free space available, number of rows on the page.</p>
+      </div>
+      <div class="info-item" style="border-color:var(--accent4)">
+        <h4>🟡 Row Data</h4>
+        <p>Each row is stored sequentially. Rows grow <strong>top → down</strong>. Every row has a small header + actual column data packed together.</p>
+      </div>
+      <div class="info-item" style="border-color:var(--text-muted)">
+        <h4>⚪ Free Space</h4>
+        <p>The gap between rows and offset array. New rows fill this space. When a page is full, SQL Server allocates a new page.</p>
+      </div>
+      <div class="info-item" style="border-color:var(--accent2)">
+        <h4>🔴 Offset Array (Slot Array)</h4>
+        <p>Grows from <strong>bottom → up</strong>. Each slot stores the byte offset of a row. This lets SQL Server jump directly to any row position without scanning row-by-row within a page.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- SECTION 4: HEAP + FULL TABLE SCAN DEMO -->
+<div class="section">
+  <div class="section-title">
+    <span class="badge">04</span> HEAP — Full Table Scan (Live Demo)
+  </div>
+  <div class="heap-wrap">
+    <div class="heap-tag">HEAP</div>
+    <p style="font-size:.85rem; color:var(--text-muted); margin-bottom:20px;">
+      Table: <code style="color:var(--accent)">Customers</code> — 50 records, randomly inserted (no order), 10 rows per page → 5 pages.
+      No Clustered Index → every search = Full Table Scan.
+    </p>
+
+    <div class="scan-controls">
+      <div class="search-input-wrap">
+        <label style="font-size:.8rem; color:var(--text-muted)">Search ID:</label>
+        <input class="search-input" type="number" id="searchId" value="37" min="1" max="50">
+      </div>
+      <button class="btn" onclick="startScan()">▶ Run Full Table Scan</button>
+      <button class="btn secondary" onclick="resetScan()">↺ Reset</button>
+      <div class="scan-status" id="scanStatus">Ready — enter an ID and click scan</div>
+    </div>
+
+    <div class="heap-pages" id="heapPages"></div>
+
+    <div class="scan-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--scan-color)"></div> Currently scanning</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--found-color)"></div> Found!</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--border)"></div> Not yet scanned / skipped</div>
+    </div>
+
+    <div class="result-box" id="resultBox">
+      <div class="result-label">QUERY RESULT</div>
+      <div id="resultValue" style="color:var(--text-muted); font-size:.8rem">Run the scan to see results…</div>
+    </div>
+
+    <div class="stats-row" id="statsRow"></div>
+
+    <div class="note">
+      <strong>Why is this slow?</strong> In a HEAP, there is no ordering — ID 37 could be on any page. SQL Server <em>must</em> read every page from start until it finds the row (or reaches the end). With a <strong>Clustered Index</strong>, it would use a B-Tree to jump directly to the right page in O(log n) instead of O(n).
+    </div>
+  </div>
+</div>
+
+<footer>SQL Server Internals Visual Guide · Pages · Heap · Full Table Scan</footer>
+
+<script>
+// ── DATA GENERATION ──
+const NAMES = ["Alice","Bob","Carlos","Diana","Eve","Frank","Grace","Hank","Irene","Jack",
+  "Karen","Leo","Mia","Nate","Olivia","Paul","Quinn","Rachel","Sam","Tina",
+  "Uma","Victor","Wendy","Xander","Yara","Zach","Anika","Ben","Clara","Derek",
+  "Elena","Felix","Gina","Hugo","Isla","James","Kylie","Liam","Maya","Noah",
+  "Orla","Pete","Rosa","Sean","Tara","Uday","Vince","Wren","Xena","Yusuf"];
+
+const COUNTRIES = ["India","USA","Germany","Italy","France","Brazil","Japan","UK","Canada","Australia"];
+
+// Create 50 rows, randomly shuffled (HEAP = no order)
+let allRows = [];
+for (let i = 1; i <= 50; i++) {
+  allRows.push({ id: i, name: NAMES[i-1], country: COUNTRIES[(i-1) % COUNTRIES.length] });
+}
+// Shuffle to simulate random insert order
+allRows = allRows.sort(() => Math.random() - 0.5);
+
+// Split into pages of 10
+const PAGES_DATA = [];
+for (let p = 0; p < 5; p++) {
+  PAGES_DATA.push({
+    pageId: `1:${100 + p}`,
+    rows: allRows.slice(p * 10, p * 10 + 10)
+  });
+}
+
+// ── RENDER HEAP ──
+function renderHeap(highlightPage = -1, highlightRow = -1, foundPage = -1, foundRow = -1, scannedPages = []) {
+  const container = document.getElementById('heapPages');
+  container.innerHTML = '';
+  PAGES_DATA.forEach((page, pi) => {
+    const isScanning = pi === highlightPage;
+    const isFound = pi === foundPage;
+    const isScanned = scannedPages.includes(pi);
+    const div = document.createElement('div');
+    div.className = 'heap-page' + (isScanning ? ' scanning' : '') + (isFound ? ' found' : '');
+
+    let rowsHtml = '';
+    page.rows.forEach((row, ri) => {
+      const isRowScanning = isScanning && ri === highlightRow;
+      const isRowFound = pi === foundPage && ri === foundRow;
+      rowsHtml += `<div class="hp-row ${isRowScanning ? 'scanning' : ''} ${isRowFound ? 'found' : ''}">
+        <span>${row.id}, ${row.name}</span><span style="color:var(--text-muted);font-size:.6rem">${row.country}</span>
+      </div>`;
+    });
+
+    div.innerHTML = `
+      <div class="hp-header">
+        <span>${page.pageId}</span>
+        <span class="scan-badge">SCANNING</span>
+      </div>
+      <div class="hp-rows">${rowsHtml}</div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+renderHeap();
+
+// ── SCAN ANIMATION ──
+let scanInterval = null;
+
+function resetScan() {
+  if (scanInterval) clearInterval(scanInterval);
+  scanInterval = null;
+  renderHeap();
+  document.getElementById('scanStatus').textContent = 'Ready — enter an ID and click scan';
+  document.getElementById('resultBox').className = 'result-box';
+  document.getElementById('resultValue').innerHTML = 'Run the scan to see results…';
+  document.getElementById('resultValue').style.color = 'var(--text-muted)';
+  document.getElementById('statsRow').innerHTML = '';
+}
+
+function startScan() {
+  resetScan();
+  const searchId = parseInt(document.getElementById('searchId').value);
+  if (isNaN(searchId) || searchId < 1 || searchId > 50) {
+    document.getElementById('scanStatus').textContent = '⚠ Enter a valid ID between 1 and 50';
+    return;
+  }
+
+  let pi = 0, ri = 0;
+  let pagesRead = 0, rowsRead = 0;
+  const scannedPages = [];
+  let foundResult = null;
+  const startTime = Date.now();
+
+  function step() {
+    if (pi >= PAGES_DATA.length) {
+      // Not found
+      clearInterval(scanInterval);
+      renderHeap(-1, -1, -1, -1, scannedPages);
+      document.getElementById('scanStatus').textContent = `❌ ID ${searchId} not found — scanned all ${pagesRead} pages, ${rowsRead} rows`;
+      const rb = document.getElementById('resultBox');
+      rb.className = 'result-box not-found';
+      document.getElementById('resultValue').innerHTML = `<span class="notfound">No row found with ID = ${searchId}</span>`;
+      showStats(pagesRead, rowsRead, Date.now() - startTime, false);
+      return;
+    }
+
+    const page = PAGES_DATA[pi];
+    const row = page.rows[ri];
+    rowsRead++;
+
+    document.getElementById('scanStatus').textContent =
+      `🔍 Scanning Page ${page.pageId} → Row ${ri+1}/10 (ID=${row.id}, ${row.name})`;
+
+    renderHeap(pi, ri, -1, -1, scannedPages);
+
+    if (row.id === searchId) {
+      // Found!
+      clearInterval(scanInterval);
+      pagesRead = pi + 1;
+      const fp = pi, fr = ri;
+      scannedPages.push(pi);
+      renderHeap(-1, -1, fp, fr, scannedPages);
+      document.getElementById('scanStatus').textContent =
+        `✅ Found! ID=${searchId} on Page ${page.pageId}, Row ${ri+1}`;
+      const rb = document.getElementById('resultBox');
+      rb.className = 'result-box success';
+      document.getElementById('resultValue').innerHTML =
+        `<span class="result-value">ID: ${row.id} | Name: ${row.name} | Country: ${row.country}</span><br>
+         <span style="color:var(--text-muted);font-size:.7rem">Located at → Page ${page.pageId}, Slot ${ri+1}, Offset array entry</span>`;
+      showStats(pagesRead, rowsRead, Date.now() - startTime, true);
+      return;
+    }
+
+    ri++;
+    if (ri >= page.rows.length) {
+      scannedPages.push(pi);
+      pagesRead++;
+      ri = 0;
+      pi++;
+    }
+  }
+
+  scanInterval = setInterval(step, 120);
+}
+
+function showStats(pages, rows, ms, found) {
+  const el = document.getElementById('statsRow');
+  el.innerHTML = `
+    <div class="stat-chip">Pages Read: <span>${pages}</span></div>
+    <div class="stat-chip">Rows Checked: <span>${rows}</span></div>
+    <div class="stat-chip">Time: <span>~${ms}ms (simulated)</span></div>
+    <div class="stat-chip">Result: <span style="color:${found?'var(--found-color)':'var(--accent2)'}">${found?'✅ FOUND':'❌ NOT FOUND'}</span></div>
+  `;
+}
+</script>
+</body>
+</html>

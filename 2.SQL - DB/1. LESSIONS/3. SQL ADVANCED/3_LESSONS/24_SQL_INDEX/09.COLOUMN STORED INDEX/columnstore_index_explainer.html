@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Columnstore Index — Visual Explainer</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', Consolas, monospace;
+  --color-bg:            #ffffff;
+  --color-bg-secondary:  #f5f5f0;
+  --color-text-primary:  #1a1a18;
+  --color-text-secondary:#6b6b67;
+  --color-text-tertiary: #9c9a92;
+  --color-border:        rgba(0,0,0,0.12);
+  --color-border-secondary: rgba(0,0,0,0.22);
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg:            #1a1a18;
+    --color-bg-secondary:  #242422;
+    --color-text-primary:  #e8e6de;
+    --color-text-secondary:#a0a098;
+    --color-text-tertiary: #6b6b67;
+    --color-border:        rgba(255,255,255,0.12);
+    --color-border-secondary: rgba(255,255,255,0.22);
+  }
+}
+body {
+  font-family: var(--font-sans);
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  padding: 2rem;
+  line-height: 1.5;
+}
+h1 { font-size: 20px; font-weight: 500; margin-bottom: 4px; }
+.subtitle { font-size: 13px; color: var(--color-text-secondary); margin-bottom: 1.5rem; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1.25rem; }
+.tab {
+  padding: 6px 13px; font-size: 12px;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: 20px; background: transparent;
+  color: var(--color-text-secondary); cursor: pointer;
+  white-space: nowrap; transition: all .2s;
+}
+.tab.on { background: #EEEDFE; color: #3C3489; border-color: #534AB7; font-weight: 500; }
+table { border-collapse: collapse; width: 100%; font-size: 12px; }
+th { padding: 7px 10px; background: var(--color-bg-secondary); border: 0.5px solid var(--color-border); color: var(--color-text-secondary); text-align: left; }
+td { padding: 7px 10px; border: 0.5px solid var(--color-border); }
+.card { border-radius: var(--radius-md); padding: .65rem 1rem; font-size: 12px; margin-bottom: 8px; line-height: 1.6; }
+.pill { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+.divider { height: 2px; background: var(--color-border); margin: 1rem 0; border-radius: 2px; }
+.step { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 8px; }
+.snum { border-radius: 50%; width: 26px; height: 26px; min-width: 26px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; color: #fff; }
+code { font-size: 11px; background: var(--color-bg-secondary); padding: 1px 5px; border-radius: 4px; font-family: var(--font-mono); }
+</style>
+</head>
+<body>
+
+<h1>Columnstore Index</h1>
+<p class="subtitle">Row store vs Column store — Analytics-க்கு 10x–100x faster!</p>
+
+<div class="tabs" id="tbr"></div>
+<div id="content"></div>
+
+<script>
+const steps = [
+
+// STEP 1 — Row vs Column
+`<div class="card" style="background:#EEEDFE;color:#3C3489;margin-bottom:1rem">
+  <strong>Columnstore Index = data-ஐ column-by-column-ஆ store பண்ணுது — row-by-row இல்ல!</strong><br>
+  இதுவே B-Tree index-ல இருந்து fundamental-ஆ வேறுபடுது.
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+  <div>
+    <div class="card" style="background:#E6F1FB;color:#0C447C;font-weight:500;text-align:center">Normal Row Store (B-Tree)</div>
+    <svg width="100%" viewBox="0 0 300 210" style="display:block">
+      <text x="150" y="14" text-anchor="middle" style="font-size:10px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">Disk-ல ஒவ்வொரு ROW together store ஆகும்</text>
+      <rect x="10" y="22" width="56" height="28" rx="3" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+      <text x="38" y="40" text-anchor="middle" style="font-size:9px;fill:#0C447C;font-family:var(--font-sans)">C001</text>
+      <rect x="68" y="22" width="56" height="28" rx="3" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+      <text x="96" y="40" text-anchor="middle" style="font-size:9px;fill:#0C447C;font-family:var(--font-sans)">Arjun</text>
+      <rect x="126" y="22" width="56" height="28" rx="3" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+      <text x="154" y="40" text-anchor="middle" style="font-size:9px;fill:#0C447C;font-family:var(--font-sans)">India</text>
+      <rect x="184" y="22" width="56" height="28" rx="3" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+      <text x="212" y="40" text-anchor="middle" style="font-size:9px;fill:#0C447C;font-family:var(--font-sans)">92</text>
+      <text x="150" y="16" text-anchor="middle" style="font-size:7px;fill:#185FA5;font-weight:500;font-family:var(--font-sans)">← Row 1 together →</text>
+      <rect x="10" y="56" width="56" height="28" rx="3" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+      <text x="38" y="74" text-anchor="middle" style="font-size:9px;fill:#0C447C;font-family:var(--font-sans)">C002</text>
+      <rect x="68" y="56" width="56" height="28" rx="3" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+      <text x="96" y="74" text-anchor="middle" style="font-size:9px;fill:#0C447C;font-family:var(--font-sans)">Priya</text>
+      <rect x="126" y="56" width="56" height="28" rx="3" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+      <text x="154" y="74" text-anchor="middle" style="font-size:9px;fill:#0C447C;font-family:var(--font-sans)">India</text>
+      <rect x="184" y="56" width="56" height="28" rx="3" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+      <text x="212" y="74" text-anchor="middle" style="font-size:9px;fill:#0C447C;font-family:var(--font-sans)">78</text>
+      <rect x="10" y="90" width="56" height="28" rx="3" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+      <text x="38" y="108" text-anchor="middle" style="font-size:9px;fill:#0C447C;font-family:var(--font-sans)">C003</text>
+      <rect x="68" y="90" width="56" height="28" rx="3" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+      <text x="96" y="108" text-anchor="middle" style="font-size:9px;fill:#0C447C;font-family:var(--font-sans)">Ravi</text>
+      <rect x="126" y="90" width="56" height="28" rx="3" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+      <text x="154" y="108" text-anchor="middle" style="font-size:9px;fill:#0C447C;font-family:var(--font-sans)">USA</text>
+      <rect x="184" y="90" width="56" height="28" rx="3" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+      <text x="212" y="108" text-anchor="middle" style="font-size:9px;fill:#0C447C;font-family:var(--font-sans)">85</text>
+      <text x="38" y="135" text-anchor="middle" style="font-size:8px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">CustID</text>
+      <text x="96" y="135" text-anchor="middle" style="font-size:8px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">Name</text>
+      <text x="154" y="135" text-anchor="middle" style="font-size:8px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">Country</text>
+      <text x="212" y="135" text-anchor="middle" style="font-size:8px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">Score</text>
+      <rect x="10" y="143" width="230" height="30" rx="4" fill="#FCEBEB" stroke="#A32D2D" stroke-width="0.8"/>
+      <text x="125" y="157" text-anchor="middle" style="font-size:9px;fill:#791F1F;font-family:var(--font-sans)">SUM(Score) → ALL columns read!</text>
+      <text x="125" y="170" text-anchor="middle" style="font-size:8px;fill:#A32D2D;font-family:var(--font-sans)">Wasteful for analytics!</text>
+      <text x="125" y="198" text-anchor="middle" style="font-size:10px;fill:#A32D2D;font-weight:500;font-family:var(--font-sans)">Slow!</text>
+    </svg>
+  </div>
+  <div>
+    <div class="card" style="background:#EEEDFE;color:#3C3489;font-weight:500;text-align:center">Columnstore Index</div>
+    <svg width="100%" viewBox="0 0 300 210" style="display:block">
+      <text x="150" y="14" text-anchor="middle" style="font-size:10px;fill:var(--color-text-tertiary);font-family:var(--font-sans)">Disk-ல ஒவ்வொரு COLUMN together store ஆகும்</text>
+      <rect x="10" y="22" width="56" height="28" rx="3" fill="#534AB7" stroke="#3C3489" stroke-width="0.8"/>
+      <text x="38" y="37" text-anchor="middle" style="font-size:8px;font-weight:500;fill:#fff;font-family:var(--font-sans)">CustID col</text>
+      <rect x="10" y="54" width="56" height="20" rx="2" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+      <text x="38" y="68" text-anchor="middle" style="font-size:8px;fill:#3C3489;font-family:var(--font-sans)">C001</text>
+      <rect x="10" y="76" width="56" height="20" rx="2" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+      <text x="38" y="90" text-anchor="middle" style="font-size:8px;fill:#3C3489;font-family:var(--font-sans)">C002</text>
+      <rect x="10" y="98" width="56" height="20" rx="2" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+      <text x="38" y="112" text-anchor="middle" style="font-size:8px;fill:#3C3489;font-family:var(--font-sans)">C003</text>
+      <rect x="78" y="22" width="56" height="28" rx="3" fill="#534AB7" stroke="#3C3489" stroke-width="0.8"/>
+      <text x="106" y="37" text-anchor="middle" style="font-size:8px;font-weight:500;fill:#fff;font-family:var(--font-sans)">Name col</text>
+      <rect x="78" y="54" width="56" height="20" rx="2" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+      <text x="106" y="68" text-anchor="middle" style="font-size:8px;fill:#3C3489;font-family:var(--font-sans)">Arjun</text>
+      <rect x="78" y="76" width="56" height="20" rx="2" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+      <text x="106" y="90" text-anchor="middle" style="font-size:8px;fill:#3C3489;font-family:var(--font-sans)">Priya</text>
+      <rect x="78" y="98" width="56" height="20" rx="2" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+      <text x="106" y="112" text-anchor="middle" style="font-size:8px;fill:#3C3489;font-family:var(--font-sans)">Ravi</text>
+      <rect x="146" y="22" width="56" height="28" rx="3" fill="#534AB7" stroke="#3C3489" stroke-width="0.8"/>
+      <text x="174" y="37" text-anchor="middle" style="font-size:8px;font-weight:500;fill:#fff;font-family:var(--font-sans)">Country col</text>
+      <rect x="146" y="54" width="56" height="20" rx="2" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+      <text x="174" y="68" text-anchor="middle" style="font-size:8px;fill:#3C3489;font-family:var(--font-sans)">India</text>
+      <rect x="146" y="76" width="56" height="20" rx="2" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+      <text x="174" y="90" text-anchor="middle" style="font-size:8px;fill:#3C3489;font-family:var(--font-sans)">India</text>
+      <rect x="146" y="98" width="56" height="20" rx="2" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+      <text x="174" y="112" text-anchor="middle" style="font-size:8px;fill:#3C3489;font-family:var(--font-sans)">USA</text>
+      <!-- Score column HIGHLIGHTED -->
+      <rect x="214" y="22" width="56" height="28" rx="3" fill="#27500A" stroke="#3B6D11" stroke-width="1.5"/>
+      <text x="242" y="37" text-anchor="middle" style="font-size:8px;font-weight:500;fill:#fff;font-family:var(--font-sans)">Score col ✓</text>
+      <rect x="214" y="54" width="56" height="20" rx="2" fill="#EAF3DE" stroke="#3B6D11" stroke-width="1"/>
+      <text x="242" y="68" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#27500A;font-family:var(--font-sans)">92</text>
+      <rect x="214" y="76" width="56" height="20" rx="2" fill="#EAF3DE" stroke="#3B6D11" stroke-width="1"/>
+      <text x="242" y="90" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#27500A;font-family:var(--font-sans)">78</text>
+      <rect x="214" y="98" width="56" height="20" rx="2" fill="#EAF3DE" stroke="#3B6D11" stroke-width="1"/>
+      <text x="242" y="112" text-anchor="middle" style="font-size:9px;font-weight:500;fill:#27500A;font-family:var(--font-sans)">85</text>
+      <rect x="10" y="143" width="260" height="30" rx="4" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.8"/>
+      <text x="140" y="157" text-anchor="middle" style="font-size:9px;fill:#27500A;font-family:var(--font-sans)">SUM(Score) → Score column மட்டும்!</text>
+      <text x="140" y="170" text-anchor="middle" style="font-size:8px;fill:#3B6D11;font-family:var(--font-sans)">90% less I/O — Super fast!</text>
+      <text x="140" y="198" text-anchor="middle" style="font-size:10px;fill:#27500A;font-weight:500;font-family:var(--font-sans)">10x–100x faster!</text>
+    </svg>
+  </div>
+</div>
+<div class="card" style="background:#EEEDFE;color:#3C3489">
+  <strong>Core idea:</strong> Row store = ஒரு row-ஓட எல்லா columns ஒரே page-ல. Columnstore = ஒரு column-ஓட எல்லா values ஒரே page-ல.<br>
+  <code>SELECT SUM(Score) FROM Customers</code> — Row store: எல்லா columns read. Columnstore: Score மட்டும் read. <strong>10x–100x faster!</strong>
+</div>`,
+
+// STEP 2 — Rowgroup & Compression
+`<div class="card" style="background:#EEEDFE;color:#3C3489;margin-bottom:1rem">
+  <strong>Columnstore-ல data எப்படி store ஆகுது — Rowgroup + Column Segment</strong>
+</div>
+<svg width="100%" viewBox="0 0 680 340" style="display:block;margin-bottom:.75rem">
+<defs><marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<text x="340" y="14" text-anchor="middle" style="font-size:11px;font-weight:500;fill:var(--color-text-primary);font-family:var(--font-sans)">1,048,576 rows (1M) → 1 Rowgroup. Each rowgroup split into Column Segments.</text>
+<rect x="20" y="22" width="640" height="130" rx="10" fill="#EEEDFE" stroke="#534AB7" stroke-width="1.5"/>
+<text x="40" y="40" style="font-size:11px;font-weight:500;fill:#3C3489;font-family:var(--font-sans)">Rowgroup 1 (rows 1 – 1,048,576)</text>
+<rect x="36"  y="48" width="140" height="90" rx="7" fill="#534AB7" stroke="#3C3489" stroke-width="1"/>
+<text x="106" y="68" text-anchor="middle" style="font-size:10px;font-weight:500;fill:#fff;font-family:var(--font-sans)">CustomerID</text>
+<text x="106" y="82" text-anchor="middle" style="font-size:9px;fill:#CECBF6;font-family:var(--font-sans)">Column Segment</text>
+<text x="106" y="100" text-anchor="middle" style="font-size:11px;font-weight:500;fill:#CECBF6;font-family:var(--font-sans)">1M values</text>
+<text x="106" y="114" text-anchor="middle" style="font-size:9px;fill:#AFA9EC;font-family:var(--font-sans)">Compressed</text>
+<text x="106" y="128" text-anchor="middle" style="font-size:9px;fill:#AFA9EC;font-family:var(--font-sans)">~2MB (from 8MB)</text>
+<rect x="190" y="48" width="140" height="90" rx="7" fill="#534AB7" stroke="#3C3489" stroke-width="1"/>
+<text x="260" y="68" text-anchor="middle" style="font-size:10px;font-weight:500;fill:#fff;font-family:var(--font-sans)">Name</text>
+<text x="260" y="82" text-anchor="middle" style="font-size:9px;fill:#CECBF6;font-family:var(--font-sans)">Column Segment</text>
+<text x="260" y="100" text-anchor="middle" style="font-size:11px;font-weight:500;fill:#CECBF6;font-family:var(--font-sans)">1M values</text>
+<text x="260" y="114" text-anchor="middle" style="font-size:9px;fill:#AFA9EC;font-family:var(--font-sans)">Compressed</text>
+<text x="260" y="128" text-anchor="middle" style="font-size:9px;fill:#AFA9EC;font-family:var(--font-sans)">~10MB (from 50MB)</text>
+<rect x="344" y="48" width="140" height="90" rx="7" fill="#27500A" stroke="#3B6D11" stroke-width="1.5"/>
+<text x="414" y="68" text-anchor="middle" style="font-size:10px;font-weight:500;fill:#fff;font-family:var(--font-sans)">Country</text>
+<text x="414" y="82" text-anchor="middle" style="font-size:9px;fill:#9FE1CB;font-family:var(--font-sans)">Column Segment</text>
+<text x="414" y="100" text-anchor="middle" style="font-size:11px;font-weight:500;fill:#9FE1CB;font-family:var(--font-sans)">1M values</text>
+<text x="414" y="114" text-anchor="middle" style="font-size:9px;fill:#5DCAA5;font-family:var(--font-sans)">SUPER compressed!</text>
+<text x="414" y="128" text-anchor="middle" style="font-size:9px;fill:#5DCAA5;font-family:var(--font-sans)">Only 3 values repeat</text>
+<rect x="498" y="48" width="140" height="90" rx="7" fill="#27500A" stroke="#3B6D11" stroke-width="1.5"/>
+<text x="568" y="68" text-anchor="middle" style="font-size:10px;font-weight:500;fill:#fff;font-family:var(--font-sans)">Score</text>
+<text x="568" y="82" text-anchor="middle" style="font-size:9px;fill:#9FE1CB;font-family:var(--font-sans)">Column Segment</text>
+<text x="568" y="100" text-anchor="middle" style="font-size:11px;font-weight:500;fill:#9FE1CB;font-family:var(--font-sans)">1M values</text>
+<text x="568" y="114" text-anchor="middle" style="font-size:9px;fill:#5DCAA5;font-family:var(--font-sans)">Compressed</text>
+<text x="568" y="128" text-anchor="middle" style="font-size:9px;fill:#5DCAA5;font-family:var(--font-sans)">~3MB (from 8MB)</text>
+<rect x="20" y="168" width="640" height="60" rx="10" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8" stroke-dasharray="5 3"/>
+<text x="340" y="194" text-anchor="middle" style="font-size:11px;font-weight:500;fill:#3C3489;font-family:var(--font-sans)">Rowgroup 2 (rows 1,048,577 – 2,097,152) — same structure</text>
+<text x="340" y="212" text-anchor="middle" style="font-size:10px;fill:#534AB7;font-family:var(--font-sans)">CustomerID segment | Name segment | Country segment | Score segment</text>
+<rect x="20" y="246" width="300" height="56" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="1"/>
+<text x="170" y="265" text-anchor="middle" style="font-size:11px;font-weight:500;fill:#633806;font-family:var(--font-sans)">Delta Store (rowstore)</text>
+<text x="170" y="280" text-anchor="middle" style="font-size:10px;fill:#854F0B;font-family:var(--font-sans)">New inserts இங்க வரும் (B-Tree format)</text>
+<text x="170" y="294" text-anchor="middle" style="font-size:9px;fill:#BA7517;font-family:var(--font-sans)">Enough rows → compressed rowgroup ஆகும்</text>
+<rect x="360" y="246" width="300" height="56" rx="8" fill="#FCEBEB" stroke="#A32D2D" stroke-width="1"/>
+<text x="510" y="265" text-anchor="middle" style="font-size:11px;font-weight:500;fill:#791F1F;font-family:var(--font-sans)">Delete Bitmap</text>
+<text x="510" y="280" text-anchor="middle" style="font-size:10px;fill:#A32D2D;font-family:var(--font-sans)">Deleted rows-ஐ mark பண்ணும்</text>
+<text x="510" y="294" text-anchor="middle" style="font-size:9px;fill:#E24B4A;font-family:var(--font-sans)">Actual deletion lazy-ஆ நடக்கும் (reorganize time)</text>
+</svg>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+  <div class="card" style="background:#EEEDFE;color:#3C3489"><strong>Rowgroup:</strong> ~1 million rows-ஓட batch. ஒவ்வொரு rowgroup-உம் column segments-ஆ split ஆகும்.</div>
+  <div class="card" style="background:#EAF3DE;color:#27500A"><strong>Compression superpower:</strong> Country column-ல "India","USA","China" மட்டும். 1M rows → 3 values மட்டும் store. 90%+ savings!</div>
+</div>`,
+
+// STEP 3 — Compression
+`<div class="card" style="background:#EEEDFE;color:#3C3489;margin-bottom:1rem">
+  <strong>ஏன் Columnstore இவ்வளவு compressed ஆகுது? — 2 techniques</strong>
+</div>
+<div class="step"><div class="snum" style="background:#534AB7">1</div>
+<div style="flex:1">
+  <div class="card" style="background:#EEEDFE;color:#3C3489;font-weight:500;margin-bottom:4px">RLE — Run Length Encoding</div>
+  <div class="card" style="background:var(--color-bg-secondary);color:var(--color-text-primary);margin-bottom:0">
+    <strong>Same value repeat ஆனா — count மட்டும் store பண்ணும்</strong><br><br>
+    <div style="font-family:var(--font-mono);font-size:11px;line-height:2;color:var(--color-text-secondary)">
+      Before: India, India, India, India, USA, USA, China...<br>
+      After:  (India × 500000), (USA × 300000), (China × 200000)
+    </div>
+    <div style="margin-top:6px;font-size:11px;color:#3C3489">1M values → 3 entries மட்டும்! 99.9997% compression!</div>
+  </div>
+</div></div>
+<div class="step" style="margin-top:8px"><div class="snum" style="background:#534AB7">2</div>
+<div style="flex:1">
+  <div class="card" style="background:#EEEDFE;color:#3C3489;font-weight:500;margin-bottom:4px">Dictionary Encoding</div>
+  <div class="card" style="background:var(--color-bg-secondary);color:var(--color-text-primary);margin-bottom:0">
+    <strong>String values-ஐ numbers-ஆ மாத்தி store பண்ணும்</strong><br><br>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px">
+      <div>Dictionary:<br><span style="font-family:var(--font-mono)">0 = "India"<br>1 = "USA"<br>2 = "China"</span></div>
+      <div>Column data:<br><span style="font-family:var(--font-mono)">0,0,0,1,2,0,0,1...</span><br>(numbers &lt; strings!)</div>
+    </div>
+  </div>
+</div></div>
+<div class="divider"></div>
+<table>
+  <thead><tr><th>Column</th><th>Row Store size</th><th>Columnstore size</th><th>Compression ratio</th></tr></thead>
+  <tbody>
+    <tr style="background:#EEEDFE40"><td style="font-weight:500">Country (3 values)</td><td style="font-family:var(--font-mono)">8 MB</td><td style="font-family:var(--font-mono);color:#27500A;font-weight:500">0.01 MB</td><td><span class="pill" style="background:#EAF3DE;color:#27500A">800x smaller!</span></td></tr>
+    <tr><td style="font-weight:500">Score (0–100)</td><td style="font-family:var(--font-mono)">8 MB</td><td style="font-family:var(--font-mono);color:#27500A;font-weight:500">1.5 MB</td><td><span class="pill" style="background:#EAF3DE;color:#27500A">5x smaller</span></td></tr>
+    <tr style="background:#EEEDFE40"><td style="font-weight:500">CustomerID (unique)</td><td style="font-family:var(--font-mono)">8 MB</td><td style="font-family:var(--font-mono);color:#3C3489;font-weight:500">4 MB</td><td><span class="pill" style="background:#EEEDFE;color:#3C3489">2x smaller</span></td></tr>
+    <tr><td style="font-weight:500">Name (varied)</td><td style="font-family:var(--font-mono)">50 MB</td><td style="font-family:var(--font-mono);color:#3C3489;font-weight:500">15 MB</td><td><span class="pill" style="background:#EEEDFE;color:#3C3489">3x smaller</span></td></tr>
+  </tbody>
+</table>`,
+
+// STEP 4 — Syntax & Types
+`<div class="card" style="background:#EEEDFE;color:#3C3489;margin-bottom:1rem">
+  <strong>Columnstore Index types & CREATE syntax</strong>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+  <div>
+    <div class="card" style="background:#EEEDFE;color:#3C3489;font-weight:500">Clustered Columnstore Index</div>
+    <div style="background:var(--color-bg-secondary);border-radius:var(--radius-md);padding:.75rem;font-family:var(--font-mono);font-size:11px;color:var(--color-text-primary);margin-bottom:8px;line-height:1.8">
+      <span style="color:#A32D2D">CREATE</span> <span style="color:#534AB7">CLUSTERED</span><br>
+      COLUMNSTORE INDEX CCI_Sales<br>
+      <span style="color:#A32D2D">ON</span> Sales;
+    </div>
+    <div class="card" style="background:#EEEDFE;color:#3C3489;font-size:11px;margin-bottom:0">Table-ஓட primary storage format-ஐயே columnstore-ஆ மாத்தும். எல்லா columns-உம். Table-க்கு 1 மட்டும்.</div>
+  </div>
+  <div>
+    <div class="card" style="background:#E1F5EE;color:#085041;font-weight:500">Non-Clustered Columnstore Index</div>
+    <div style="background:var(--color-bg-secondary);border-radius:var(--radius-md);padding:.75rem;font-family:var(--font-mono);font-size:11px;color:var(--color-text-primary);margin-bottom:8px;line-height:1.8">
+      <span style="color:#A32D2D">CREATE</span> NONCLUSTERED<br>
+      COLUMNSTORE INDEX NCCI_Sales<br>
+      <span style="color:#A32D2D">ON</span> Sales<br>
+      (OrderDate, Amount, Region);
+    </div>
+    <div class="card" style="background:#E1F5EE;color:#085041;font-size:11px;margin-bottom:0">Row store table-ல வேற. Specific columns மட்டும். OLTP + Analytics mixed workload-க்கு.</div>
+  </div>
+</div>
+<table>
+  <thead><tr><th></th><th style="background:#EEEDFE;color:#3C3489">Clustered Columnstore</th><th style="background:#E1F5EE;color:#085041">Non-Clustered Columnstore</th></tr></thead>
+  <tbody>
+    <tr><td>Storage</td><td>Table IS columnstore</td><td>Separate columnstore structure</td></tr>
+    <tr style="background:var(--color-bg-secondary)"><td>Columns</td><td>All columns</td><td>Specific columns only</td></tr>
+    <tr><td>Updatable?</td><td style="color:#27500A">SQL 2014+ — Yes</td><td style="color:#27500A">Yes</td></tr>
+    <tr style="background:var(--color-bg-secondary)"><td>Per table</td><td>1 only</td><td>Multiple allowed</td></tr>
+    <tr><td>Best for</td><td>Pure analytics (DWH)</td><td>Mixed OLTP + Analytics</td></tr>
+  </tbody>
+</table>`,
+
+// STEP 5 — When to use
+`<div class="card" style="background:#EEEDFE;color:#3C3489;margin-bottom:1rem">
+  <strong>எப்போ Columnstore use பண்ணணும்? எப்போ வேண்டாம்?</strong>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+  <div>
+    <div class="card" style="background:#EAF3DE;color:#27500A;font-weight:500">Use பண்ணு ✓</div>
+    <div class="step"><div class="snum" style="background:#27500A">1</div>
+    <div class="card" style="background:#EAF3DE;color:#27500A;flex:1;margin-bottom:0"><strong>Analytics / Aggregation</strong><br>SUM, AVG, COUNT, GROUP BY — millions of rows-ல fast!</div></div>
+    <div class="step"><div class="snum" style="background:#27500A">2</div>
+    <div class="card" style="background:#EAF3DE;color:#27500A;flex:1;margin-bottom:0"><strong>Data Warehouse / Reporting</strong><br>Monthly sales, yearly trends — perfect fit!</div></div>
+    <div class="step"><div class="snum" style="background:#27500A">3</div>
+    <div class="card" style="background:#EAF3DE;color:#27500A;flex:1;margin-bottom:0"><strong>Large tables (millions of rows)</strong><br>Row count அதிகமா இருந்தா compression benefit அதிகம்.</div></div>
+    <div class="step"><div class="snum" style="background:#27500A">4</div>
+    <div class="card" style="background:#EAF3DE;color:#27500A;flex:1;margin-bottom:0"><strong>Few columns needed</strong><br>SELECT Score, Country — 2 columns மட்டும் read.</div></div>
+  </div>
+  <div>
+    <div class="card" style="background:#FCEBEB;color:#791F1F;font-weight:500">Use பண்ணாதே ✗</div>
+    <div class="step"><div class="snum" style="background:#A32D2D">1</div>
+    <div class="card" style="background:#FCEBEB;color:#791F1F;flex:1;margin-bottom:0"><strong>OLTP (frequent single row ops)</strong><br>INSERT/UPDATE/DELETE per row — slow! Delta store overhead.</div></div>
+    <div class="step"><div class="snum" style="background:#A32D2D">2</div>
+    <div class="card" style="background:#FCEBEB;color:#791F1F;flex:1;margin-bottom:0"><strong>Point lookups</strong><br>WHERE CustomerID = 5001 — single row. B-Tree faster.</div></div>
+    <div class="step"><div class="snum" style="background:#A32D2D">3</div>
+    <div class="card" style="background:#FCEBEB;color:#791F1F;flex:1;margin-bottom:0"><strong>Small tables</strong><br>100–1000 rows — compression benefit இல்ல. Overhead waste.</div></div>
+    <div class="step"><div class="snum" style="background:#A32D2D">4</div>
+    <div class="card" style="background:#FCEBEB;color:#791F1F;flex:1;margin-bottom:0"><strong>SELECT * queries</strong><br>எல்லா columns-உம் வேணும்னா row store better.</div></div>
+  </div>
+</div>`,
+
+// STEP 6 — B-Tree vs Columnstore
+`<div class="card" style="background:#EEEDFE;color:#3C3489;margin-bottom:1rem">
+  <strong>B-Tree Index vs Columnstore Index — Complete comparison</strong>
+</div>
+<table style="margin-bottom:1rem">
+  <thead><tr>
+    <th>Feature</th>
+    <th style="background:#E6F1FB;color:#0C447C">B-Tree Index (NCI/CI)</th>
+    <th style="background:#EEEDFE;color:#3C3489">Columnstore Index</th>
+  </tr></thead>
+  <tbody>
+    <tr><td>Storage format</td><td>Row-by-row (pages)</td><td style="color:#3C3489;font-weight:500">Column-by-column (segments)</td></tr>
+    <tr style="background:var(--color-bg-secondary)"><td>Structure</td><td>B-Tree (Root→Inter→Leaf)</td><td style="color:#3C3489;font-weight:500">Rowgroups → Column Segments</td></tr>
+    <tr><td>Compression</td><td>Row compression (~2x)</td><td style="color:#27500A;font-weight:500">Column compression (~10x)</td></tr>
+    <tr style="background:var(--color-bg-secondary)"><td>Analytics speed</td><td style="color:#A32D2D">Slow (reads all columns)</td><td style="color:#27500A;font-weight:500">10x–100x faster!</td></tr>
+    <tr><td>Point lookup speed</td><td style="color:#27500A;font-weight:500">Fast (3 page reads)</td><td style="color:#A32D2D">Slow (no B-Tree)</td></tr>
+    <tr style="background:var(--color-bg-secondary)"><td>INSERT/UPDATE/DELETE</td><td style="color:#27500A;font-weight:500">Fast</td><td style="color:#A32D2D">Slower (delta store)</td></tr>
+    <tr><td>Best use case</td><td>OLTP — transactions</td><td style="color:#3C3489;font-weight:500">OLAP — analytics/reporting</td></tr>
+    <tr style="background:var(--color-bg-secondary)"><td>Batch mode execution</td><td>இல்ல</td><td style="color:#27500A;font-weight:500">ஆமா — 64K rows at once</td></tr>
+    <tr><td>Memory usage</td><td>Standard</td><td style="color:#27500A;font-weight:500">Lower (compressed data)</td></tr>
+  </tbody>
+</table>
+<div class="card" style="background:#EEEDFE;color:#3C3489">
+  <strong>Real world example:</strong><br>
+  <code>SELECT Country, AVG(Score) FROM Customers GROUP BY Country</code><br><br>
+  B-Tree: 5000 rows → 13 pages → all 4 columns → filter → group → slow<br>
+  Columnstore: Country + Score segments மட்டும் → batch process → <strong>10x+ faster!</strong>
+</div>`
+];
+
+const labels = ['1. Row vs Column','2. Rowgroup structure','3. Compression','4. Syntax & types','5. When to use','6. B-Tree vs Columnstore'];
+
+const tb = document.getElementById('tbr');
+labels.forEach((l,i) => {
+  const b = document.createElement('button');
+  b.className = 'tab' + (i===0?' on':'');
+  b.textContent = l;
+  b.onclick = () => {
+    document.querySelectorAll('.tab').forEach((x,j) => x.classList.toggle('on', j===i));
+    document.getElementById('content').innerHTML = steps[i];
+  };
+  tb.appendChild(b);
+});
+document.getElementById('content').innerHTML = steps[0];
+</script>
+</body>
+</html>

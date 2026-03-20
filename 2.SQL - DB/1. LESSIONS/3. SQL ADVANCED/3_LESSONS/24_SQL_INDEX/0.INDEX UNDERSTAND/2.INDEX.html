@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL Server Indexes — Complete Visual Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#03050c; --s1:#070a18; --s2:#0a0e20; --s3:#0d1228;
+  --border:#141a34; --border2:#1c2548;
+  --page-c:#06b6d4;    /* cyan   - data pages */
+  --idx-c:#f59e0b;     /* amber  - index pages */
+  --rid-c:#f43f5e;     /* rose   - RID */
+  --seek-c:#22c55e;    /* green  - seek/found */
+  --root-c:#a78bfa;    /* violet - root */
+  --inter-c:#fb923c;   /* orange - intermediate */
+  --ci-c:#22d3ee;      /* sky    - clustered */
+  --nci-c:#e879f9;     /* pink   - non-clustered */
+  --text:#e2eaf8; --muted:#243060; --muted2:#3a4f88;
+  --mono:'JetBrains Mono',monospace; --disp:'Syne',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:var(--disp);min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse 70% 40% at 10% 5%,rgba(6,182,212,0.06) 0%,transparent 55%),
+    radial-gradient(ellipse 55% 35% at 90% 95%,rgba(245,158,11,0.05) 0%,transparent 55%),
+    linear-gradient(rgba(6,182,212,0.02) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(6,182,212,0.02) 1px,transparent 1px);
+  background-size:100%,100%,44px 44px,44px 44px;}
+
+/* NAV */
+.nav{position:sticky;top:0;z-index:300;background:rgba(3,5,12,0.97);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border2);padding:0 20px;display:flex;overflow-x:auto;gap:0;}
+.ntab{display:flex;align-items:center;gap:7px;padding:13px 16px;cursor:pointer;
+  font-family:var(--mono);font-size:10px;font-weight:600;color:var(--muted2);
+  border-bottom:2px solid transparent;white-space:nowrap;transition:all .2s;letter-spacing:.5px;}
+.ntab:hover{color:var(--text);}
+.ntab.active{color:var(--page-c);border-bottom-color:var(--page-c);}
+.nd{width:7px;height:7px;border-radius:50%;}
+
+.wrap{position:relative;z-index:1;max-width:1500px;margin:0 auto;padding:0 20px 100px;}
+.pg{display:none;padding-top:36px;} .pg.active{display:block;}
+
+/* SECTION HEADER */
+.sh{display:flex;align-items:center;gap:12px;margin-bottom:22px;}
+.sn{width:36px;height:36px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;font-weight:700;}
+.sn1{background:rgba(6,182,212,.12);border:1px solid rgba(6,182,212,.3);color:var(--page-c);}
+.sn2{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);color:var(--idx-c);}
+.sn3{background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.3);color:var(--root-c);}
+.sn4{background:rgba(34,211,238,.12);border:1px solid rgba(34,211,238,.3);color:var(--ci-c);}
+.sn5{background:rgba(232,121,249,.12);border:1px solid rgba(232,121,249,.3);color:var(--nci-c);}
+.st{font-size:19px;font-weight:800;letter-spacing:-.5px;}
+.ss{font-family:var(--mono);font-size:10px;color:var(--muted2);margin-top:2px;}
+
+.card{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:24px;position:relative;overflow:hidden;margin-bottom:24px;}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;}
+.cc1::before{background:linear-gradient(90deg,transparent,var(--page-c),transparent);}
+.cc2::before{background:linear-gradient(90deg,transparent,var(--idx-c),transparent);}
+.cc3::before{background:linear-gradient(90deg,transparent,var(--root-c),transparent);}
+.cc4::before{background:linear-gradient(90deg,transparent,var(--ci-c),transparent);}
+.cc5::before{background:linear-gradient(90deg,transparent,var(--nci-c),transparent);}
+
+.divider{height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);margin:32px 0;}
+
+/* TABLE STYLES */
+.sql-tbl{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;}
+.sql-tbl th{padding:7px 10px;color:var(--muted2);font-size:9px;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border);text-align:left;background:rgba(0,0,0,.22);}
+.sql-tbl td{padding:5px 10px;border-bottom:1px solid rgba(20,26,52,.7);}
+.sql-tbl tr:hover td{background:rgba(6,182,212,.04);}
+.sql-tbl tr.highlight td{background:rgba(244,63,94,.1);border-left:2px solid var(--rid-c);}
+.c-id{color:var(--page-c);font-weight:700;}
+.c-name{color:#a3e635;}
+.c-dept{color:var(--idx-c);}
+.c-sal{color:#fde68a;}
+.c-city{color:var(--inter-c);}
+
+/* DATA PAGE */
+.dp-outer{border-radius:12px;overflow:hidden;border:2px solid var(--page-c);background:var(--s2);transition:all .3s;}
+.dp-outer.active{border-color:var(--rid-c);box-shadow:0 0 18px rgba(244,63,94,.35);}
+.dp-outer.seeking{border-color:var(--seek-c);box-shadow:0 0 18px rgba(34,197,94,.35);}
+.dp-header-block{background:rgba(6,182,212,.15);border-bottom:1px solid var(--border2);padding:0;}
+.dp-hdr-row{display:grid;grid-template-columns:1fr 1fr 1fr;font-family:var(--mono);font-size:9px;border-bottom:1px solid rgba(6,182,212,.12);}
+.dp-hdr-cell{padding:4px 8px;border-right:1px solid rgba(6,182,212,.12);}
+.dp-hdr-cell:last-child{border-right:none;}
+.dp-hdr-label{color:var(--muted2);font-size:8px;letter-spacing:1px;display:block;margin-bottom:1px;}
+.dp-hdr-val{color:var(--page-c);font-weight:700;font-size:10px;}
+.dp-title-bar{background:var(--page-c);padding:5px 10px;font-family:var(--mono);font-size:11px;font-weight:700;color:#000;display:flex;justify-content:space-between;align-items:center;}
+.dp-col-hdr{display:grid;grid-template-columns:30px 90px 80px 70px 60px 50px;padding:4px 8px;background:rgba(0,0,0,.2);border-bottom:1px solid rgba(6,182,212,.12);}
+.dp-col-hdr span{font-family:var(--mono);font-size:8px;color:var(--muted2);letter-spacing:.5px;text-transform:uppercase;}
+.dp-row-item{display:grid;grid-template-columns:30px 90px 80px 70px 60px 50px;padding:4px 8px;border-bottom:1px solid rgba(6,182,212,.07);transition:all .25s;cursor:default;}
+.dp-row-item:last-child{border-bottom:none;}
+.dp-row-item:hover{background:rgba(6,182,212,.06);}
+.dp-row-item.found{background:rgba(244,63,94,.15);border-left:3px solid var(--rid-c);}
+.dp-free{padding:8px;text-align:center;font-family:var(--mono);font-size:10px;color:var(--muted2);border-top:1px dashed rgba(6,182,212,.15);border-bottom:1px dashed rgba(6,182,212,.15);}
+.dp-offset-bar{padding:6px 8px;background:rgba(244,63,94,.06);border-top:1px solid rgba(6,182,212,.12);}
+.dp-offset-label{font-family:var(--mono);font-size:8px;color:var(--muted2);letter-spacing:1px;margin-bottom:4px;}
+.dp-offset-chips{display:flex;gap:4px;flex-wrap:wrap;}
+.dp-offset-chip{padding:2px 6px;border:1px solid var(--rid-c);border-radius:3px;font-family:var(--mono);font-size:9px;color:var(--rid-c);}
+
+/* INDEX PAGE */
+.ip-outer{border-radius:12px;overflow:hidden;border:2px solid var(--idx-c);background:var(--s2);transition:all .3s;}
+.ip-outer.active{border-color:var(--seek-c);box-shadow:0 0 18px rgba(34,197,94,.35);}
+.ip-title-bar{background:var(--idx-c);padding:5px 10px;font-family:var(--mono);font-size:11px;font-weight:700;color:#000;display:flex;justify-content:space-between;}
+.ip-hdr-block{background:rgba(245,158,11,.08);border-bottom:1px solid rgba(245,158,11,.15);}
+.ip-hdr-row{display:grid;grid-template-columns:1fr 1fr 1fr;font-family:var(--mono);font-size:9px;border-bottom:1px solid rgba(245,158,11,.1);}
+.ip-hdr-cell{padding:4px 8px;border-right:1px solid rgba(245,158,11,.1);}
+.ip-hdr-cell:last-child{border-right:none;}
+.ip-hdr-label{color:var(--muted2);font-size:8px;letter-spacing:1px;display:block;margin-bottom:1px;}
+.ip-hdr-val{color:var(--idx-c);font-weight:700;font-size:10px;}
+.ip-col-hdr{display:grid;padding:4px 8px;background:rgba(0,0,0,.2);border-bottom:1px solid rgba(245,158,11,.1);}
+.ip-row-item{display:grid;padding:4px 8px;border-bottom:1px solid rgba(245,158,11,.06);transition:all .25s;font-family:var(--mono);font-size:10px;}
+.ip-row-item:last-child{border-bottom:none;}
+.ip-row-item:hover{background:rgba(245,158,11,.07);}
+.ip-row-item.seeking{background:rgba(34,197,94,.12);border-left:3px solid var(--seek-c);}
+.ip-row-item.found{background:rgba(244,63,94,.15);border-left:3px solid var(--rid-c);}
+
+/* BTREE */
+.btree-section{margin-bottom:18px;}
+.btree-level-label{font-family:var(--mono);font-size:10px;letter-spacing:2px;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.btree-level{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;}
+.connector{text-align:center;color:var(--muted2);font-size:20px;margin:6px 0;}
+
+/* ROOT NODE */
+.root-box{border-radius:10px;overflow:hidden;border:2px solid var(--root-c);background:var(--s2);min-width:200px;}
+.root-bar{background:var(--root-c);padding:5px 12px;font-family:var(--mono);font-size:11px;font-weight:700;color:#000;}
+.root-row{display:grid;grid-template-columns:60px 20px 80px;padding:5px 12px;border-bottom:1px solid rgba(167,139,250,.12);font-family:var(--mono);font-size:11px;transition:all .25s;}
+.root-row:last-child{border-bottom:none;}
+.root-row.seeking{background:rgba(34,197,94,.12);border-left:3px solid var(--seek-c);}
+.rk{color:var(--root-c);font-weight:700;}
+.rp{color:var(--idx-c);}
+
+/* INTER NODE */
+.inter-box{border-radius:10px;overflow:hidden;border:2px solid var(--inter-c);background:var(--s2);min-width:180px;}
+.inter-bar{background:var(--inter-c);padding:5px 12px;font-family:var(--mono);font-size:11px;font-weight:700;color:#000;}
+.inter-row{display:grid;grid-template-columns:55px 20px 80px;padding:5px 12px;border-bottom:1px solid rgba(251,146,60,.12);font-family:var(--mono);font-size:11px;transition:all .25s;}
+.inter-row:last-child{border-bottom:none;}
+.inter-row.seeking{background:rgba(34,197,94,.12);border-left:3px solid var(--seek-c);}
+.ik{color:var(--inter-c);font-weight:700;}
+.ip{color:var(--idx-c);}
+
+/* LEAF for clustered */
+.leaf-ci-box{border-radius:10px;overflow:hidden;border:2px solid var(--ci-c);background:var(--s2);min-width:140px;}
+.leaf-ci-bar{background:var(--ci-c);padding:4px 10px;font-family:var(--mono);font-size:10px;font-weight:700;color:#000;}
+.leaf-ci-row{display:grid;grid-template-columns:28px 80px 55px;padding:3px 10px;border-bottom:1px solid rgba(34,211,238,.08);font-family:var(--mono);font-size:10px;transition:all .25s;}
+.leaf-ci-row:last-child{border-bottom:none;}
+.leaf-ci-row.seeking{background:rgba(34,197,94,.12);border-left:3px solid var(--seek-c);}
+.leaf-ci-row.found{background:rgba(34,211,238,.18);border-left:3px solid var(--ci-c);}
+.lck{color:var(--ci-c);font-weight:700;}
+.lcn{color:#a3e635;}
+.lcs{color:#fde68a;font-size:9px;}
+
+/* LEAF for non-clustered */
+.leaf-nci-box{border-radius:10px;overflow:hidden;border:2px solid var(--nci-c);background:var(--s2);min-width:170px;}
+.leaf-nci-bar{background:var(--nci-c);padding:4px 10px;font-family:var(--mono);font-size:10px;font-weight:700;color:#000;}
+.leaf-nci-row{display:grid;grid-template-columns:28px 20px 90px;padding:3px 10px;border-bottom:1px solid rgba(232,121,249,.08);font-family:var(--mono);font-size:10px;transition:all .25s;}
+.leaf-nci-row:last-child{border-bottom:none;}
+.leaf-nci-row.seeking{background:rgba(34,197,94,.12);border-left:3px solid var(--seek-c);}
+.leaf-nci-row.found{background:rgba(232,121,249,.18);border-left:3px solid var(--nci-c);}
+.lnk{color:var(--nci-c);font-weight:700;}
+.lnr{color:var(--rid-c);font-size:9px;}
+
+/* SEARCH BAR */
+.sbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--s2);border:1px solid var(--border2);border-radius:9px;padding:12px 16px;margin-bottom:18px;}
+.sbar-lbl{font-family:var(--mono);font-size:10px;color:var(--muted2);}
+.eid-btn{padding:5px 13px;border-radius:5px;cursor:pointer;font-family:var(--mono);font-size:11px;font-weight:600;background:var(--s3);border:1px solid var(--border2);color:var(--muted2);transition:all .15s;}
+.eid-btn:hover{color:var(--text);border-color:var(--idx-c);}
+.eid-btn.sel{background:rgba(245,158,11,.12);border-color:var(--idx-c);color:var(--idx-c);}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:7px;border:none;cursor:pointer;font-family:var(--disp);font-size:12px;font-weight:800;transition:all .18s;}
+.btn-g{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.35);color:var(--seek-c);}
+.btn-g:hover{background:rgba(34,197,94,.22);}
+.btn-r{background:rgba(100,100,100,.1);border:1px solid var(--border2);color:var(--muted2);}
+.step-pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+.sp{padding:4px 10px;border-radius:4px;font-family:var(--mono);font-size:9px;opacity:.3;transition:all .3s;border:1px solid transparent;letter-spacing:.5px;}
+.sp.done{opacity:1;}
+.sp-r{background:rgba(167,139,250,.1);border-color:rgba(167,139,250,.3);color:var(--root-c);}
+.sp-i{background:rgba(251,146,60,.1);border-color:rgba(251,146,60,.3);color:var(--inter-c);}
+.sp-l{background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:var(--idx-c);}
+.sp-d{background:rgba(244,63,94,.1);border-color:rgba(244,63,94,.3);color:var(--rid-c);}
+.sp-ok{background:rgba(34,197,94,.1);border-color:rgba(34,197,94,.3);color:var(--seek-c);}
+.stbox{padding:10px 14px;border-radius:8px;font-family:var(--mono);font-size:11px;background:rgba(0,0,0,.3);border:1px solid var(--border2);min-height:34px;line-height:1.7;margin-top:10px;}
+.tag{display:inline-block;padding:2px 7px;border-radius:3px;font-family:var(--mono);font-size:9px;font-weight:700;}
+.tg{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:var(--seek-c);}
+.tr{background:rgba(244,63,94,.12);border:1px solid rgba(244,63,94,.3);color:var(--rid-c);}
+.ta{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);color:var(--idx-c);}
+.tc{background:rgba(6,182,212,.12);border:1px solid rgba(6,182,212,.3);color:var(--page-c);}
+.tp{background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.3);color:var(--root-c);}
+.to{background:rgba(251,146,60,.12);border:1px solid rgba(251,146,60,.3);color:var(--inter-c);}
+.tci{background:rgba(34,211,238,.12);border:1px solid rgba(34,211,238,.3);color:var(--ci-c);}
+.tnci{background:rgba(232,121,249,.12);border:1px solid rgba(232,121,249,.3);color:var(--nci-c);}
+
+.warn{padding:10px 14px;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.18);border-radius:7px;font-family:var(--mono);font-size:11px;color:#d4a017;line-height:1.8;margin-top:14px;}
+.info{padding:10px 14px;background:rgba(6,182,212,.05);border:1px solid rgba(6,182,212,.16);border-radius:7px;font-family:var(--mono);font-size:11px;color:var(--page-c);line-height:1.8;margin-top:14px;}
+
+.overflow-x{overflow-x:auto;}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="ntab active" id="tab-t1" onclick="go('t1')"><div class="nd" style="background:var(--page-c);box-shadow:0 0 5px var(--page-c)"></div>01. SAMPLE TABLES</div>
+  <div class="ntab" id="tab-t2" onclick="go('t2')"><div class="nd" style="background:var(--page-c)"></div>02. DATA PAGES (EMP 50 rows)</div>
+  <div class="ntab" id="tab-t3" onclick="go('t3')"><div class="nd" style="background:var(--page-c)"></div>03. DATA PAGES (DEPT 20 rows)</div>
+  <div class="ntab" id="tab-t4" onclick="go('t4')"><div class="nd" style="background:var(--idx-c)"></div>04. CLUSTERED INDEX PAGES</div>
+  <div class="ntab" id="tab-t5" onclick="go('t5')"><div class="nd" style="background:var(--root-c)"></div>05. B-TREE SEEK (CLUSTERED)</div>
+  <div class="ntab" id="tab-t6" onclick="go('t6')"><div class="nd" style="background:var(--nci-c)"></div>06. NON-CLUSTERED INDEX</div>
+</nav>
+
+<div class="wrap">
+
+<!-- ══════════════════════════════════════════════
+     PAGE 1 — SAMPLE TABLE STRUCTURES
+══════════════════════════════════════════════ -->
+<div class="pg active" id="pg-t1">
+  <div class="sh"><div class="sn sn1">01</div><div><div class="st">Sample Table Structures — Schema + 50 Rows</div><div class="ss">dbo.Employees (50 rows) · dbo.Departments (20 rows) · இதை base-ஆக வச்சு index பார்ப்போம்</div></div></div>
+
+  <div class="card cc1">
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted2);margin-bottom:14px;letter-spacing:1px;">📋 CREATE TABLE SCRIPT</div>
+    <div style="background:rgba(0,0,0,.4);border:1px solid var(--border2);border-radius:9px;padding:16px;font-family:var(--mono);font-size:12px;line-height:2;margin-bottom:20px;">
+      <span style="color:var(--root-c)">CREATE TABLE</span> <span style="color:var(--page-c)">dbo.Employees</span> (<br>
+      &nbsp;&nbsp;<span style="color:var(--idx-c)">EmpID</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--muted2)">INT</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--seek-c)">PRIMARY KEY</span>,&nbsp;&nbsp;<span style="color:#4a7a4a;font-style:italic">-- Clustered Index by default</span><br>
+      &nbsp;&nbsp;<span style="color:var(--idx-c)">EmpName</span>&nbsp;&nbsp;&nbsp;<span style="color:var(--muted2)">VARCHAR(50)</span>&nbsp;&nbsp;<span style="color:var(--muted2)">NOT NULL</span>,<br>
+      &nbsp;&nbsp;<span style="color:var(--idx-c)">Department</span>&nbsp;<span style="color:var(--muted2)">VARCHAR(30)</span>&nbsp;&nbsp;<span style="color:var(--muted2)">NOT NULL</span>,<br>
+      &nbsp;&nbsp;<span style="color:var(--idx-c)">Salary</span>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--muted2)">INT</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--muted2)">NOT NULL</span>,<br>
+      &nbsp;&nbsp;<span style="color:var(--idx-c)">City</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--muted2)">VARCHAR(30)</span><br>
+      );<br><br>
+      <span style="color:var(--root-c)">CREATE TABLE</span> <span style="color:var(--page-c)">dbo.Departments</span> (<br>
+      &nbsp;&nbsp;<span style="color:var(--idx-c)">DeptID</span>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--muted2)">INT</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--seek-c)">PRIMARY KEY</span>,<br>
+      &nbsp;&nbsp;<span style="color:var(--idx-c)">DeptName</span>&nbsp;&nbsp;<span style="color:var(--muted2)">VARCHAR(30)</span>&nbsp;&nbsp;<span style="color:var(--muted2)">NOT NULL</span>,<br>
+      &nbsp;&nbsp;<span style="color:var(--idx-c)">Manager</span>&nbsp;&nbsp;&nbsp;<span style="color:var(--muted2)">VARCHAR(50)</span>,<br>
+      &nbsp;&nbsp;<span style="color:var(--idx-c)">Location</span>&nbsp;&nbsp;<span style="color:var(--muted2)">VARCHAR(30)</span><br>
+      );
+    </div>
+
+    <!-- Employees table -->
+    <div style="font-family:var(--mono);font-size:10px;color:var(--page-c);margin-bottom:10px;letter-spacing:1px;">📊 dbo.Employees — 50 Rows (sorted by EmpID — this is how Clustered Index stores them)</div>
+    <div class="overflow-x">
+      <table class="sql-tbl" id="empFullTable">
+        <thead><tr><th>EmpID</th><th>EmpName</th><th>Department</th><th>Salary</th><th>City</th><th>Page</th></tr></thead>
+        <tbody id="empTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card cc1">
+    <div style="font-family:var(--mono);font-size:10px;color:var(--page-c);margin-bottom:10px;letter-spacing:1px;">📊 dbo.Departments — 20 Rows</div>
+    <div class="overflow-x">
+      <table class="sql-tbl" id="deptFullTable">
+        <thead><tr><th>DeptID</th><th>DeptName</th><th>Manager</th><th>Location</th><th>Page</th></tr></thead>
+        <tbody id="deptTbody"></tbody>
+      </table>
+    </div>
+    <div class="warn" style="margin-top:14px;">
+      ⚠️ <strong>Page allocation rule:</strong> Each data page = 8KB. Our example ஒரு page-ல 10 rows store ஆகும்.<br>
+      Employees: 50 rows ÷ 10 rows/page = <strong>5 data pages (1:101 → 1:105)</strong><br>
+      Departments: 20 rows ÷ 10 rows/page = <strong>2 data pages (1:201 → 1:202)</strong>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     PAGE 2 — DATA PAGES (EMPLOYEES)
+══════════════════════════════════════════════ -->
+<div class="pg" id="pg-t2">
+  <div class="sh"><div class="sn sn1">02</div><div><div class="st">Data Pages — dbo.Employees (50 rows → 5 Pages)</div><div class="ss">ஒரு data page-ல என்ன என்ன இருக்கும் — Header, Rows, Free Space, Offset Array — full skeleton</div></div></div>
+
+  <!-- Data Page Anatomy explanation -->
+  <div class="card cc1" style="margin-bottom:20px;">
+    <div style="font-family:var(--mono);font-size:10px;color:var(--page-c);margin-bottom:14px;letter-spacing:1px;">🏗️ DATA PAGE ANATOMY — ஒரு Page-ல என்ன structure இருக்கும்</div>
+    <div style="display:grid;grid-template-columns:1fr 2fr;gap:20px;align-items:start;">
+      <div>
+        <div style="background:var(--s2);border:2px solid var(--page-c);border-radius:10px;overflow:hidden;">
+          <div style="background:var(--page-c);padding:6px 12px;font-family:var(--mono);font-size:11px;font-weight:700;color:#000;text-align:center;">Data Page 1:101</div>
+          <div style="background:rgba(244,63,94,.1);border-bottom:1px solid rgba(6,182,212,.15);padding:8px 12px;">
+            <div style="font-family:var(--mono);font-size:9px;color:var(--rid-c);letter-spacing:1px;margin-bottom:4px;">① PAGE HEADER (96 bytes)</div>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--muted2);line-height:1.8;">
+              Page ID: 1:101<br>FileID: 1 · PageNum: 101<br>PageType: DATA (1)<br>FreeBytes: 7,040<br>SlotCount: 10
+            </div>
+          </div>
+          <div style="border-bottom:1px solid rgba(6,182,212,.15);padding:6px 12px;background:rgba(6,182,212,.05);">
+            <div style="font-family:var(--mono);font-size:9px;color:var(--page-c);letter-spacing:1px;margin-bottom:3px;">② ROW DATA</div>
+            <div style="font-family:var(--mono);font-size:10px;line-height:1.9;color:var(--muted2);">
+              <span style="color:var(--page-c)">Row 1</span>: EmpID=1, Ravi, IT, 72000<br>
+              <span style="color:var(--page-c)">Row 2</span>: EmpID=2, Priya, HR, 65000<br>
+              <span style="color:var(--muted2)">... 8 more rows ...</span>
+            </div>
+          </div>
+          <div style="padding:10px 12px;text-align:center;border-bottom:1px dashed rgba(6,182,212,.2);">
+            <div style="font-family:var(--mono);font-size:10px;color:var(--muted2);">③ FREE SPACE</div>
+            <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;">[ available bytes ]</div>
+          </div>
+          <div style="padding:6px 12px;background:rgba(244,63,94,.06);">
+            <div style="font-family:var(--mono);font-size:9px;color:var(--rid-c);letter-spacing:1px;margin-bottom:4px;">④ SLOT ARRAY (Offset Table)</div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+              <div style="padding:2px 6px;border:1px solid var(--rid-c);border-radius:3px;font-family:var(--mono);font-size:9px;color:var(--rid-c)">96</div>
+              <div style="padding:2px 6px;border:1px solid rgba(244,63,94,.4);border-radius:3px;font-family:var(--mono);font-size:9px;color:rgba(244,63,94,.7)">140</div>
+              <div style="padding:2px 6px;border:1px solid rgba(244,63,94,.3);border-radius:3px;font-family:var(--mono);font-size:9px;color:rgba(244,63,94,.5)">184</div>
+              <div style="font-family:var(--mono);font-size:9px;color:var(--muted2);padding:2px 4px">...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div style="font-family:var(--mono);font-size:11px;line-height:2;color:var(--muted2);">
+          <div style="margin-bottom:10px;padding:10px 14px;background:rgba(244,63,94,.07);border:1px solid rgba(244,63,94,.2);border-radius:7px;">
+            <span style="color:var(--rid-c);font-weight:700">① Header (96 bytes)</span><br>
+            Page address (FileID:PageNum), page type, free space, slot count, prev/next page pointers — SQL Server internal metadata.
+          </div>
+          <div style="margin-bottom:10px;padding:10px 14px;background:rgba(6,182,212,.07);border:1px solid rgba(6,182,212,.2);border-radius:7px;">
+            <span style="color:var(--page-c);font-weight:700">② Row Data</span><br>
+            Actual table rows stored here. Each row has: null bitmap + column lengths + column values. Rows are NOT sorted in heap (they insert in any position with free space).
+          </div>
+          <div style="margin-bottom:10px;padding:10px 14px;background:rgba(100,100,100,.07);border:1px solid rgba(100,100,100,.2);border-radius:7px;">
+            <span style="color:var(--muted2);font-weight:700">③ Free Space</span><br>
+            Remaining space in the page. New rows go here. When full, SQL Server allocates a new page.
+          </div>
+          <div style="padding:10px 14px;background:rgba(244,63,94,.07);border:1px solid rgba(244,63,94,.2);border-radius:7px;">
+            <span style="color:var(--rid-c);font-weight:700">④ Slot Array (Offset Table)</span><br>
+            Grows backwards from end of page. Each slot = 2 bytes = byte offset where a row starts. <strong>RID = FileID:PageNum:SlotOffset</strong>. This is how index pages point to exact rows.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5 Data Pages for Employees -->
+  <div style="font-family:var(--mono);font-size:10px;color:var(--page-c);margin-bottom:14px;letter-spacing:1px;">📄 5 DATA PAGES — Employees table (10 rows per page, sorted by EmpID because Clustered Index exists)</div>
+  <div style="display:flex;gap:14px;flex-wrap:wrap;" id="empDataPages"></div>
+
+  <div class="info" style="margin-top:18px;">
+    💡 <strong>Clustered Index இருக்கும்போது:</strong> Data pages-ல் EmpID order-ல் rows store ஆகும் (1,2,3,...50). இது HEAP அல்ல — physically sorted linked list. Page 1:101 → 1:102 → 1:103 → 1:104 → 1:105 doubly linked.
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     PAGE 3 — DATA PAGES (DEPARTMENTS)
+══════════════════════════════════════════════ -->
+<div class="pg" id="pg-t3">
+  <div class="sh"><div class="sn sn1">03</div><div><div class="st">Data Pages — dbo.Departments (20 rows → 2 Pages)</div><div class="ss">2nd table-க்கான data pages — same skeleton, வேற page numbers</div></div></div>
+
+  <div class="card cc1" style="margin-bottom:18px;">
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted2);line-height:2;">
+      Departments table: <strong style="color:var(--page-c)">20 rows ÷ 10 rows per page = 2 pages</strong><br>
+      Page 1:201 → DeptID 1–10 &nbsp;|&nbsp; Page 1:202 → DeptID 11–20<br>
+      இந்த table-ல் DeptID PK ஆக இருக்கு → Clustered Index on DeptID → sorted order.
+    </div>
+  </div>
+
+  <div style="display:flex;gap:14px;flex-wrap:wrap;" id="deptDataPages"></div>
+
+  <div class="warn" style="margin-top:18px;">
+    ⚠️ <strong>இரண்டு வேற tables, இரண்டு வேற page ranges:</strong><br>
+    Employees: pages 1:101 → 1:105 (FileID 1, PageNum 101 to 105)<br>
+    Departments: pages 1:201 → 1:202 (FileID 1, PageNum 201 to 202)<br>
+    SQL Server allocates pages from the same data file but tracks them separately via IAM (Index Allocation Map).
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     PAGE 4 — CLUSTERED INDEX PAGES
+══════════════════════════════════════════════ -->
+<div class="pg" id="pg-t4">
+  <div class="sh"><div class="sn sn4">04</div><div><div class="st">Clustered Index Pages — Employees</div><div class="ss">CREATE UNIQUE CLUSTERED INDEX on EmpID → எத்தனை index pages வரும்? என்ன skeleton?</div></div></div>
+
+  <div class="card cc4" style="margin-bottom:20px;">
+    <div style="background:rgba(0,0,0,.4);border:1px solid var(--border2);border-radius:9px;padding:14px;font-family:var(--mono);font-size:12px;line-height:2;margin-bottom:18px;">
+      <span style="color:var(--root-c)">CREATE UNIQUE CLUSTERED INDEX</span> <span style="color:var(--ci-c)">CIX_Employees_EmpID</span><br>
+      <span style="color:var(--root-c)">ON</span> <span style="color:var(--page-c)">dbo.Employees</span> (<span style="color:var(--idx-c)">EmpID</span> <span style="color:var(--muted2)">ASC</span>);<br>
+      <span style="color:#4a7a4a;font-style:italic">-- PRIMARY KEY automatically creates this!</span>
+    </div>
+
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted2);line-height:2;margin-bottom:16px;">
+      <span style="color:var(--ci-c);font-weight:700">Clustered Index Leaf Level = Data Pages themselves!</span><br>
+      Leaf node-ல் separate pages இல்லை — data pages 1:101→1:105 இதுவே leaf nodes.<br>
+      இதுக்கு மேல Non-Leaf (intermediate + root) pages மட்டும் create ஆகும்.
+    </div>
+
+    <!-- Index Page Anatomy -->
+    <div style="font-family:var(--mono);font-size:10px;color:var(--idx-c);margin-bottom:12px;letter-spacing:1px;">🏗️ INDEX PAGE ANATOMY — leaf-level இல்லாத upper level pages</div>
+    <div style="display:grid;grid-template-columns:1fr 2fr;gap:18px;margin-bottom:22px;">
+      <div style="background:var(--s2);border:2px solid var(--idx-c);border-radius:10px;overflow:hidden;">
+        <div style="background:var(--idx-c);padding:6px 12px;font-family:var(--mono);font-size:11px;font-weight:700;color:#000;text-align:center;">Index Page 1:301 (Intermediate)</div>
+        <div style="background:rgba(245,158,11,.08);border-bottom:1px solid rgba(245,158,11,.15);padding:8px 12px;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--idx-c);letter-spacing:1px;margin-bottom:4px;">① PAGE HEADER</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--muted2);line-height:1.7;">
+            Page ID: 1:301<br>PageType: INDEX (2)<br>IndexID: 1 (clustered)<br>Level: 1 (intermediate)
+          </div>
+        </div>
+        <div style="padding:6px 12px;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--ci-c);letter-spacing:1px;margin-bottom:5px;">② INDEX ROWS (Key + Page Pointer)</div>
+          <div style="font-family:var(--mono);font-size:10px;line-height:1.8;color:var(--muted2);">
+            <span style="color:var(--idx-c)">EmpID=1</span> → <span style="color:var(--ci-c)">1:101</span><br>
+            <span style="color:var(--idx-c)">EmpID=11</span> → <span style="color:var(--ci-c)">1:102</span><br>
+            <span style="color:var(--idx-c)">EmpID=21</span> → <span style="color:var(--ci-c)">1:103</span><br>
+            <span style="color:var(--idx-c)">EmpID=31</span> → <span style="color:var(--ci-c)">1:104</span><br>
+            <span style="color:var(--idx-c)">EmpID=41</span> → <span style="color:var(--ci-c)">1:105</span>
+          </div>
+        </div>
+        <div style="padding:10px 12px;text-align:center;border-top:1px dashed rgba(245,158,11,.2);">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--muted2);">③ FREE SPACE</div>
+        </div>
+      </div>
+      <div style="font-family:var(--mono);font-size:11px;line-height:2;color:var(--muted2);">
+        <div style="padding:10px 14px;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);border-radius:7px;margin-bottom:10px;">
+          <span style="color:var(--idx-c);font-weight:700">Clustered Index Row Structure:</span><br>
+          [Index Key (EmpID)] + [Page Pointer to child page]<br>
+          <span style="color:var(--ci-c)">No RID needed!</span> Leaf level IS the data page. So intermediate nodes point directly to child pages.
+        </div>
+        <div style="padding:10px 14px;background:rgba(34,211,238,.07);border:1px solid rgba(34,211,238,.2);border-radius:7px;margin-bottom:10px;">
+          <span style="color:var(--ci-c);font-weight:700">50 rows → எத்தனை index pages?</span><br>
+          Leaf (Data Pages): 5 pages (1:101–1:105) — already exist<br>
+          Intermediate: <span style="color:var(--ci-c)">1 page</span> (1:301) — 5 pointers, fits in one page<br>
+          Root: <span style="color:var(--root-c)">1 page</span> (1:400) — points to intermediate<br>
+          <strong>Total extra pages: 2</strong> (intermediate + root)
+        </div>
+        <div style="padding:10px 14px;background:rgba(167,139,250,.07);border:1px solid rgba(167,139,250,.2);border-radius:7px;">
+          <span style="color:var(--root-c);font-weight:700">Rule: When is intermediate needed?</span><br>
+          Root மட்டும் போதுமா? 5 pages fit in root → technically 2 levels.<br>
+          Real SQL Server-ல் data பெரிதாக இருந்தால் 3+ levels வரும்.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Clustered Index Pages -->
+  <div style="font-family:var(--mono);font-size:10px;color:var(--idx-c);margin-bottom:12px;letter-spacing:1px;">📇 CLUSTERED INDEX PAGES — Employees table</div>
+  <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:18px;" id="ciIndexPages"></div>
+
+  <div class="info">
+    💡 <strong>Clustered Index = Data ஒரே structure!</strong> Leaf nodes = data pages. Index pages-ல் rows scan செய்ய வேண்டாம் — directly data pages-க்கு pointer மட்டும் வைக்கும்.
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     PAGE 5 — B-TREE SEEK (CLUSTERED)
+══════════════════════════════════════════════ -->
+<div class="pg" id="pg-t5">
+  <div class="sh"><div class="sn sn3">05</div><div><div class="st">B-Tree Seek — Clustered Index on Employees</div><div class="ss">Root → Intermediate → Leaf(=Data Page) → Row Found! — interactive seek</div></div></div>
+
+  <div class="card cc3">
+    <!-- B-Tree explanation -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:22px;">
+      <div style="padding:12px;background:rgba(167,139,250,.07);border:1px solid rgba(167,139,250,.2);border-radius:8px;">
+        <div style="color:var(--root-c);font-weight:800;font-size:13px;margin-bottom:7px;">🌳 B-Tree எப்படி உருவாகுது?</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted2);line-height:1.8;">
+          1. முதலில் data pages (leaves) உருவாகும்<br>
+          2. Page count > threshold → intermediate page create<br>
+          3. Intermediate count > threshold → root create<br>
+          4. Root எப்போதும் ஒரே ஒரு page!
+        </div>
+      </div>
+      <div style="padding:12px;background:rgba(251,146,60,.07);border:1px solid rgba(251,146,60,.2);border-radius:8px;">
+        <div style="color:var(--inter-c);font-weight:800;font-size:13px;margin-bottom:7px;">📐 எந்த key இந்த page-ல் போகும்?</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted2);line-height:1.8;">
+          Intermediate row = ஒவ்வொரு child leaf page-ல் <strong>முதல் key</strong><br>
+          Page 1:101 first row = EmpID 1 → "1 → 1:101"<br>
+          Page 1:102 first row = EmpID 11 → "11 → 1:102"<br>
+          ...and so on
+        </div>
+      </div>
+      <div style="padding:12px;background:rgba(34,211,238,.07);border:1px solid rgba(34,211,238,.2);border-radius:8px;">
+        <div style="color:var(--ci-c);font-weight:800;font-size:13px;margin-bottom:7px;">🔍 Seek எப்படி நடக்கும்?</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted2);line-height:1.8;">
+          EmpID=35 தேடுகிறோம்:<br>
+          Root: 35 ≥ 31 → go to 1:301<br>
+          Intermediate: 31≤35&lt;41 → go to 1:104<br>
+          Data Page 1:104: scan → EmpID=35 found!
+        </div>
+      </div>
+    </div>
+
+    <div class="sbar">
+      <span class="sbar-lbl">SEARCH EmpID:</span>
+      <div id="ci-btn-group" style="display:flex;gap:5px;flex-wrap:wrap;"></div>
+      <button class="btn btn-g" onclick="runCISeek()">▶ Seek</button>
+      <button class="btn btn-r" onclick="resetCI()">↺ Reset</button>
+    </div>
+
+    <div class="step-pills">
+      <div class="sp sp-r" id="ci-sc1">① ROOT NODE</div>
+      <div class="sp sp-i" id="ci-sc2">② INTERMEDIATE NODE</div>
+      <div class="sp sp-l" id="ci-sc3">③ DATA PAGE (Leaf)</div>
+      <div class="sp sp-ok" id="ci-sc4">✅ FOUND</div>
+    </div>
+
+    <div class="stbox" id="ci-status">Select an EmpID and press Seek to watch the B-Tree traversal step by step.</div>
+
+    <!-- ROOT -->
+    <div class="btree-section" style="margin-top:20px;">
+      <div class="btree-level-label"><span class="tag tp">ROOT NODE</span> <span style="font-family:var(--mono);font-size:10px;color:var(--muted2)">— Index Page 1:400 — வரும் query எல்லாம் இங்கிருந்தே தொடங்கும்</span></div>
+      <div class="btree-level">
+        <div class="root-box" id="ci-root">
+          <div class="root-bar">Index Page 1:400 — ROOT</div>
+          <div class="root-row" id="ci-rr1"><span class="rk">EmpID 1–25</span><span style="color:var(--muted2)">→</span><span class="rp">1:301</span></div>
+          <div class="root-row" id="ci-rr2"><span class="rk">EmpID 26–50</span><span style="color:var(--muted2)">→</span><span class="rp">1:302</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector">↓</div>
+
+    <!-- INTERMEDIATE -->
+    <div class="btree-section">
+      <div class="btree-level-label"><span class="tag to">INTERMEDIATE NODES</span> <span style="font-family:var(--mono);font-size:10px;color:var(--muted2)">— 2 pages, each covering half the range</span></div>
+      <div class="btree-level" style="gap:40px;">
+        <div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted2);text-align:center;margin-bottom:5px;">EmpID 1–25</div>
+          <div class="inter-box" id="ci-int1">
+            <div class="inter-bar">Index Page 1:301</div>
+            <div class="inter-row" id="ci-ir1"><span class="ik">EmpID 1</span><span style="color:var(--muted2)">→</span><span class="ip">1:101</span></div>
+            <div class="inter-row" id="ci-ir2"><span class="ik">EmpID 11</span><span style="color:var(--muted2)">→</span><span class="ip">1:102</span></div>
+            <div class="inter-row" id="ci-ir3"><span class="ik">EmpID 21</span><span style="color:var(--muted2)">→</span><span class="ip">1:103</span></div>
+          </div>
+        </div>
+        <div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted2);text-align:center;margin-bottom:5px;">EmpID 26–50</div>
+          <div class="inter-box" id="ci-int2">
+            <div class="inter-bar">Index Page 1:302</div>
+            <div class="inter-row" id="ci-ir4"><span class="ik">EmpID 26</span><span style="color:var(--muted2)">→</span><span class="ip">1:103</span></div>
+            <div class="inter-row" id="ci-ir5"><span class="ik">EmpID 31</span><span style="color:var(--muted2)">→</span><span class="ip">1:104</span></div>
+            <div class="inter-row" id="ci-ir6"><span class="ik">EmpID 41</span><span style="color:var(--muted2)">→</span><span class="ip">1:105</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector">↓</div>
+
+    <!-- LEAF = DATA PAGES -->
+    <div class="btree-section">
+      <div class="btree-level-label"><span class="tag tci">LEAF NODES = DATA PAGES</span> <span style="font-family:var(--mono);font-size:10px;color:var(--ci-c)">— Clustered Index-ல் leaf nodes தனியா இல்லை! Data pages-ஐ இதுவே leaf.</span></div>
+      <div class="btree-level" id="ci-leaf-row" style="gap:10px;"></div>
+    </div>
+
+    <div class="stbox" id="ci-status2" style="margin-top:14px;"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     PAGE 6 — NON-CLUSTERED INDEX
+══════════════════════════════════════════════ -->
+<div class="pg" id="pg-t6">
+  <div class="sh"><div class="sn sn5">06</div><div><div class="st">Non-Clustered Index — Same Table, Different Index</div><div class="ss">CREATE INDEX on Salary column → separate index structure + RID lookup to data pages</div></div></div>
+
+  <div class="card cc5" style="margin-bottom:20px;">
+    <div style="background:rgba(0,0,0,.4);border:1px solid var(--border2);border-radius:9px;padding:14px;font-family:var(--mono);font-size:12px;line-height:2;margin-bottom:18px;">
+      <span style="color:var(--root-c)">CREATE NONCLUSTERED INDEX</span> <span style="color:var(--nci-c)">IX_Employees_Salary</span><br>
+      <span style="color:var(--root-c)">ON</span> <span style="color:var(--page-c)">dbo.Employees</span> (<span style="color:var(--idx-c)">Salary</span> <span style="color:var(--muted2)">ASC</span>);<br>
+      <span style="color:#4a7a4a;font-style:italic">-- Data pages unchanged! Separate index pages created.</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px;">
+      <div style="padding:12px;background:rgba(34,211,238,.07);border:1px solid rgba(34,211,238,.2);border-radius:8px;">
+        <div style="color:var(--ci-c);font-weight:800;margin-bottom:8px;">🟢 Clustered Index (EmpID)</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted2);line-height:1.9;">
+          Leaf level = Data pages (actual rows)<br>
+          Seek → Root → Inter → <strong>Data Page (leaf)</strong><br>
+          No extra lookup needed<br>
+          <strong style="color:var(--ci-c)">3 I/Os to find any row</strong>
+        </div>
+      </div>
+      <div style="padding:12px;background:rgba(232,121,249,.07);border:1px solid rgba(232,121,249,.2);border-radius:8px;">
+        <div style="color:var(--nci-c);font-weight:800;margin-bottom:8px;">🔵 Non-Clustered Index (Salary)</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted2);line-height:1.9;">
+          Leaf level = Salary + <strong style="color:var(--rid-c)">RID pointer</strong><br>
+          Seek → Root → Inter → Leaf → <strong>RID → Data Page</strong><br>
+          Extra lookup to heap/clustered<br>
+          <strong style="color:var(--nci-c)">4 I/Os to find any row</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- NCI Seek -->
+    <div class="sbar">
+      <span class="sbar-lbl">SEARCH Salary:</span>
+      <div id="nci-btn-group" style="display:flex;gap:5px;flex-wrap:wrap;"></div>
+      <button class="btn btn-g" onclick="runNCISeek()">▶ Seek by Salary</button>
+      <button class="btn btn-r" onclick="resetNCI()">↺ Reset</button>
+    </div>
+
+    <div class="step-pills">
+      <div class="sp sp-r" id="nci-sc1">① NCI ROOT</div>
+      <div class="sp sp-i" id="nci-sc2">② NCI INTERMEDIATE</div>
+      <div class="sp sp-l" id="nci-sc3">③ NCI LEAF → RID</div>
+      <div class="sp sp-d" id="nci-sc4">④ DATA PAGE FETCH</div>
+      <div class="sp sp-ok" id="nci-sc5">✅ FOUND</div>
+    </div>
+
+    <div class="stbox" id="nci-status">Select a Salary value to search and press Seek.</div>
+
+    <!-- NCI ROOT -->
+    <div class="btree-section" style="margin-top:20px;">
+      <div class="btree-level-label"><span class="tag tp">NCI ROOT</span> <span style="font-family:var(--mono);font-size:10px;color:var(--muted2)">— Index Page 1:500 — Salary order!</span></div>
+      <div class="btree-level">
+        <div class="root-box" id="nci-root" style="border-color:var(--nci-c);">
+          <div class="root-bar" style="background:var(--nci-c);">Index Page 1:500 — NCI ROOT (Salary)</div>
+          <div class="root-row" id="nci-rr1"><span class="rk" style="color:var(--nci-c);">Sal 40k–70k</span><span style="color:var(--muted2)">→</span><span class="rp">1:501</span></div>
+          <div class="root-row" id="nci-rr2"><span class="rk" style="color:var(--nci-c);">Sal 71k–120k</span><span style="color:var(--muted2)">→</span><span class="rp">1:502</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector">↓</div>
+
+    <!-- NCI INTERMEDIATE -->
+    <div class="btree-section">
+      <div class="btree-level-label"><span class="tag to">NCI INTERMEDIATE</span></div>
+      <div class="btree-level" style="gap:40px;">
+        <div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted2);text-align:center;margin-bottom:5px;">Salary 40k–70k</div>
+          <div class="inter-box" id="nci-int1" style="border-color:var(--nci-c);">
+            <div class="inter-bar" style="background:var(--nci-c);">Index Page 1:501</div>
+            <div class="inter-row" id="nci-ir1"><span class="ik" style="color:var(--nci-c)">40k–55k</span><span style="color:var(--muted2)">→</span><span class="ip">1:510</span></div>
+            <div class="inter-row" id="nci-ir2"><span class="ik" style="color:var(--nci-c)">56k–70k</span><span style="color:var(--muted2)">→</span><span class="ip">1:511</span></div>
+          </div>
+        </div>
+        <div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted2);text-align:center;margin-bottom:5px;">Salary 71k–120k</div>
+          <div class="inter-box" id="nci-int2" style="border-color:var(--nci-c);">
+            <div class="inter-bar" style="background:var(--nci-c);">Index Page 1:502</div>
+            <div class="inter-row" id="nci-ir3"><span class="ik" style="color:var(--nci-c)">71k–90k</span><span style="color:var(--muted2)">→</span><span class="ip">1:512</span></div>
+            <div class="inter-row" id="nci-ir4"><span class="ik" style="color:var(--nci-c)">91k–120k</span><span style="color:var(--muted2)">→</span><span class="ip">1:513</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector">↓</div>
+
+    <!-- NCI LEAF -->
+    <div class="btree-section">
+      <div class="btree-level-label"><span class="tag tnci">NCI LEAF NODES</span> <span style="font-family:var(--mono);font-size:10px;color:var(--nci-c)">— contain Salary + RID (FileID:PageNum:Offset) — NOT the actual rows!</span></div>
+      <div class="btree-level" style="gap:12px;" id="nci-leaf-row"></div>
+    </div>
+
+    <div class="connector" style="color:var(--rid-c);">↓ RID Lookup ↓</div>
+
+    <!-- DATA PAGES (heap lookup) -->
+    <div class="btree-section">
+      <div class="btree-level-label"><span class="tag tc">DATA PAGES (Heap)</span> <span style="font-family:var(--mono);font-size:10px;color:var(--muted2)">— RID uses FileID:PageNum to jump here directly</span></div>
+      <div class="btree-level" style="gap:10px;" id="nci-data-row"></div>
+    </div>
+
+    <div class="stbox" id="nci-status2" style="margin-top:14px;"></div>
+  </div>
+</div>
+
+</div><!-- /wrap -->
+<script>
+// ══════════════════════════════════════════
+// DATA GENERATION
+// ══════════════════════════════════════════
+const DEPT_NAMES=['IT','HR','Finance','Sales','Marketing','Operations','Legal','R&D'];
+const CITIES=['Chennai','Mumbai','Delhi','Hyderabad','Bangalore','Pune','Kolkata','Ahmedabad'];
+const FIRST=['Ravi','Priya','Arjun','Meena','Suresh','Kavitha','Vijay','Anita','Ramesh','Deepa','Karthik','Sunita','Manoj','Divya','Sanjay','Rekha','Rajesh','Pooja','Arun','Nisha','Ganesh','Uma','Prasad','Lakshmi','Senthil','Geetha','Murugan','Radha','Balaji','Saranya','Venkat','Padma','Gopal','Vasantha','Siva','Mala','Dinesh','Kamala','Prabhu','Vimala','Harish','Shanthi','Sugumar','Jaya','Naresh','Sudha','Vinoth','Bhanu','Selvam','Thilaga'];
+const EMPS=Array.from({length:50},(_,i)=>({
+  id:i+1,
+  name:FIRST[i],
+  dept:DEPT_NAMES[i%8],
+  salary:Math.floor(40000+Math.random()*80000),
+  city:CITIES[i%8],
+  page:`1:${101+Math.floor(i/10)}`
+}));
+const DEPT_ROWS=[
+  {id:1,name:'IT',mgr:'Rajesh Kumar',loc:'Chennai',page:'1:201'},
+  {id:2,name:'HR',mgr:'Priya Sharma',loc:'Mumbai',page:'1:201'},
+  {id:3,name:'Finance',mgr:'Arun Gupta',loc:'Delhi',page:'1:201'},
+  {id:4,name:'Sales',mgr:'Meena Iyer',loc:'Hyderabad',page:'1:201'},
+  {id:5,name:'Marketing',mgr:'Suresh Nair',loc:'Bangalore',page:'1:201'},
+  {id:6,name:'Operations',mgr:'Kavitha Rao',loc:'Pune',page:'1:201'},
+  {id:7,name:'Legal',mgr:'Vijay Pillai',loc:'Kolkata',page:'1:201'},
+  {id:8,name:'R&D',mgr:'Anita Singh',loc:'Ahmedabad',page:'1:201'},
+  {id:9,name:'IT-2',mgr:'Ramesh Patel',loc:'Chennai',page:'1:201'},
+  {id:10,name:'HR-2',mgr:'Deepa Menon',loc:'Mumbai',page:'1:201'},
+  {id:11,name:'Finance-2',mgr:'Karthik Raja',loc:'Delhi',page:'1:202'},
+  {id:12,name:'Sales-2',mgr:'Sunita Verma',loc:'Hyderabad',page:'1:202'},
+  {id:13,name:'Marketing-2',mgr:'Manoj Kumar',loc:'Bangalore',page:'1:202'},
+  {id:14,name:'Operations-2',mgr:'Divya Reddy',loc:'Pune',page:'1:202'},
+  {id:15,name:'Legal-2',mgr:'Sanjay Shah',loc:'Kolkata',page:'1:202'},
+  {id:16,name:'R&D-2',mgr:'Rekha Joshi',loc:'Ahmedabad',page:'1:202'},
+  {id:17,name:'Admin',mgr:'Rajesh Pillai',loc:'Chennai',page:'1:202'},
+  {id:18,name:'Support',mgr:'Pooja Iyer',loc:'Mumbai',page:'1:202'},
+  {id:19,name:'QA',mgr:'Arun Nair',loc:'Delhi',page:'1:202'},
+  {id:20,name:'DevOps',mgr:'Nisha Patel',loc:'Bangalore',page:'1:202'},
+];
+
+// NCI: sort employees by salary for leaf display
+const EMPS_BY_SAL=[...EMPS].sort((a,b)=>a.salary-b.salary);
+
+// ══════════════════════════════════════════
+// NAV
+// ══════════════════════════════════════════
+function go(id){
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('pg-'+id).classList.add('active');
+  document.getElementById('tab-'+id).classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ══════════════════════════════════════════
+// RENDER FULL TABLES (Page 1)
+// ══════════════════════════════════════════
+function renderEmpFull(){
+  const tb=document.getElementById('empTbody');
+  EMPS.forEach(e=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="c-id">${e.id}</td><td class="c-name">${e.name}</td><td class="c-dept">${e.dept}</td><td class="c-sal">${e.salary.toLocaleString()}</td><td class="c-city">${e.city}</td><td><span style="font-family:var(--mono);font-size:9px;padding:2px 6px;border-radius:3px;background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.25);color:var(--page-c)">${e.page}</span></td>`;
+    tb.appendChild(tr);
+  });
+}
+function renderDeptFull(){
+  const tb=document.getElementById('deptTbody');
+  DEPT_ROWS.forEach(d=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="c-id">${d.id}</td><td class="c-dept">${d.name}</td><td class="c-name">${d.mgr}</td><td class="c-city">${d.loc}</td><td><span style="font-family:var(--mono);font-size:9px;padding:2px 6px;border-radius:3px;background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.25);color:var(--page-c)">${d.page}</span></td>`;
+    tb.appendChild(tr);
+  });
+}
+
+// ══════════════════════════════════════════
+// BUILD DATA PAGE (full skeleton)
+// ══════════════════════════════════════════
+function buildDataPage(container, pageId, rows, pageNum, isCI=true){
+  const dp=document.createElement('div');
+  dp.className='dp-outer'; dp.id=`dp-${pageId}`;
+  dp.style.minWidth='280px';dp.style.maxWidth='320px';
+  const totalRows=rows.length;
+  const offsets=rows.map((_,i)=>96+i*44);
+  const freeBytes=8192-96-(totalRows*44)-totalRows*2;
+  dp.innerHTML=`
+    <div class="dp-title-bar">
+      <span>Data Page ${pageId}</span>
+      <span style="font-size:9px">${isCI?'Clustered':'Heap'}</span>
+    </div>
+    <div class="dp-header-block">
+      <div class="dp-hdr-row">
+        <div class="dp-hdr-cell"><span class="dp-hdr-label">PAGE ID</span><span class="dp-hdr-val">${pageId}</span></div>
+        <div class="dp-hdr-cell"><span class="dp-hdr-label">PAGE TYPE</span><span class="dp-hdr-val">DATA (1)</span></div>
+        <div class="dp-hdr-cell"><span class="dp-hdr-label">SLOT COUNT</span><span class="dp-hdr-val">${totalRows}</span></div>
+      </div>
+      <div class="dp-hdr-row">
+        <div class="dp-hdr-cell"><span class="dp-hdr-label">FREE BYTES</span><span class="dp-hdr-val">${freeBytes.toLocaleString()}</span></div>
+        <div class="dp-hdr-cell"><span class="dp-hdr-label">PREV PAGE</span><span class="dp-hdr-val">${pageNum>0?`1:${pageNum-1}`:'NULL'}</span></div>
+        <div class="dp-hdr-cell"><span class="dp-hdr-label">NEXT PAGE</span><span class="dp-hdr-val">${pageNum<105?`1:${pageNum+1}`:'NULL'}</span></div>
+      </div>
+    </div>
+    <div class="dp-col-hdr">
+      <span>#</span><span>EmpID</span><span>Name</span><span>Dept</span><span>Sal</span><span>City</span>
+    </div>
+    ${rows.map((e,i)=>`<div class="dp-row-item" id="dp-row-${e.id}">
+      <span style="color:var(--muted2);font-size:9px">${i+1}</span>
+      <span class="c-id">${e.id}</span>
+      <span class="c-name" style="font-size:10px">${e.name}</span>
+      <span class="c-dept" style="font-size:9px">${e.dept}</span>
+      <span class="c-sal" style="font-size:9px">${Math.round(e.salary/1000)}k</span>
+      <span style="color:var(--muted2);font-size:9px">${e.city.substr(0,3)}</span>
+    </div>`).join('')}
+    <div class="dp-free">··· FREE SPACE (${freeBytes.toLocaleString()} bytes) ···</div>
+    <div class="dp-offset-bar">
+      <div class="dp-offset-label">OFFSET ARRAY (slot array grows ← from end)</div>
+      <div class="dp-offset-chips">${offsets.map((o,i)=>`<div class="dp-offset-chip">slot${i+1}:${o}</div>`).join('')}</div>
+    </div>`;
+  container.appendChild(dp);
+}
+
+function buildDeptDataPage(container, pageId, rows, pageNum){
+  const dp=document.createElement('div');
+  dp.className='dp-outer'; dp.id=`dp-dept-${pageId}`;
+  dp.style.minWidth='300px';dp.style.maxWidth='340px';
+  const offsets=rows.map((_,i)=>96+i*48);
+  const freeBytes=8192-96-(rows.length*48)-rows.length*2;
+  dp.innerHTML=`
+    <div class="dp-title-bar" style="background:rgba(6,182,212,.7)">
+      <span>Data Page ${pageId}</span><span style="font-size:9px">Departments</span>
+    </div>
+    <div class="dp-header-block">
+      <div class="dp-hdr-row">
+        <div class="dp-hdr-cell"><span class="dp-hdr-label">PAGE ID</span><span class="dp-hdr-val">${pageId}</span></div>
+        <div class="dp-hdr-cell"><span class="dp-hdr-label">PAGE TYPE</span><span class="dp-hdr-val">DATA (1)</span></div>
+        <div class="dp-hdr-cell"><span class="dp-hdr-label">SLOT COUNT</span><span class="dp-hdr-val">${rows.length}</span></div>
+      </div>
+      <div class="dp-hdr-row">
+        <div class="dp-hdr-cell"><span class="dp-hdr-label">FREE BYTES</span><span class="dp-hdr-val">${freeBytes.toLocaleString()}</span></div>
+        <div class="dp-hdr-cell"><span class="dp-hdr-label">PREV PAGE</span><span class="dp-hdr-val">${pageNum>201?`1:${pageNum-1}`:'NULL'}</span></div>
+        <div class="dp-hdr-cell"><span class="dp-hdr-label">NEXT PAGE</span><span class="dp-hdr-val">${pageNum<202?`1:${pageNum+1}`:'NULL'}</span></div>
+      </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:10px;">
+      <thead><tr style="background:rgba(0,0,0,.2)"><th style="padding:4px 8px;color:var(--muted2);font-size:8px;border-bottom:1px solid rgba(6,182,212,.12)">#</th><th style="padding:4px 8px;color:var(--muted2);font-size:8px;border-bottom:1px solid rgba(6,182,212,.12)">DeptID</th><th style="padding:4px 8px;color:var(--muted2);font-size:8px;border-bottom:1px solid rgba(6,182,212,.12)">DeptName</th><th style="padding:4px 8px;color:var(--muted2);font-size:8px;border-bottom:1px solid rgba(6,182,212,.12)">Manager</th><th style="padding:4px 8px;color:var(--muted2);font-size:8px;border-bottom:1px solid rgba(6,182,212,.12)">Location</th></tr></thead>
+      <tbody>${rows.map((d,i)=>`<tr><td style="padding:4px 8px;border-bottom:1px solid rgba(6,182,212,.06);color:var(--muted2)">${i+1}</td><td style="padding:4px 8px;border-bottom:1px solid rgba(6,182,212,.06);color:var(--page-c);font-weight:700">${d.id}</td><td style="padding:4px 8px;border-bottom:1px solid rgba(6,182,212,.06);color:var(--idx-c)">${d.name}</td><td style="padding:4px 8px;border-bottom:1px solid rgba(6,182,212,.06);color:#a3e635;font-size:9px">${d.mgr}</td><td style="padding:4px 8px;border-bottom:1px solid rgba(6,182,212,.06);color:var(--inter-c);font-size:9px">${d.loc}</td></tr>`).join('')}</tbody>
+    </table>
+    <div class="dp-free">··· FREE SPACE ···</div>
+    <div class="dp-offset-bar"><div class="dp-offset-label">OFFSET ARRAY</div><div class="dp-offset-chips">${offsets.map((o,i)=>`<div class="dp-offset-chip">slot${i+1}:${o}</div>`).join('')}</div></div>`;
+  container.appendChild(dp);
+}
+
+// ══════════════════════════════════════════
+// CLUSTERED INDEX PAGES (Page 4)
+// ══════════════════════════════════════════
+function buildCIIndexPage(container, pageId, entries, level, title){
+  const ip=document.createElement('div');
+  ip.className='ip-outer'; ip.id=`ip-${pageId}`;
+  const colCols=level==='leaf'?'40px 100px 80px 70px':'60px 20px 80px';
+  ip.innerHTML=`
+    <div class="ip-title-bar"><span>${title} ${pageId}</span><span style="font-size:9px">${level.toUpperCase()}</span></div>
+    <div class="ip-hdr-block">
+      <div class="ip-hdr-row">
+        <div class="ip-hdr-cell"><span class="ip-hdr-label">PAGE ID</span><span class="ip-hdr-val">${pageId}</span></div>
+        <div class="ip-hdr-cell"><span class="ip-hdr-label">PAGE TYPE</span><span class="ip-hdr-val">INDEX (2)</span></div>
+        <div class="ip-hdr-cell"><span class="ip-hdr-label">LEVEL</span><span class="ip-hdr-val">${level}</span></div>
+      </div>
+    </div>
+    <div class="ip-col-hdr" style="grid-template-columns:${colCols}">
+      ${level==='leaf'?'<span style="font-family:var(--mono);font-size:8px;color:var(--muted2)">EmpID</span><span style="font-family:var(--mono);font-size:8px;color:var(--muted2)">Name</span><span style="font-family:var(--mono);font-size:8px;color:var(--muted2)">Dept</span><span style="font-family:var(--mono);font-size:8px;color:var(--muted2)">→ DataPage</span>':'<span style="font-family:var(--mono);font-size:8px;color:var(--muted2)">Key range</span><span></span><span style="font-family:var(--mono);font-size:8px;color:var(--muted2)">→ Page</span>'}
+    </div>
+    ${entries.map((e,i)=>`<div class="ip-row-item" style="grid-template-columns:${colCols}" id="ci-ip-${pageId}-${i}">
+      ${level==='leaf'?`<span style="color:var(--ci-c);font-weight:700">${e.key}</span><span style="color:#a3e635;font-size:9px">${e.name}</span><span style="color:var(--idx-c);font-size:9px">${e.dept}</span><span style="color:var(--page-c);font-size:9px">→${e.ptr}</span>`
+      :`<span style="color:var(--idx-c);font-weight:700;font-size:10px">${e.key}</span><span style="color:var(--muted2)">→</span><span style="color:var(--page-c);font-size:10px">${e.ptr}</span>`}
+    </div>`).join('')}`;
+  container.appendChild(ip);
+}
+
+// ══════════════════════════════════════════
+// B-TREE CLUSTERED (Page 5)
+// ══════════════════════════════════════════
+let ciSelected=35; let ciRunning=false;
+function buildCILeaves(){
+  const cont=document.getElementById('ci-leaf-row');
+  if(!cont) return; cont.innerHTML='';
+  for(let p=0;p<5;p++){
+    const pageRows=EMPS.slice(p*10,(p+1)*10);
+    const pgId=`1:${101+p}`;
+    const box=document.createElement('div');
+    box.className='leaf-ci-box'; box.id=`ci-dp-${pgId}`;
+    box.innerHTML=`<div class="leaf-ci-bar">Data Page ${pgId} (LEAF=DATA)</div>
+      ${pageRows.map(e=>`<div class="leaf-ci-row" id="ci-drow-${e.id}">
+        <span class="lck">${e.id}</span><span class="lcn" style="font-size:9px">${e.name}</span><span class="lcs">${Math.round(e.salary/1000)}k</span>
+      </div>`).join('')}`;
+    cont.appendChild(box);
+  }
+}
+function buildCIButtons(){
+  const bg=document.getElementById('ci-btn-group');
+  [1,7,15,22,31,35,42,48,50].forEach(id=>{
+    const b=document.createElement('div');
+    b.className='eid-btn'+(id===35?' sel':'');
+    b.textContent=`EmpID ${id}`;
+    b.onclick=()=>{document.querySelectorAll('#ci-btn-group .eid-btn').forEach(x=>x.classList.remove('sel'));b.classList.add('sel');ciSelected=id;resetCI();};
+    bg.appendChild(b);
+  });
+}
+function getCIPath(id){
+  const pageIdx=Math.floor((id-1)/10);
+  const pageId=`1:${101+pageIdx}`;
+  const rootRow=id<=25?'ci-rr1':'ci-rr2';
+  const rootPage=id<=25?'1:301':'1:302';
+  let interRow,interPage;
+  if(id<=10){interRow='ci-ir1';interPage='1:101';}
+  else if(id<=20){interRow='ci-ir2';interPage='1:102';}
+  else if(id<=30){interRow=id<=25?'ci-ir3':'ci-ir4';interPage=`1:10${Math.floor((id-1)/10)+1}`;}
+  else if(id<=40){interRow='ci-ir5';interPage='1:104';}
+  else{interRow='ci-ir6';interPage='1:105';}
+  return {rootRow,rootPage,interRow,interPage,dataPage:pageId};
+}
+function resetCI(){
+  document.querySelectorAll('.root-row,.inter-row,.leaf-ci-row').forEach(el=>el.classList.remove('seeking','found'));
+  document.querySelectorAll('.root-box,.inter-box,.leaf-ci-box,.dp-outer').forEach(el=>el.classList.remove('active','seeking'));
+  ['ci-sc1','ci-sc2','ci-sc3','ci-sc4'].forEach(id=>document.getElementById(id).classList.remove('done'));
+  document.getElementById('ci-status').innerHTML='Select an EmpID and press Seek to watch the B-Tree traversal step by step.';
+  document.getElementById('ci-status2').innerHTML='';
+}
+async function runCISeek(){
+  if(ciRunning)return; ciRunning=true;
+  resetCI();
+  const id=ciSelected; const path=getCIPath(id); const T=800;
+  // Step 1 Root
+  document.getElementById('ci-sc1').classList.add('done');
+  document.getElementById('ci-root').classList.add('active');
+  document.getElementById(path.rootRow).classList.add('seeking');
+  document.getElementById('ci-status').innerHTML=`<span style="color:var(--root-c)">① ROOT NODE (1:400)</span> — EmpID ${id} is ${id<=25?'≤25':'26–50'} → go to intermediate page <span style="color:var(--idx-c)">${id<=25?'1:301':'1:302'}</span>`;
+  await sleep(T);
+  // Step 2 Intermediate
+  document.getElementById('ci-sc2').classList.add('done');
+  const intEl=id<=25?document.getElementById('ci-int1'):document.getElementById('ci-int2');
+  intEl.classList.add('active');
+  document.getElementById(path.interRow).classList.add('seeking');
+  document.getElementById('ci-status').innerHTML=`<span style="color:var(--inter-c)">② INTERMEDIATE (${id<=25?'1:301':'1:302'})</span> — EmpID ${id} range → go to data page <span style="color:var(--page-c)">${path.dataPage}</span>`;
+  await sleep(T);
+  // Step 3 Data page (leaf)
+  document.getElementById('ci-sc3').classList.add('done');
+  const dpEl=document.getElementById(`ci-dp-${path.dataPage}`);
+  if(dpEl){dpEl.classList.add('active');}
+  const drow=document.getElementById(`ci-drow-${id}`);
+  if(drow){drow.classList.add('found');}
+  document.getElementById('ci-status').innerHTML=`<span style="color:var(--ci-c)">③ DATA PAGE ${path.dataPage} (Leaf = Data!)</span> — scan page → EmpID ${id} found! <span style="color:var(--seek-c)">✅ No extra lookup!</span>`;
+  document.getElementById('ci-sc4').classList.add('done');
+  document.getElementById('ci-status2').innerHTML=`<span style="color:var(--seek-c)">🎉 Clustered Index Seek complete! Total I/Os: ROOT + INTERMEDIATE + DATA PAGE = <strong>3 reads only</strong>. Leaf IS the data — no extra hop needed!</span>`;
+  ciRunning=false;
+}
+
+// ══════════════════════════════════════════
+// NON-CLUSTERED INDEX (Page 6)
+// ══════════════════════════════════════════
+let nciSelected=72000; let nciRunning=false;
+const NCI_RANGES=[{sal:42000,lbl:'42,000'},{sal:58000,lbl:'58,000'},{sal:72000,lbl:'72,000'},{sal:85000,lbl:'85,000'},{sal:98000,lbl:'98,000'},{sal:115000,lbl:'1,15,000'}];
+
+function buildNCILeaves(){
+  const cont=document.getElementById('nci-leaf-row');
+  if(!cont) return; cont.innerHTML='';
+  // 4 leaf pages, each with ~12 rows sorted by salary
+  const batches=[[0,12],[12,25],[25,37],[37,50]];
+  const leafPages=['1:510','1:511','1:512','1:513'];
+  batches.forEach(([s,e],pi)=>{
+    const rows=EMPS_BY_SAL.slice(s,e);
+    const box=document.createElement('div');
+    box.className='leaf-nci-box'; box.id=`nci-leaf-${leafPages[pi]}`;
+    box.innerHTML=`<div class="leaf-nci-bar">Index Page ${leafPages[pi]} (NCI Leaf)</div>
+      <div style="padding:2px 8px;font-family:var(--mono);font-size:8px;color:var(--muted2);background:rgba(0,0,0,.2);display:grid;grid-template-columns:28px 20px 90px"><span>Sal</span><span>→</span><span>RID</span></div>
+      ${rows.map(e=>{const pgNum=100+Math.floor((e.id-1)/10)+1;const slot=((e.id-1)%10)+1;const offset=96+(slot-1)*44;
+      return `<div class="leaf-nci-row" id="nci-lrow-${e.id}">
+        <span class="lnk">${Math.round(e.salary/1000)}k</span><span style="color:var(--muted2)">→</span><span class="lnr">1:${pgNum}:${offset}</span>
+      </div>`;}).join('')}`;
+    cont.appendChild(box);
+  });
+}
+function buildNCIDataRows(){
+  const cont=document.getElementById('nci-data-row');
+  if(!cont) return; cont.innerHTML='';
+  for(let p=0;p<5;p++){
+    const pageRows=EMPS.slice(p*10,(p+1)*10);
+    const pgId=`1:${101+p}`;
+    const box=document.createElement('div');
+    box.className='dp-outer'; box.id=`nci-dp-${pgId}`;
+    box.style.minWidth='200px';
+    box.innerHTML=`<div class="dp-title-bar" style="font-size:10px">Data Page ${pgId}</div>
+      ${pageRows.map(e=>`<div class="dp-row-item" style="grid-template-columns:28px 70px 60px" id="nci-drow-${e.id}">
+        <span class="c-id" style="font-size:10px">${e.id}</span><span class="c-name" style="font-size:10px">${e.name}</span><span class="c-sal" style="font-size:9px">${Math.round(e.salary/1000)}k</span>
+      </div>`).join('')}`;
+    cont.appendChild(box);
+  }
+}
+function buildNCIButtons(){
+  const bg=document.getElementById('nci-btn-group');
+  NCI_RANGES.forEach(r=>{
+    const b=document.createElement('div');
+    b.className='eid-btn'+(r.sal===72000?' sel':'');
+    b.textContent=`₹${r.lbl}`;
+    b.onclick=()=>{document.querySelectorAll('#nci-btn-group .eid-btn').forEach(x=>x.classList.remove('sel'));b.classList.add('sel');nciSelected=r.sal;resetNCI();};
+    bg.appendChild(b);
+  });
+}
+function resetNCI(){
+  document.querySelectorAll('.root-row,.inter-row,.leaf-nci-row,.dp-row-item').forEach(el=>el.classList.remove('seeking','found'));
+  document.querySelectorAll('.root-box,.inter-box,.leaf-nci-box,.dp-outer').forEach(el=>el.classList.remove('active','seeking'));
+  ['nci-sc1','nci-sc2','nci-sc3','nci-sc4','nci-sc5'].forEach(id=>document.getElementById(id)?.classList.remove('done'));
+  document.getElementById('nci-status').innerHTML='Select a Salary value to search and press Seek.';
+  document.getElementById('nci-status2').innerHTML='';
+}
+function getNCIPath(sal){
+  const rootRow=sal<=70000?'nci-rr1':'nci-rr2';
+  const rootPage=sal<=70000?'1:501':'1:502';
+  let interRow,interPage;
+  if(sal<=55000){interRow='nci-ir1';interPage='1:510';}
+  else if(sal<=70000){interRow='nci-ir2';interPage='1:511';}
+  else if(sal<=90000){interRow='nci-ir3';interPage='1:512';}
+  else{interRow='nci-ir4';interPage='1:513';}
+  // Find matching emp
+  const emp=EMPS_BY_SAL.find(e=>e.salary>=sal)||EMPS_BY_SAL[Math.floor(EMPS_BY_SAL.length/2)];
+  const pgNum=100+Math.floor((emp.id-1)/10)+1;
+  const dataPage=`1:${pgNum}`;
+  const slot=((emp.id-1)%10)+1;
+  const offset=96+(slot-1)*44;
+  return {rootRow,rootPage,interRow,interPage,leafPage:interPage,emp,dataPage,offset,rid:`1:${pgNum}:${offset}`};
+}
+async function runNCISeek(){
+  if(nciRunning)return; nciRunning=true;
+  resetNCI();
+  const sal=nciSelected; const path=getNCIPath(sal); const T=900;
+  // Step 1 NCI Root
+  document.getElementById('nci-sc1').classList.add('done');
+  document.getElementById('nci-root').classList.add('active');
+  document.getElementById(path.rootRow).classList.add('seeking');
+  document.getElementById('nci-status').innerHTML=`<span style="color:var(--root-c)">① NCI ROOT (1:500)</span> — Salary ${sal.toLocaleString()} is ${sal<=70000?'≤70k':'71k+'} → go to page <span style="color:var(--idx-c)">${sal<=70000?'1:501':'1:502'}</span>`;
+  await sleep(T);
+  // Step 2 Intermediate
+  document.getElementById('nci-sc2').classList.add('done');
+  const intEl=sal<=70000?document.getElementById('nci-int1'):document.getElementById('nci-int2');
+  intEl.classList.add('active');
+  document.getElementById(path.interRow).classList.add('seeking');
+  document.getElementById('nci-status').innerHTML=`<span style="color:var(--inter-c)">② NCI INTERMEDIATE</span> — Salary range → go to NCI leaf page <span style="color:var(--idx-c)">${path.leafPage}</span>`;
+  await sleep(T);
+  // Step 3 Leaf (NCI) — show RID
+  document.getElementById('nci-sc3').classList.add('done');
+  const leafEl=document.getElementById(`nci-leaf-${path.leafPage}`);
+  if(leafEl)leafEl.classList.add('active');
+  const lrow=document.getElementById(`nci-lrow-${path.emp.id}`);
+  if(lrow)lrow.classList.add('found');
+  document.getElementById('nci-status').innerHTML=`<span style="color:var(--nci-c)">③ NCI LEAF PAGE (${path.leafPage})</span> — Found Salary ≈${sal.toLocaleString()} → RID = <span style="color:var(--rid-c)">${path.rid}</span> → Now fetch data page!`;
+  await sleep(T);
+  // Step 4 Data page fetch (RID lookup)
+  document.getElementById('nci-sc4').classList.add('done');
+  const dpEl=document.getElementById(`nci-dp-${path.dataPage}`);
+  if(dpEl)dpEl.classList.add('highlighted');
+  const drow=document.getElementById(`nci-drow-${path.emp.id}`);
+  if(drow){drow.classList.add('found');drow.querySelector('.dr-id')?.classList.add('found');}
+  document.getElementById('nci-status').innerHTML=`<span style="color:var(--rid-c)">④ DATA PAGE FETCH (${path.dataPage})</span> — RID ${path.rid} → Jump to page ${path.dataPage} → scan offset ${path.offset} → <span style="color:var(--seek-c)">EmpID ${path.emp.id} (${path.emp.name}) FOUND! ✅</span>`;
+  document.getElementById('nci-sc5').classList.add('done');
+  document.getElementById('nci-status2').innerHTML=`<span style="color:var(--seek-c)">🎉 NCI Seek complete! Total I/Os: NCI ROOT + NCI INTERMEDIATE + NCI LEAF + DATA PAGE = <strong>4 reads</strong>. Extra hop because leaf has RID, not actual data.</span>`;
+  nciRunning=false;
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+// ══════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════
+// Page 1
+renderEmpFull(); renderDeptFull();
+
+// Page 2 - Emp data pages
+const empDPCont=document.getElementById('empDataPages');
+for(let p=0;p<5;p++){buildDataPage(empDPCont,`1:${101+p}`,EMPS.slice(p*10,(p+1)*10),101+p,true);}
+
+// Page 3 - Dept data pages
+const deptDPCont=document.getElementById('deptDataPages');
+buildDeptDataPage(deptDPCont,'1:201',DEPT_ROWS.slice(0,10),201);
+buildDeptDataPage(deptDPCont,'1:202',DEPT_ROWS.slice(10,20),202);
+
+// Page 4 - Clustered index pages (non-leaf)
+const ciCont=document.getElementById('ciIndexPages');
+buildCIIndexPage(ciCont,'1:400',[
+  {key:'EmpID 1–25',ptr:'1:301'},{key:'EmpID 26–50',ptr:'1:302'}
+],'root','Index Page');
+buildCIIndexPage(ciCont,'1:301',[
+  {key:'EmpID 1',ptr:'1:101'},{key:'EmpID 11',ptr:'1:102'},{key:'EmpID 21',ptr:'1:103'}
+],'intermediate','Index Page');
+buildCIIndexPage(ciCont,'1:302',[
+  {key:'EmpID 26',ptr:'1:103'},{key:'EmpID 31',ptr:'1:104'},{key:'EmpID 41',ptr:'1:105'}
+],'intermediate','Index Page');
+// Leaf pages = data pages (just show pointers)
+['1:101','1:102','1:103','1:104','1:105'].forEach((pg,i)=>{
+  buildCIIndexPage(ciCont,pg,
+    EMPS.slice(i*10,(i+1)*10).map(e=>({key:e.id,name:e.name,dept:e.dept.substr(0,3),ptr:pg})),
+    'leaf','Data Page');
+});
+
+// Page 5
+buildCILeaves(); buildCIButtons();
+
+// Page 6
+buildNCILeaves(); buildNCIDataRows(); buildNCIButtons();
+</script>
+</body>
+</html>

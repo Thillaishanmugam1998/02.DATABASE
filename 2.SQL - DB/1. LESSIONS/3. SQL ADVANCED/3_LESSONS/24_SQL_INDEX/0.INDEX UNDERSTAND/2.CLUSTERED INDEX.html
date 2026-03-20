@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clustered Index — B-Tree Visual</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Clash+Display:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0e1a;
+  --surface: #111827;
+  --surface2: #1a2235;
+  --border: #2a3550;
+  --root-color: #f59e0b;
+  --root-bg: #1a1200;
+  --inter-color: #a78bfa;
+  --inter-bg: #110a2a;
+  --leaf-color: #38bdf8;
+  --leaf-bg: #031622;
+  --heap-color: #fb7185;
+  --heap-bg: #1a0510;
+  --text: #e2e8f0;
+  --muted: #64748b;
+  --found: #4ade80;
+  --scan: #fb923c;
+  --active-path: #f59e0b;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Manrope', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* HEADER */
+.header {
+  text-align: center;
+  padding: 36px 20px 20px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, #0d1525 0%, var(--bg) 100%);
+}
+.header h1 {
+  font-size: clamp(1.6rem, 3.5vw, 2.6rem);
+  font-weight: 800;
+  letter-spacing: -1px;
+  background: linear-gradient(135deg, var(--root-color), var(--inter-color), var(--leaf-color));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.header p { color: var(--muted); font-family: 'DM Mono', monospace; font-size: .8rem; margin-top: 6px; }
+
+/* TABS */
+.tabs {
+  display: flex; gap: 0; max-width: 900px; margin: 24px auto 0;
+  border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+}
+.tab {
+  flex: 1; padding: 10px 16px; text-align: center;
+  background: var(--surface); color: var(--muted);
+  cursor: pointer; font-weight: 600; font-size: .85rem;
+  border-right: 1px solid var(--border); transition: all .2s;
+}
+.tab:last-child { border-right: none; }
+.tab.active { background: var(--surface2); color: var(--text); }
+.tab:hover:not(.active) { color: var(--text); }
+
+/* CONTROLS */
+.controls {
+  max-width: 1100px; margin: 20px auto; padding: 0 20px;
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+}
+.ctrl-group { display: flex; align-items: center; gap: 8px; }
+.ctrl-label { font-size: .75rem; color: var(--muted); font-family: 'DM Mono', monospace; white-space: nowrap; }
+.btn {
+  background: var(--root-color); color: #000;
+  border: none; padding: 8px 18px; border-radius: 8px;
+  font-family: 'Manrope', sans-serif; font-weight: 700; font-size: .82rem;
+  cursor: pointer; transition: opacity .2s, transform .1s;
+}
+.btn:hover { opacity: .85; }
+.btn:active { transform: scale(.97); }
+.btn.purple { background: var(--inter-color); }
+.btn.blue { background: var(--leaf-color); }
+.btn.ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+.btn.red { background: var(--heap-color); color: #fff; }
+
+/* Speed slider */
+.speed-wrap { display: flex; align-items: center; gap: 10px; }
+input[type=range] {
+  -webkit-appearance: none; width: 140px; height: 4px;
+  background: var(--border); border-radius: 2px; outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 16px; height: 16px;
+  background: var(--root-color); border-radius: 50%; cursor: pointer;
+}
+.speed-val { font-family: 'DM Mono', monospace; font-size: .75rem; color: var(--root-color); min-width: 48px; }
+
+/* Search input */
+.search-in {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); padding: 7px 12px; border-radius: 8px;
+  font-family: 'DM Mono', monospace; font-size: .85rem; width: 72px;
+}
+.search-in:focus { outline: none; border-color: var(--inter-color); }
+
+/* STATUS BAR */
+.status-bar {
+  max-width: 1100px; margin: 0 auto 16px; padding: 0 20px;
+}
+.status-pill {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 16px;
+  font-family: 'DM Mono', monospace; font-size: .78rem;
+  color: var(--root-color); min-height: 36px;
+  display: flex; align-items: center; gap: 8px;
+}
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--root-color); flex-shrink: 0; }
+.status-dot.green { background: var(--found); }
+.status-dot.red { background: var(--heap-color); }
+.status-dot.blue { background: var(--leaf-color); }
+
+/* SPLIT LAYOUT */
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); max-width: 1400px; margin: 0 auto; }
+@media(max-width: 800px) { .split { grid-template-columns: 1fr; } }
+.panel { background: var(--bg); padding: 20px; }
+.panel-title {
+  font-size: .7rem; font-family: 'DM Mono', monospace; letter-spacing: 2px;
+  color: var(--muted); margin-bottom: 16px; text-transform: uppercase;
+  display: flex; align-items: center; gap: 8px;
+}
+.panel-title span { 
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+}
+
+/* B-TREE NODES */
+.btree { display: flex; flex-direction: column; gap: 24px; align-items: center; }
+.tree-level { display: flex; gap: 16px; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+.level-label {
+  font-size: .65rem; font-family: 'DM Mono', monospace; color: var(--muted);
+  writing-mode: vertical-rl; text-orientation: mixed;
+  margin-right: 8px; align-self: center; letter-spacing: 2px;
+}
+
+.node {
+  border-radius: 10px; overflow: hidden;
+  border: 2px solid transparent;
+  transition: border-color .3s, box-shadow .3s, transform .2s;
+  min-width: 130px;
+}
+.node.root { border-color: var(--root-color); background: var(--root-bg); }
+.node.inter { border-color: var(--inter-color); background: var(--inter-bg); }
+.node.leaf { border-color: var(--leaf-color); background: var(--leaf-bg); }
+.node.active { transform: scale(1.06); box-shadow: 0 0 20px 4px rgba(245,158,11,.35); }
+.node.active.inter { box-shadow: 0 0 20px 4px rgba(167,139,250,.35); }
+.node.active.leaf { box-shadow: 0 0 20px 4px rgba(56,189,248,.35); }
+.node.done { opacity: .35; }
+
+.node-header {
+  padding: 5px 10px; font-family: 'DM Mono', monospace; font-size: .7rem; font-weight: 700;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.node.root .node-header { background: rgba(245,158,11,.15); color: var(--root-color); }
+.node.inter .node-header { background: rgba(167,139,250,.15); color: var(--inter-color); }
+.node.leaf .node-header { background: rgba(56,189,248,.12); color: var(--leaf-color); }
+
+.node-rows { padding: 6px 8px; }
+.node-row {
+  font-family: 'DM Mono', monospace; font-size: .68rem;
+  padding: 3px 4px; border-radius: 4px; display: flex; justify-content: space-between;
+  transition: background .2s, color .2s;
+  color: var(--muted);
+}
+.node-row.checking { background: rgba(251,146,60,.2); color: var(--scan); }
+.node-row.chosen { background: rgba(245,158,11,.2); color: var(--root-color); font-weight: 700; }
+.node-row.found-row { background: rgba(74,222,128,.2); color: var(--found); font-weight: 700; }
+
+/* connector arrows */
+.arrows { position: relative; height: 32px; width: 100%; display: flex; justify-content: center; }
+.arrow-line {
+  position: absolute; width: 2px; background: var(--border);
+  top: 0; height: 100%; left: 50%; transform: translateX(-50%);
+  transition: background .3s;
+}
+.arrow-line.active { background: var(--root-color); }
+
+/* DATA PAGES (leaf level) */
+.data-pages { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.data-page {
+  border: 2px solid var(--border); border-radius: 10px;
+  overflow: hidden; min-width: 115px;
+  background: var(--leaf-bg);
+  transition: border-color .3s, box-shadow .3s;
+}
+.data-page.active { border-color: var(--leaf-color); box-shadow: 0 0 16px 2px rgba(56,189,248,.3); }
+.dp-header {
+  background: rgba(56,189,248,.1); padding: 5px 8px;
+  font-family: 'DM Mono', monospace; font-size: .68rem; color: var(--leaf-color);
+  font-weight: 700;
+}
+.dp-rows { padding: 5px 8px; }
+.dp-row {
+  font-family: 'DM Mono', monospace; font-size: .65rem;
+  padding: 2px 3px; border-radius: 3px;
+  color: var(--muted); transition: background .2s, color .2s;
+  display: flex; justify-content: space-between;
+}
+.dp-row.checking { background: rgba(251,146,60,.2); color: var(--scan); }
+.dp-row.found-row { background: rgba(74,222,128,.2); color: var(--found); font-weight: 700; }
+
+/* HEAP PANEL */
+.heap-pages { display: flex; gap: 10px; flex-wrap: wrap; }
+.heap-page {
+  border: 2px solid var(--border); border-radius: 10px;
+  overflow: hidden; min-width: 115px; background: var(--heap-bg);
+  transition: border-color .3s, box-shadow .3s;
+}
+.heap-page.scanning { border-color: var(--heap-color); box-shadow: 0 0 14px 2px rgba(251,113,133,.3); }
+.heap-page.found { border-color: var(--found); }
+.hp-hdr {
+  background: rgba(251,113,133,.1); padding: 5px 8px;
+  font-family: 'DM Mono', monospace; font-size: .68rem; color: var(--heap-color);
+  font-weight: 700; display: flex; justify-content: space-between;
+}
+.hp-hdr .scan-badge {
+  background: var(--heap-color); color: #fff;
+  padding: 1px 5px; border-radius: 3px; font-size: .55rem; display: none;
+}
+.heap-page.scanning .scan-badge { display: block; }
+.hp-rows { padding: 5px 8px; }
+.hp-row {
+  font-family: 'DM Mono', monospace; font-size: .65rem;
+  padding: 2px 3px; border-radius: 3px;
+  color: var(--muted); transition: background .2s, color .2s;
+}
+.hp-row.scanning { background: rgba(251,113,133,.2); color: var(--heap-color); }
+.hp-row.found-row { background: rgba(74,222,128,.2); color: var(--found); font-weight: 700; }
+
+/* STATS */
+.stats-row {
+  display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px;
+}
+.stat { 
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 12px;
+  font-family: 'DM Mono', monospace; font-size: .72rem;
+}
+.stat span { font-weight: 700; }
+.stat.c span { color: var(--inter-color); }
+.stat.h span { color: var(--heap-color); }
+.stat.g span { color: var(--found); }
+
+/* RESULT */
+.result-box {
+  margin-top: 14px; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 16px;
+  font-family: 'DM Mono', monospace; font-size: .78rem; min-height: 48px;
+  transition: border-color .3s;
+}
+.result-box.found { border-color: var(--found); }
+.result-box.notfound { border-color: var(--heap-color); }
+.result-label { font-size: .6rem; color: var(--muted); letter-spacing: 1px; margin-bottom: 5px; }
+.result-val { color: var(--found); font-weight: 700; font-size: .85rem; }
+.result-val.nf { color: var(--heap-color); }
+
+/* STEP LOG */
+.step-log {
+  margin-top: 14px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 14px; max-height: 130px; overflow-y: auto;
+  font-family: 'DM Mono', monospace; font-size: .68rem;
+}
+.log-entry { padding: 3px 0; border-bottom: 1px solid var(--border); color: var(--muted); }
+.log-entry:last-child { border-bottom: none; }
+.log-entry .lc { color: var(--inter-color); }
+.log-entry .lh { color: var(--heap-color); }
+.log-entry .lg { color: var(--found); }
+.log-entry .lr { color: var(--root-color); }
+
+/* NOTE */
+.note {
+  background: var(--surface2); border-left: 3px solid var(--root-color);
+  border-radius: 0 8px 8px 0; padding: 10px 14px;
+  font-size: .78rem; color: var(--muted); line-height: 1.6; margin-top: 12px;
+}
+.note strong { color: var(--root-color); }
+
+footer { text-align: center; padding: 24px; color: var(--muted); font-size: .7rem; font-family: 'DM Mono', monospace; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Clustered Index — B-Tree vs Heap</h1>
+  <p>// Interactive visualization with speed control · Search any ID · Watch every step</p>
+
+  <div class="tabs" style="max-width:500px">
+    <div class="tab active" onclick="setTab('split')" id="tab-split">Split View (Both)</div>
+    <div class="tab" onclick="setTab('btree')" id="tab-btree">Clustered Only</div>
+    <div class="tab" onclick="setTab('heap')" id="tab-heap">Heap Only</div>
+  </div>
+</div>
+
+<!-- CONTROLS -->
+<div class="controls">
+  <div class="ctrl-group">
+    <span class="ctrl-label">Search ID:</span>
+    <input class="search-in" type="number" id="searchId" value="14" min="1" max="20">
+  </div>
+  <button class="btn purple" onclick="startBoth()">▶ Run Both</button>
+  <button class="btn blue" onclick="startClustered()">▶ Clustered Only</button>
+  <button class="btn red" onclick="startHeap()">▶ Heap Only</button>
+  <button class="btn ghost" onclick="resetAll()">↺ Reset</button>
+  <div class="ctrl-group speed-wrap">
+    <span class="ctrl-label">Speed:</span>
+    <input type="range" id="speedSlider" min="1" max="10" value="5" oninput="updateSpeed()">
+    <span class="speed-val" id="speedVal">500ms</span>
+  </div>
+  <button class="btn ghost" onclick="stepOnce()" id="stepBtn">⏭ Step</button>
+</div>
+
+<!-- STATUS -->
+<div class="status-bar">
+  <div class="status-pill">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">Ready — set a Search ID and click Run</span>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="split" id="mainSplit">
+  <!-- LEFT: CLUSTERED INDEX -->
+  <div class="panel" id="panelClustered">
+    <div class="panel-title"><span style="background:var(--inter-color)"></span> CLUSTERED INDEX (B-TREE)</div>
+
+    <!-- B-TREE -->
+    <div class="btree">
+      <!-- Root -->
+      <div class="tree-level">
+        <div class="node root" id="node-root">
+          <div class="node-header"><span>ROOT · 1:300</span><span>Index Page</span></div>
+          <div class="node-rows">
+            <div class="node-row" id="r-row-0" data-key="1" data-ptr="1:200">1 → 1:200</div>
+            <div class="node-row" id="r-row-1" data-key="11" data-ptr="1:201">11 → 1:201</div>
+          </div>
+        </div>
+      </div>
+      <!-- Intermediate -->
+      <div class="tree-level">
+        <div class="node inter" id="node-inter-left">
+          <div class="node-header"><span>1:200</span><span>Index Page</span></div>
+          <div class="node-rows">
+            <div class="node-row" id="i-row-0" data-key="1" data-ptr="1:100">1 → 1:100</div>
+            <div class="node-row" id="i-row-1" data-key="6" data-ptr="1:101">6 → 1:101</div>
+          </div>
+        </div>
+        <div class="node inter" id="node-inter-right">
+          <div class="node-header"><span>1:201</span><span>Index Page</span></div>
+          <div class="node-rows">
+            <div class="node-row" id="i-row-2" data-key="11" data-ptr="1:102">11 → 1:102</div>
+            <div class="node-row" id="i-row-3" data-key="16" data-ptr="1:103">16 → 1:103</div>
+          </div>
+        </div>
+      </div>
+      <!-- Leaf data pages -->
+      <div class="tree-level">
+        <div class="data-pages">
+          <div class="data-page" id="dp-0">
+            <div class="dp-header">1:100 · Data Page</div>
+            <div class="dp-rows" id="dp-rows-0"></div>
+          </div>
+          <div class="data-page" id="dp-1">
+            <div class="dp-header">1:101 · Data Page</div>
+            <div class="dp-rows" id="dp-rows-1"></div>
+          </div>
+          <div class="data-page" id="dp-2">
+            <div class="dp-header">1:102 · Data Page</div>
+            <div class="dp-rows" id="dp-rows-2"></div>
+          </div>
+          <div class="data-page" id="dp-3">
+            <div class="dp-header">1:103 · Data Page</div>
+            <div class="dp-rows" id="dp-rows-3"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats-row" id="ci-stats"></div>
+    <div class="result-box" id="ci-result">
+      <div class="result-label">CLUSTERED INDEX RESULT</div>
+      <div id="ci-result-val" style="color:var(--muted); font-size:.75rem">Waiting…</div>
+    </div>
+    <div class="step-log" id="ci-log"><div class="log-entry" style="color:var(--muted)">Log will appear here…</div></div>
+  </div>
+
+  <!-- RIGHT: HEAP -->
+  <div class="panel" id="panelHeap">
+    <div class="panel-title"><span style="background:var(--heap-color)"></span> HEAP (NO INDEX)</div>
+
+    <div class="heap-pages" id="heapPages"></div>
+
+    <div class="stats-row" id="hp-stats"></div>
+    <div class="result-box" id="hp-result">
+      <div class="result-label">HEAP RESULT</div>
+      <div id="hp-result-val" style="color:var(--muted); font-size:.75rem">Waiting…</div>
+    </div>
+    <div class="step-log" id="hp-log"><div class="log-entry" style="color:var(--muted)">Log will appear here…</div></div>
+
+    <div class="note">
+      <strong>Heap:</strong> No index → SQL Server reads every page, every row until found. ID 14 could be on page 4 or page 1 — no way to know without checking all.
+    </div>
+  </div>
+</div>
+
+<div style="max-width:1100px; margin: 16px auto; padding: 0 20px;">
+  <div class="note">
+    <strong>Clustered Index B-Tree:</strong> Root → checks key ranges → goes to correct Intermediate node → goes to exact Data Page. Only <strong>3 page reads</strong> regardless of table size. Heap does a <strong>Full Table Scan</strong> = reads ALL pages.
+  </div>
+</div>
+
+<footer>Clustered Index · B-Tree · Heap · Full Table Scan — SQL Server Internals</footer>
+
+<script>
+// ── DATA ──
+const NAMES = ["Bob","Anna","Emily","John","Chris","Jessica","David","Laura","Robert","Olivia","James","Lisa","Daniel","Sophia","Mathew","Emma","Brain","Sarah","Andrew","Jane"];
+// Clustered: sorted order, 5 per page
+const CI_PAGES = [
+  { id: "1:100", rows: [{id:1,name:"Bob"},{id:2,name:"Anna"},{id:3,name:"Emily"},{id:4,name:"John"},{id:5,name:"Chris"}] },
+  { id: "1:101", rows: [{id:6,name:"Jessica"},{id:7,name:"David"},{id:8,name:"Laura"},{id:9,name:"Robert"},{id:10,name:"Olivia"}] },
+  { id: "1:102", rows: [{id:11,name:"James"},{id:12,name:"Lisa"},{id:13,name:"Daniel"},{id:14,name:"Sophia"},{id:15,name:"Mathew"}] },
+  { id: "1:103", rows: [{id:16,name:"Emma"},{id:17,name:"Brain"},{id:18,name:"Sarah"},{id:19,name:"Andrew"},{id:20,name:"Jane"}] },
+];
+// Heap: random order
+const HP_PAGES_DATA = [
+  { id: "1:100", rows: [{id:12,name:"Lisa"},{id:5,name:"Chris"},{id:15,name:"Mathew"},{id:6,name:"Jessica"},{id:7,name:"David"}] },
+  { id: "1:101", rows: [{id:20,name:"Jane"},{id:2,name:"Anna"},{id:3,name:"Emily"},{id:9,name:"Robert"},{id:19,name:"Andrew"}] },
+  { id: "1:102", rows: [{id:1,name:"Bob"},{id:4,name:"John"},{id:8,name:"Laura"},{id:10,name:"Olivia"},{id:11,name:"James"}] },
+  { id: "1:103", rows: [{id:18,name:"Sarah"},{id:16,name:"Emma"},{id:13,name:"Daniel"},{id:14,name:"Sophia"},{id:17,name:"Brain"}] },
+];
+
+let speed = 500;
+let stepMode = false;
+let pendingSteps = [];
+let stepIndex = 0;
+let runInterval = null;
+
+function updateSpeed() {
+  const v = parseInt(document.getElementById('speedSlider').value);
+  // 1=2000ms (slow) 10=80ms (fast)
+  speed = Math.round(2000 - (v-1) * (1920/9));
+  document.getElementById('speedVal').textContent = speed + 'ms';
+}
+updateSpeed();
+
+// ── RENDER DATA PAGES (CI) ──
+function renderCIPages(highlightPage=-1, highlightRow=-1, foundPage=-1, foundRow=-1) {
+  CI_PAGES.forEach((p, pi) => {
+    const container = document.getElementById(`dp-rows-${pi}`);
+    container.innerHTML = '';
+    p.rows.forEach((row, ri) => {
+      const isChecking = pi === highlightPage && ri === highlightRow;
+      const isFound = pi === foundPage && ri === foundRow;
+      const d = document.createElement('div');
+      d.className = 'dp-row' + (isChecking ? ' checking' : '') + (isFound ? ' found-row' : '');
+      d.textContent = `${row.id}, ${row.name}`;
+      container.appendChild(d);
+    });
+    const dp = document.getElementById(`dp-${pi}`);
+    dp.className = 'data-page' + (pi === highlightPage || pi === foundPage ? ' active' : '');
+  });
+}
+renderCIPages();
+
+// ── RENDER HEAP ──
+function renderHeap(highlightPage=-1, highlightRow=-1, foundPage=-1, foundRow=-1) {
+  const container = document.getElementById('heapPages');
+  container.innerHTML = '';
+  HP_PAGES_DATA.forEach((page, pi) => {
+    const isScanning = pi === highlightPage;
+    const isFound = pi === foundPage;
+    const div = document.createElement('div');
+    div.className = 'heap-page' + (isScanning ? ' scanning' : '') + (isFound ? ' found' : '');
+    let rowsHtml = '';
+    page.rows.forEach((row, ri) => {
+      const isRowScan = isScanning && ri === highlightRow;
+      const isRowFound = pi === foundPage && ri === foundRow;
+      rowsHtml += `<div class="hp-row ${isRowScan?'scanning':''} ${isRowFound?'found-row':''}">${row.id}, ${row.name}</div>`;
+    });
+    div.innerHTML = `<div class="hp-hdr"><span>${page.id}</span><span class="scan-badge">SCANNING</span></div><div class="hp-rows">${rowsHtml}</div>`;
+    container.appendChild(div);
+  });
+}
+renderHeap();
+
+// ── NODE HELPERS ──
+function clearNodes() {
+  ['node-root','node-inter-left','node-inter-right'].forEach(id => {
+    const n = document.getElementById(id);
+    if(n) { n.classList.remove('active','done'); }
+  });
+  document.querySelectorAll('.node-row').forEach(r => r.className = 'node-row');
+}
+
+function activateNode(id) {
+  clearNodesActive();
+  const n = document.getElementById(id);
+  if(n) n.classList.add('active');
+}
+function clearNodesActive() {
+  ['node-root','node-inter-left','node-inter-right'].forEach(id => {
+    const n = document.getElementById(id);
+    if(n) n.classList.remove('active');
+  });
+}
+function doneNode(id) {
+  const n = document.getElementById(id);
+  if(n) { n.classList.remove('active'); n.classList.add('done'); }
+}
+
+// ── LOGGING ──
+function ciLog(msg, cls='') {
+  const log = document.getElementById('ci-log');
+  const e = document.createElement('div');
+  e.className = 'log-entry';
+  e.innerHTML = `<span class="${cls}">${msg}</span>`;
+  log.appendChild(e);
+  log.scrollTop = log.scrollHeight;
+}
+function hpLog(msg, cls='') {
+  const log = document.getElementById('hp-log');
+  const e = document.createElement('div');
+  e.className = 'log-entry';
+  e.innerHTML = `<span class="${cls}">${msg}</span>`;
+  log.appendChild(e);
+  log.scrollTop = log.scrollHeight;
+}
+
+function setStatus(msg, dotCls='') {
+  document.getElementById('statusText').textContent = msg;
+  const dot = document.getElementById('statusDot');
+  dot.className = 'status-dot' + (dotCls ? ' '+dotCls : '');
+}
+
+// ── RESET ──
+function resetAll() {
+  if(runInterval) clearInterval(runInterval);
+  runInterval = null; pendingSteps = []; stepIndex = 0; stepMode = false;
+  clearNodes();
+  renderCIPages(); renderHeap();
+  document.getElementById('ci-stats').innerHTML = '';
+  document.getElementById('hp-stats').innerHTML = '';
+  document.getElementById('ci-result').className = 'result-box';
+  document.getElementById('ci-result-val').innerHTML = 'Waiting…';
+  document.getElementById('ci-result-val').style.color = 'var(--muted)';
+  document.getElementById('hp-result').className = 'result-box';
+  document.getElementById('hp-result-val').innerHTML = 'Waiting…';
+  document.getElementById('hp-result-val').style.color = 'var(--muted)';
+  document.getElementById('ci-log').innerHTML = '<div class="log-entry" style="color:var(--muted)">Log will appear here…</div>';
+  document.getElementById('hp-log').innerHTML = '<div class="log-entry" style="color:var(--muted)">Log will appear here…</div>';
+  setStatus('Ready — set a Search ID and click Run');
+}
+
+// ── BUILD STEPS ──
+function buildSteps(searchId) {
+  const steps = [];
+
+  // === CLUSTERED INDEX STEPS ===
+  // Step 1: Root node
+  steps.push({ type:'ci', action:'activate-node', nodeId:'node-root', msg:`[CI] Step 1: Read ROOT page 1:300`, logCls:'lr' });
+  // Check root rows
+  steps.push({ type:'ci', action:'check-root-row', rowId:'r-row-0', key:1, nextKey:11, searchId, msg:`[CI] Root: Check row "1 → 1:200". ${searchId} >= 1?`, logCls:'lr' });
+  steps.push({ type:'ci', action:'check-root-row', rowId:'r-row-1', key:11, nextKey:999, searchId, msg:`[CI] Root: Check row "11 → 1:201". ${searchId} >= 11?`, logCls:'lr' });
+
+  // Decide which intermediate
+  const goRight = searchId >= 11;
+  const interNode = goRight ? 'node-inter-right' : 'node-inter-left';
+  const interPage = goRight ? '1:201' : '1:200';
+  steps.push({ type:'ci', action:'done-node', nodeId:'node-root', msg:`[CI] Root decision: go to Intermediate ${interPage}`, logCls:'lr' });
+  steps.push({ type:'ci', action:'activate-node', nodeId: interNode, msg:`[CI] Step 2: Read Intermediate page ${interPage}`, logCls:'lc' });
+
+  // Check intermediate rows
+  if(!goRight) {
+    steps.push({ type:'ci', action:'check-inter-row', rowId:'i-row-0', key:1, nextKey:6, searchId, msg:`[CI] Inter: Check "1→1:100". ${searchId} in 1-5?`, logCls:'lc' });
+    steps.push({ type:'ci', action:'check-inter-row', rowId:'i-row-1', key:6, nextKey:11, searchId, msg:`[CI] Inter: Check "6→1:101". ${searchId} in 6-10?`, logCls:'lc' });
+  } else {
+    steps.push({ type:'ci', action:'check-inter-row', rowId:'i-row-2', key:11, nextKey:16, searchId, msg:`[CI] Inter: Check "11→1:102". ${searchId} in 11-15?`, logCls:'lc' });
+    steps.push({ type:'ci', action:'check-inter-row', rowId:'i-row-3', key:16, nextKey:21, searchId, msg:`[CI] Inter: Check "16→1:103". ${searchId} in 16-20?`, logCls:'lc' });
+  }
+
+  // Find target data page
+  let targetPage = 0;
+  if (searchId <= 5) targetPage = 0;
+  else if (searchId <= 10) targetPage = 1;
+  else if (searchId <= 15) targetPage = 2;
+  else targetPage = 3;
+
+  steps.push({ type:'ci', action:'done-node', nodeId: interNode, msg:`[CI] Intermediate decision: go to Data Page ${CI_PAGES[targetPage].id}`, logCls:'lc' });
+
+  // Step 3: scan leaf data page
+  steps.push({ type:'ci', action:'activate-dp', pageIdx: targetPage, msg:`[CI] Step 3: Read Leaf Data Page ${CI_PAGES[targetPage].id}`, logCls:'lb' });
+  CI_PAGES[targetPage].rows.forEach((row, ri) => {
+    steps.push({ type:'ci', action:'check-dp-row', pageIdx: targetPage, rowIdx: ri, rowId: row.id, searchId, msg:`[CI] Leaf: Check row ${row.id}, ${row.name}. Match ${row.id}===${searchId}?`, logCls:'lb' });
+  });
+
+  // Found or not
+  const ciFoundRow = CI_PAGES[targetPage].rows.findIndex(r => r.id === searchId);
+  if(ciFoundRow >= 0) {
+    const r = CI_PAGES[targetPage].rows[ciFoundRow];
+    steps.push({ type:'ci', action:'ci-found', pageIdx: targetPage, rowIdx: ciFoundRow, row: r, pagesRead:3, msg:`[CI] ✅ FOUND! ID=${r.id}, ${r.name} — Only 3 page reads!`, logCls:'lg' });
+  } else {
+    steps.push({ type:'ci', action:'ci-notfound', searchId, pagesRead:3, msg:`[CI] ❌ ID ${searchId} not found. 3 page reads.`, logCls:'lh' });
+  }
+
+  // === HEAP STEPS ===
+  let heapPagesRead = 0, heapRowsRead = 0, heapFoundPage = -1, heapFoundRow = -1;
+  let hDone = false;
+  for(let pi=0; pi<HP_PAGES_DATA.length && !hDone; pi++) {
+    heapPagesRead++;
+    steps.push({ type:'hp', action:'hp-scan-page', pageIdx: pi, msg:`[Heap] Scanning page ${HP_PAGES_DATA[pi].id}…`, logCls:'lh' });
+    for(let ri=0; ri<HP_PAGES_DATA[pi].rows.length && !hDone; ri++) {
+      heapRowsRead++;
+      const row = HP_PAGES_DATA[pi].rows[ri];
+      steps.push({ type:'hp', action:'hp-scan-row', pageIdx: pi, rowIdx: ri, rowId: row.id, searchId, msg:`[Heap] Page ${HP_PAGES_DATA[pi].id} Row ${ri+1}: ID=${row.id} (${row.name}) == ${searchId}?`, logCls:'lh' });
+      if(row.id === searchId) {
+        heapFoundPage = pi; heapFoundRow = ri;
+        steps.push({ type:'hp', action:'hp-found', pageIdx: pi, rowIdx: ri, row, pagesRead: heapPagesRead, rowsRead: heapRowsRead, msg:`[Heap] ✅ FOUND! ID=${row.id}, ${row.name} — after ${heapRowsRead} rows, ${heapPagesRead} pages!`, logCls:'lg' });
+        hDone = true;
+      }
+    }
+  }
+  if(!hDone) {
+    steps.push({ type:'hp', action:'hp-notfound', searchId, pagesRead: heapPagesRead, rowsRead: heapRowsRead, msg:`[Heap] ❌ Not found. Read all ${heapPagesRead} pages, ${heapRowsRead} rows.`, logCls:'lh' });
+  }
+
+  return steps;
+}
+
+// ── EXECUTE STEP ──
+let ciPagesRead = 0, hpPagesRead = 0, hpRowsRead = 0;
+
+function execStep(step) {
+  if(step.type === 'ci') {
+    switch(step.action) {
+      case 'activate-node':
+        activateNode(step.nodeId);
+        if(step.nodeId === 'node-root') ciPagesRead = 1;
+        else if(step.nodeId.includes('inter')) ciPagesRead = 2;
+        ciLog(step.msg, step.logCls); break;
+      case 'check-root-row': {
+        document.querySelectorAll('.node-row').forEach(r => { if(!r.classList.contains('chosen')) r.classList.remove('checking'); });
+        const row = document.getElementById(step.rowId);
+        if(row) {
+          if(step.searchId >= step.key && step.searchId < step.nextKey) row.classList.add('chosen');
+          else row.classList.add('checking');
+        }
+        ciLog(step.msg, step.logCls); break;
+      }
+      case 'check-inter-row': {
+        const row = document.getElementById(step.rowId);
+        if(row) {
+          if(step.searchId >= step.key && step.searchId < step.nextKey) row.classList.add('chosen');
+          else row.classList.add('checking');
+        }
+        ciLog(step.msg, step.logCls); break;
+      }
+      case 'done-node':
+        doneNode(step.nodeId);
+        ciLog(step.msg, step.logCls); break;
+      case 'activate-dp':
+        clearNodesActive();
+        document.getElementById(`dp-${step.pageIdx}`).classList.add('active');
+        ciLog(step.msg, step.logCls); break;
+      case 'check-dp-row': {
+        renderCIPages(step.pageIdx, step.rowIdx);
+        ciLog(step.msg, step.logCls); break;
+      }
+      case 'ci-found':
+        renderCIPages(-1, -1, step.pageIdx, step.rowIdx);
+        document.getElementById('ci-result').className = 'result-box found';
+        document.getElementById('ci-result-val').innerHTML = `<span class="result-val">ID:${step.row.id} | ${step.row.name} | Pages Read: ${step.pagesRead}</span>`;
+        document.getElementById('ci-stats').innerHTML = `
+          <div class="stat c">Page Reads: <span>${step.pagesRead}</span></div>
+          <div class="stat g">Result: <span>✅ FOUND</span></div>`;
+        setStatus(`✅ Clustered Index found ID=${step.row.id} in just 3 page reads!`, 'green');
+        ciLog(step.msg, step.logCls); break;
+      case 'ci-notfound':
+        document.getElementById('ci-result').className = 'result-box notfound';
+        document.getElementById('ci-result-val').innerHTML = `<span class="result-val nf">ID ${step.searchId} not found. Pages Read: ${step.pagesRead}</span>`;
+        ciLog(step.msg, step.logCls); break;
+    }
+  } else {
+    switch(step.action) {
+      case 'hp-scan-page':
+        renderHeap(step.pageIdx, -1);
+        hpLog(step.msg, step.logCls); break;
+      case 'hp-scan-row':
+        renderHeap(step.pageIdx, step.rowIdx);
+        hpLog(step.msg, step.logCls); break;
+      case 'hp-found':
+        renderHeap(-1, -1, step.pageIdx, step.rowIdx);
+        document.getElementById('hp-result').className = 'result-box found';
+        document.getElementById('hp-result-val').innerHTML = `<span class="result-val">ID:${step.row.id} | ${step.row.name} | Pages:${step.pagesRead} | Rows:${step.rowsRead}</span>`;
+        document.getElementById('hp-stats').innerHTML = `
+          <div class="stat h">Page Reads: <span>${step.pagesRead}</span></div>
+          <div class="stat h">Rows Checked: <span>${step.rowsRead}</span></div>
+          <div class="stat g">Result: <span>✅ FOUND</span></div>`;
+        hpLog(step.msg, step.logCls); break;
+      case 'hp-notfound':
+        document.getElementById('hp-result').className = 'result-box notfound';
+        document.getElementById('hp-result-val').innerHTML = `<span class="result-val nf">Not found. Pages:${step.pagesRead}, Rows:${step.rowsRead}</span>`;
+        document.getElementById('hp-stats').innerHTML = `
+          <div class="stat h">Page Reads: <span>${step.pagesRead}</span></div>
+          <div class="stat h">Rows Checked: <span>${step.rowsRead}</span></div>`;
+        hpLog(step.msg, step.logCls); break;
+    }
+  }
+}
+
+// ── RUN ──
+function runSteps(steps) {
+  pendingSteps = steps; stepIndex = 0; stepMode = false;
+  if(runInterval) clearInterval(runInterval);
+  runInterval = setInterval(() => {
+    if(stepIndex >= pendingSteps.length) { clearInterval(runInterval); return; }
+    execStep(pendingSteps[stepIndex++]);
+  }, speed);
+}
+
+function stepOnce() {
+  if(!pendingSteps.length) {
+    // build if not started
+    const sid = parseInt(document.getElementById('searchId').value);
+    if(isNaN(sid)||sid<1||sid>20) return;
+    resetAll();
+    pendingSteps = buildSteps(sid);
+    stepIndex = 0;
+    stepMode = true;
+    if(runInterval) clearInterval(runInterval);
+    setStatus('Step mode — click Step to advance');
+  }
+  if(stepIndex < pendingSteps.length) {
+    execStep(pendingSteps[stepIndex++]);
+  }
+}
+
+function startBoth() {
+  const sid = parseInt(document.getElementById('searchId').value);
+  if(isNaN(sid)||sid<1||sid>20) { setStatus('⚠ Enter ID between 1 and 20', 'red'); return; }
+  resetAll();
+  setStatus(`Searching for ID = ${sid}…`, 'blue');
+  ciPagesRead = 0; hpPagesRead = 0; hpRowsRead = 0;
+  runSteps(buildSteps(sid));
+}
+function startClustered() {
+  const sid = parseInt(document.getElementById('searchId').value);
+  if(isNaN(sid)||sid<1||sid>20) return;
+  resetAll();
+  setStatus(`[Clustered] Searching ID = ${sid}…`, 'blue');
+  const steps = buildSteps(sid).filter(s => s.type === 'ci');
+  runSteps(steps);
+}
+function startHeap() {
+  const sid = parseInt(document.getElementById('searchId').value);
+  if(isNaN(sid)||sid<1||sid>20) return;
+  resetAll();
+  setStatus(`[Heap] Searching ID = ${sid}…`, 'red');
+  const steps = buildSteps(sid).filter(s => s.type === 'hp');
+  runSteps(steps);
+}
+
+// ── TABS ──
+function setTab(t) {
+  ['split','btree','heap'].forEach(id => {
+    document.getElementById('tab-'+id).classList.remove('active');
+  });
+  document.getElementById('tab-'+t).classList.add('active');
+  const split = document.getElementById('mainSplit');
+  const pc = document.getElementById('panelClustered');
+  const ph = document.getElementById('panelHeap');
+  if(t==='split') {
+    split.style.gridTemplateColumns='1fr 1fr';
+    pc.style.display=''; ph.style.display='';
+  } else if(t==='btree') {
+    split.style.gridTemplateColumns='1fr';
+    pc.style.display=''; ph.style.display='none';
+  } else {
+    split.style.gridTemplateColumns='1fr';
+    pc.style.display='none'; ph.style.display='';
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL Server — Page Numbering எப்படி வருது?</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#03050c;--s1:#070a18;--s2:#0a0e20;--s3:#0d1228;
+  --border:#141a34;--border2:#1c2548;
+  --file:#06b6d4;    /* cyan   - file */
+  --page:#f59e0b;    /* amber  - page */
+  --ext:#22c55e;     /* green  - extent */
+  --sys:#a78bfa;     /* violet - system pages */
+  --t1:#f43f5e;      /* rose   - table 1 */
+  --t2:#fb923c;      /* orange - table 2 */
+  --t3:#e879f9;      /* pink   - table 3 */
+  --free:#3a4f88;    /* muted  - free pages */
+  --text:#e2eaf8;--muted:#243060;--muted2:#3a4f88;
+  --mono:'JetBrains Mono',monospace;--disp:'Syne',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:var(--disp);min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse 70% 40% at 10% 5%,rgba(6,182,212,0.06) 0%,transparent 55%),
+    radial-gradient(ellipse 55% 35% at 90% 95%,rgba(245,158,11,0.05) 0%,transparent 55%),
+    linear-gradient(rgba(6,182,212,0.02) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(6,182,212,0.02) 1px,transparent 1px);
+  background-size:100%,100%,44px 44px,44px 44px;}
+
+/* NAV */
+.nav{position:sticky;top:0;z-index:300;background:rgba(3,5,12,0.97);backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border2);padding:0 20px;display:flex;overflow-x:auto;}
+.ntab{display:flex;align-items:center;gap:7px;padding:13px 16px;cursor:pointer;
+  font-family:var(--mono);font-size:10px;font-weight:600;color:var(--muted2);
+  border-bottom:2px solid transparent;white-space:nowrap;transition:all .2s;letter-spacing:.5px;}
+.ntab:hover{color:var(--text);}
+.ntab.active{color:var(--file);border-bottom-color:var(--file);}
+.nd{width:7px;height:7px;border-radius:50%;}
+
+.wrap{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:0 20px 100px;}
+.pg{display:none;padding-top:36px;}.pg.active{display:block;}
+
+/* SECTION HEADER */
+.sh{display:flex;align-items:center;gap:12px;margin-bottom:22px;}
+.sn{width:38px;height:38px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;font-weight:700;}
+.sna{background:rgba(6,182,212,.12);border:1px solid rgba(6,182,212,.3);color:var(--file);}
+.snb{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);color:var(--page);}
+.snc{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:var(--ext);}
+.snd{background:rgba(244,63,94,.12);border:1px solid rgba(244,63,94,.3);color:var(--t1);}
+.st{font-size:18px;font-weight:800;letter-spacing:-.5px;}
+.ss{font-family:var(--mono);font-size:10px;color:var(--muted2);margin-top:2px;}
+
+.card{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:24px;position:relative;overflow:hidden;margin-bottom:22px;}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;}
+.ca::before{background:linear-gradient(90deg,transparent,var(--file),transparent);}
+.cb::before{background:linear-gradient(90deg,transparent,var(--page),transparent);}
+.cc::before{background:linear-gradient(90deg,transparent,var(--ext),transparent);}
+.cd::before{background:linear-gradient(90deg,transparent,var(--t1),transparent);}
+
+.divider{height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);margin:28px 0;}
+
+/* CODE BOX */
+.code{background:rgba(0,0,0,.45);border:1px solid var(--border2);border-radius:9px;padding:14px 18px;font-family:var(--mono);font-size:12px;line-height:2;}
+.kw{color:var(--sys);}.cm{color:#4a7a4a;font-style:italic;}.str{color:#86efac;}
+
+/* TAG */
+.tag{display:inline-block;padding:2px 8px;border-radius:3px;font-family:var(--mono);font-size:9px;font-weight:700;vertical-align:middle;}
+.tf{background:rgba(6,182,212,.12);border:1px solid rgba(6,182,212,.3);color:var(--file);}
+.tp{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);color:var(--page);}
+.te{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:var(--ext);}
+.ts{background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.3);color:var(--sys);}
+.t1{background:rgba(244,63,94,.12);border:1px solid rgba(244,63,94,.3);color:var(--t1);}
+.t2{background:rgba(251,146,60,.12);border:1px solid rgba(251,146,60,.3);color:var(--t2);}
+.t3{background:rgba(232,121,249,.12);border:1px solid rgba(232,121,249,.3);color:var(--t3);}
+.tfr{background:rgba(58,79,136,.1);border:1px solid rgba(58,79,136,.3);color:var(--muted2);}
+
+/* INFO / WARN boxes */
+.info{padding:12px 16px;background:rgba(6,182,212,.05);border:1px solid rgba(6,182,212,.18);border-radius:8px;font-family:var(--mono);font-size:11px;color:var(--file);line-height:1.9;margin-top:14px;}
+.warn{padding:12px 16px;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.18);border-radius:8px;font-family:var(--mono);font-size:11px;color:#d4a017;line-height:1.9;margin-top:14px;}
+.good{padding:12px 16px;background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.18);border-radius:8px;font-family:var(--mono);font-size:11px;color:var(--ext);line-height:1.9;margin-top:14px;}
+
+/* PAGE GRID */
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(56px,1fr));gap:6px;margin:14px 0;}
+.pbox{height:52px;border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;border:1px solid transparent;position:relative;}
+.pbox:hover{transform:scale(1.05);z-index:2;}
+.pbox.free{background:rgba(58,79,136,.15);border-color:rgba(58,79,136,.3);}
+.pbox.sys{background:rgba(167,139,250,.15);border-color:rgba(167,139,250,.4);}
+.pbox.t1p{background:rgba(244,63,94,.18);border-color:rgba(244,63,94,.45);}
+.pbox.t2p{background:rgba(251,146,60,.18);border-color:rgba(251,146,60,.45);}
+.pbox.t3p{background:rgba(232,121,249,.18);border-color:rgba(232,121,249,.45);}
+.pbox.t1p.active,.pbox.t2p.active,.pbox.sys.active{transform:scale(1.1);box-shadow:0 0 16px rgba(245,158,11,.4);border-color:var(--page)!important;}
+.pb-num{font-family:var(--mono);font-size:10px;font-weight:700;}
+.pb-lbl{font-family:var(--mono);font-size:8px;margin-top:2px;}
+
+/* EXTENT ROW */
+.ext-row{display:flex;gap:4px;margin-bottom:8px;align-items:center;flex-wrap:wrap;}
+.ext-box{display:flex;gap:2px;border:1px solid;border-radius:5px;overflow:hidden;padding:2px;}
+.ext-pg{width:28px;height:28px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;font-weight:700;}
+
+/* FILE DIAGRAM */
+.file-strip{border:2px solid var(--file);border-radius:10px;overflow:hidden;margin-bottom:14px;}
+.file-header{background:rgba(6,182,212,.15);padding:8px 14px;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--file);display:flex;justify-content:space-between;border-bottom:1px solid rgba(6,182,212,.2);}
+.file-body{display:flex;flex-wrap:wrap;gap:3px;padding:12px;}
+
+/* STEP BOX */
+.step-box{padding:14px;border-radius:9px;border:1px solid;margin-bottom:12px;}
+.sb-num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;font-family:var(--mono);font-size:11px;font-weight:700;margin-right:8px;flex-shrink:0;}
+
+/* FORMULA BOX */
+.formula{display:inline-flex;align-items:center;gap:8px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:10px 18px;font-family:var(--mono);font-size:13px;font-weight:700;}
+
+/* TOOLTIP */
+.tooltip{position:fixed;background:var(--s1);border:1px solid var(--page);border-radius:8px;padding:10px 14px;font-family:var(--mono);font-size:11px;pointer-events:none;z-index:999;display:none;max-width:260px;line-height:1.7;box-shadow:0 8px 24px rgba(0,0,0,.5);}
+
+/* TABLE */
+.ttbl{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;}
+.ttbl th{padding:7px 12px;color:var(--muted2);font-size:9px;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border);text-align:left;background:rgba(0,0,0,.2);}
+.ttbl td{padding:7px 12px;border-bottom:1px solid rgba(20,26,52,.7);}
+.ttbl tr:last-child td{border-bottom:none;}
+.ttbl tr:hover td{background:rgba(255,255,255,.02);}
+
+/* ANIMATION */
+.anim-btn{display:inline-flex;align-items:center;gap:7px;padding:9px 20px;border-radius:7px;border:none;cursor:pointer;font-family:var(--disp);font-size:12px;font-weight:800;transition:all .18s;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.35);color:var(--ext);}
+.anim-btn:hover{background:rgba(34,197,94,.22);}
+.rst-btn{display:inline-flex;align-items:center;gap:7px;padding:9px 20px;border-radius:7px;border:none;cursor:pointer;font-family:var(--disp);font-size:12px;font-weight:800;transition:all .18s;background:rgba(100,100,100,.1);border:1px solid var(--border2);color:var(--muted2);}
+.stbox{padding:10px 14px;border-radius:8px;font-family:var(--mono);font-size:11px;background:rgba(0,0,0,.3);border:1px solid var(--border2);min-height:34px;line-height:1.7;margin-top:10px;}
+
+@media(max-width:700px){.pgrid{grid-template-columns:repeat(auto-fill,minmax(44px,1fr));}}
+</style>
+</head>
+<body>
+
+<div class="tooltip" id="tooltip"></div>
+
+<nav class="nav">
+  <div class="ntab active" id="tab-a" onclick="go('a')"><div class="nd" style="background:var(--file);box-shadow:0 0 5px var(--file)"></div>01. Page Number என்ன?</div>
+  <div class="ntab" id="tab-b" onclick="go('b')"><div class="nd" style="background:var(--page)"></div>02. File-ல் Pages எப்படி?</div>
+  <div class="ntab" id="tab-c" onclick="go('c')"><div class="nd" style="background:var(--ext)"></div>03. Extent = 8 Pages</div>
+  <div class="ntab" id="tab-d" onclick="go('d')"><div class="nd" style="background:var(--t1)"></div>04. Table Insert → Pages</div>
+  <div class="ntab" id="tab-e" onclick="go('e')"><div class="nd" style="background:var(--sys)"></div>05. 1:101 எப்படி வந்தது?</div>
+</nav>
+
+<div class="wrap">
+
+<!-- ══════════════════════════════════
+     PAGE A — Page Number என்ன?
+══════════════════════════════════ -->
+<div class="pg active" id="pg-a">
+  <div class="sh"><div class="sn sna">01</div><div>
+    <div class="st">Page Address = <span style="color:var(--file)">FileID</span> : <span style="color:var(--page)">PageNumber</span></div>
+    <div class="ss">1:101 → FileID=1, PageNumber=101 — இந்த number SQL Server எப்படி decide பண்றது?</div>
+  </div></div>
+
+  <div class="card ca">
+    <!-- Big formula -->
+    <div style="text-align:center;margin-bottom:28px;">
+      <div style="font-family:var(--mono);font-size:13px;color:var(--muted2);margin-bottom:12px;">ஒரு page address இப்படி இருக்கும்:</div>
+      <div class="formula">
+        <span style="color:var(--file);font-size:18px">1</span>
+        <span style="color:var(--muted2);font-size:22px"> : </span>
+        <span style="color:var(--page);font-size:18px">101</span>
+      </div>
+      <div style="display:flex;justify-content:center;gap:60px;margin-top:12px;font-family:var(--mono);font-size:11px;">
+        <span style="color:var(--file)">↑ FileID<br>எந்த .mdf file?</span>
+        <span style="color:var(--page)">↑ PageNumber<br>அந்த file-ல் எந்த page?</span>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- What is FileID -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:20px;">
+      <div style="padding:16px;background:rgba(6,182,212,.07);border:1px solid rgba(6,182,212,.2);border-radius:10px;">
+        <div style="color:var(--file);font-size:15px;font-weight:800;margin-bottom:10px;">FileID என்ன?</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--muted2);line-height:2;">
+          SQL Server database = ஒன்று அல்லது அதிகமான <strong style="color:var(--file)">.mdf / .ndf files</strong> ஆல் ஆனது.<br><br>
+          Primary file = <strong style="color:var(--file)">FileID 1</strong> (.mdf)<br>
+          Secondary files = FileID 2, 3, ... (.ndf)<br><br>
+          நம்ம example-ல் ஒரே file மட்டும் → எல்லாமே <strong style="color:var(--file)">FileID = 1</strong>
+        </div>
+      </div>
+      <div style="padding:16px;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);border-radius:10px;">
+        <div style="color:var(--page);font-size:15px;font-weight:800;margin-bottom:10px;">PageNumber என்ன?</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--muted2);line-height:2;">
+          ஒரு file-ல் pages sequential ஆக numbered: <strong style="color:var(--page)">0, 1, 2, 3, 4 ...</strong><br><br>
+          Page 0 = file-ல் முதல் page (system page)<br>
+          Page 1 = இரண்டாவது page<br>
+          Page 101 = 102-வது page in the file<br><br>
+          <strong style="color:var(--page)">Page size = 8KB (8192 bytes)</strong><br>
+          Page 101 starts at: 101 × 8192 = <strong style="color:var(--page)">827,392th byte</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Real physical layout -->
+    <div style="font-family:var(--mono);font-size:10px;color:var(--file);letter-spacing:1px;margin-bottom:12px;">🗄️ PHYSICAL .MDF FILE — BYTES</div>
+    <div style="background:var(--s2);border:1px solid var(--border2);border-radius:10px;overflow:hidden;margin-bottom:10px;">
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);border-bottom:1px solid var(--border);">
+        <div style="padding:8px;border-right:1px solid var(--border);text-align:center;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--sys);margin-bottom:3px;">Page 0</div>
+          <div style="font-family:var(--mono);font-size:8px;color:var(--muted2);">Byte 0–8191</div>
+          <div style="margin-top:4px;"><span class="tag ts">FileHeader</span></div>
+        </div>
+        <div style="padding:8px;border-right:1px solid var(--border);text-align:center;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--sys);margin-bottom:3px;">Page 1</div>
+          <div style="font-family:var(--mono);font-size:8px;color:var(--muted2);">Byte 8192–16383</div>
+          <div style="margin-top:4px;"><span class="tag ts">PFS Page</span></div>
+        </div>
+        <div style="padding:8px;border-right:1px solid var(--border);text-align:center;background:rgba(167,139,250,.06);">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--sys);margin-bottom:3px;">Page 2</div>
+          <div style="font-family:var(--mono);font-size:8px;color:var(--muted2);">Byte 16384–24575</div>
+          <div style="margin-top:4px;"><span class="tag ts">GAM Page</span></div>
+        </div>
+        <div style="padding:8px;border-right:1px solid var(--border);text-align:center;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted2);margin-bottom:3px;">...</div>
+        </div>
+        <div style="padding:8px;border-right:1px solid var(--border);text-align:center;background:rgba(244,63,94,.07);">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--t1);margin-bottom:3px;">Page 101</div>
+          <div style="font-family:var(--mono);font-size:8px;color:var(--muted2);">Byte 827392–835583</div>
+          <div style="margin-top:4px;"><span class="tag t1">Employees</span></div>
+        </div>
+        <div style="padding:8px;text-align:center;background:rgba(251,146,60,.07);">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--t2);margin-bottom:3px;">Page 201</div>
+          <div style="font-family:var(--mono);font-size:8px;color:var(--muted2);">Byte 1646592–1654783</div>
+          <div style="margin-top:4px;"><span class="tag t2">Departments</span></div>
+        </div>
+      </div>
+      <div style="padding:8px 12px;font-family:var(--mono);font-size:10px;color:var(--muted2);">
+        PageNumber 101-க்கான byte offset = 101 × 8,192 = 827,392 — SQL Server இந்த exact byte position-க்கு jump பண்ணும்!
+      </div>
+    </div>
+
+    <div class="info">
+      💡 <strong>Key insight:</strong> 1:101 என்பது "File 1-ல் 102-வது page (0 indexed)". Page number directly physical file-ல் எந்த position-ல் page இருக்கும் என்று சொல்லும். SQL Server-க்கு separate address book தேவையில்லை — PageNumber × 8192 = exact byte position!
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     PAGE B — File-ல் Pages எப்படி?
+══════════════════════════════════ -->
+<div class="pg" id="pg-b">
+  <div class="sh"><div class="sn snb">02</div><div>
+    <div class="st">ஒரு .mdf File-ல் Pages எப்படி arranged?</div>
+    <div class="ss">Page 0 → Page 1 → Page 2 → ... sequential — system pages எங்கே, data pages எங்கே</div>
+  </div></div>
+
+  <div class="card cb">
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted2);margin-bottom:18px;line-height:2;">
+      Database file = pages-இன் array. Index = page number. Simple!<br>
+      ஆனா எல்லா pages-உம் data pages அல்ல — சில <strong style="color:var(--sys)">system pages</strong> (SQL Server internal management).
+    </div>
+
+    <!-- System pages explanation -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;">
+      <div style="padding:13px;background:rgba(167,139,250,.07);border:1px solid rgba(167,139,250,.2);border-radius:9px;">
+        <div style="color:var(--sys);font-weight:800;font-size:12px;margin-bottom:7px;">Page 0 — File Header</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted2);line-height:1.8;">
+          Database பத்தின metadata.<br>Creation date, version, file size.<br>
+          <span style="color:var(--sys)">எல்லா file-லயும் page 0 = header.</span>
+        </div>
+      </div>
+      <div style="padding:13px;background:rgba(167,139,250,.07);border:1px solid rgba(167,139,250,.2);border-radius:9px;">
+        <div style="color:var(--sys);font-weight:800;font-size:12px;margin-bottom:7px;">Page 1 — PFS Page</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted2);line-height:1.8;">
+          Page Free Space tracker.<br>எந்த pages free/used/full என்று bitmap.<br>
+          <span style="color:var(--sys)">ஒரு PFS page = 8088 pages track பண்ணும்.</span>
+        </div>
+      </div>
+      <div style="padding:13px;background:rgba(167,139,250,.07);border:1px solid rgba(167,139,250,.2);border-radius:9px;">
+        <div style="color:var(--sys);font-weight:800;font-size:12px;margin-bottom:7px;">Page 2 — GAM Page</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted2);line-height:1.8;">
+          Global Allocation Map.<br>Extent-கள் free-ஆ mixed-ஆ என்று track.<br>
+          <span style="color:var(--sys)">1 bit = 1 extent (8 pages).</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Interactive file view -->
+    <div style="font-family:var(--mono);font-size:10px;color:var(--file);letter-spacing:1px;margin-bottom:12px;">📂 MyDatabase.mdf — Pages 0 to 220 (click any page)</div>
+    <div class="file-strip">
+      <div class="file-header">
+        <span>MyDatabase.mdf (FileID = 1)</span>
+        <span style="color:var(--muted2);font-size:10px">Page size = 8KB each</span>
+      </div>
+      <div style="padding:12px;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+          <span><span class="tag ts">■</span> System pages</span>
+          <span><span class="tag t1">■</span> Employees data</span>
+          <span><span class="tag t2">■</span> Departments data</span>
+          <span><span class="tag tfr">■</span> Free / unallocated</span>
+        </div>
+        <div class="pgrid" id="filePageGrid"></div>
+      </div>
+    </div>
+
+    <div class="stbox" id="file-tooltip-box">Click any page above to see what it is.</div>
+
+    <div class="warn">
+      ⚠️ <strong>Page numbers SQL Server decide பண்றது — நாம் control பண்ண முடியாது!</strong><br>
+      SQL Server free pages-ஐ find பண்ணி, அந்த page number-ஐ allocate பண்ணும்.<br>
+      அதனால் Employees-க்கு 101, 102... Departments-க்கு 201, 202... வருது — இது real values இல்லை, SQL Server decide பண்ணும்.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     PAGE C — EXTENT
+══════════════════════════════════ -->
+<div class="pg" id="pg-c">
+  <div class="sh"><div class="sn snc">03</div><div>
+    <div class="st">Extent = 8 Pages = 64KB</div>
+    <div class="ss">SQL Server pages-ஐ ஒவ்வொன்னா allocate பண்றதில்லை — Extents-ஆ allocate பண்ணும்</div>
+  </div></div>
+
+  <div class="card cc">
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted2);line-height:2;margin-bottom:18px;">
+      SQL Server-ல் disk allocation unit = <strong style="color:var(--ext)">Extent</strong>.<br>
+      1 Extent = <strong style="color:var(--page)">8 consecutive pages</strong> = 8 × 8KB = <strong style="color:var(--ext)">64KB</strong>.<br>
+      Table-க்கு space வேண்டும்போது, SQL Server ஒரு Extent-ஐ reserve பண்ணும்.
+    </div>
+
+    <!-- Extent visual -->
+    <div style="font-family:var(--mono);font-size:10px;color:var(--ext);letter-spacing:1px;margin-bottom:12px;">🗂️ EXTENT LAYOUT — 8 pages together</div>
+    <div style="overflow-x:auto;margin-bottom:20px;">
+      <div style="display:flex;align-items:center;gap:0;min-width:600px;border:2px solid var(--ext);border-radius:10px;overflow:hidden;">
+        <div style="padding:10px;background:rgba(34,197,94,.15);font-family:var(--mono);font-size:10px;color:var(--ext);font-weight:700;white-space:nowrap;border-right:1px solid rgba(34,197,94,.2);">Extent<br>(64KB)</div>
+        ${[0,1,2,3,4,5,6,7].map(i=>`<div style="flex:1;padding:10px 6px;text-align:center;border-right:1px solid rgba(34,197,94,.12);background:rgba(34,197,94,.06);">
+          <div style="font-family:var(--mono);font-size:10px;font-weight:700;color:var(--page)">Page ${i}</div>
+          <div style="font-family:var(--mono);font-size:8px;color:var(--muted2);margin-top:3px;">8KB</div>
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- Two types of extents -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;">
+      <div style="padding:14px;background:rgba(6,182,212,.07);border:1px solid rgba(6,182,212,.2);border-radius:9px;">
+        <div style="color:var(--file);font-weight:800;font-size:13px;margin-bottom:8px;">Uniform Extent</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted2);line-height:1.9;margin-bottom:10px;">
+          8 pages எல்லாமே <strong>ஒரே table-க்கு</strong> belong.<br>
+          Table போதுமான size வளர்ந்தால் uniform extents பெறும்.
+        </div>
+        <div style="display:flex;gap:2px;">
+          ${[0,1,2,3,4,5,6,7].map(i=>`<div style="flex:1;height:28px;border-radius:3px;background:rgba(244,63,94,.25);border:1px solid rgba(244,63,94,.4);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;color:var(--t1)">E</div>`).join('')}
+        </div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--t1);margin-top:5px;text-align:center;">All 8 pages → Employees</div>
+      </div>
+      <div style="padding:14px;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);border-radius:9px;">
+        <div style="color:var(--page);font-weight:800;font-size:13px;margin-bottom:8px;">Mixed Extent</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted2);line-height:1.9;margin-bottom:10px;">
+          8 pages <strong>வேற வேற tables-க்கு</strong> பகிர்ந்து கொள்வார்கள்.<br>
+          Small tables ஆரம்பத்தில் mixed extents-ல் தொடங்கும்.
+        </div>
+        <div style="display:flex;gap:2px;">
+          <div style="flex:1;height:28px;border-radius:3px;background:rgba(244,63,94,.25);border:1px solid rgba(244,63,94,.4);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;color:var(--t1)">E</div>
+          <div style="flex:1;height:28px;border-radius:3px;background:rgba(251,146,60,.25);border:1px solid rgba(251,146,60,.4);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;color:var(--t2)">D</div>
+          <div style="flex:1;height:28px;border-radius:3px;background:rgba(232,121,249,.25);border:1px solid rgba(232,121,249,.4);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;color:var(--t3)">O</div>
+          <div style="flex:1;height:28px;border-radius:3px;background:rgba(244,63,94,.25);border:1px solid rgba(244,63,94,.4);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;color:var(--t1)">E</div>
+          <div style="flex:1;height:28px;border-radius:3px;background:rgba(58,79,136,.2);border:1px solid rgba(58,79,136,.3);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;color:var(--muted2)">-</div>
+          <div style="flex:1;height:28px;border-radius:3px;background:rgba(251,146,60,.25);border:1px solid rgba(251,146,60,.4);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;color:var(--t2)">D</div>
+          <div style="flex:1;height:28px;border-radius:3px;background:rgba(58,79,136,.2);border:1px solid rgba(58,79,136,.3);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;color:var(--muted2)">-</div>
+          <div style="flex:1;height:28px;border-radius:3px;background:rgba(232,121,249,.25);border:1px solid rgba(232,121,249,.4);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;color:var(--t3)">O</div>
+        </div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--muted2);margin-top:5px;text-align:center;"><span style="color:var(--t1)">E=Employees</span> <span style="color:var(--t2)">D=Departments</span> <span style="color:var(--t3)">O=Orders</span></div>
+      </div>
+    </div>
+
+    <!-- Extent numbers -->
+    <div style="font-family:var(--mono);font-size:10px;color:var(--ext);letter-spacing:1px;margin-bottom:12px;">📐 EXTENT NUMBERS — page 0 to 7 = Extent 0, page 8 to 15 = Extent 1, etc.</div>
+    <div style="overflow-x:auto;">
+      <table class="ttbl">
+        <thead><tr><th>Extent #</th><th>Pages Covered</th><th>Page Numbers</th><th>Byte Range</th><th>Size</th></tr></thead>
+        <tbody>
+          <tr><td style="color:var(--ext);font-weight:700">Extent 0</td><td>Pages 0–7</td><td style="color:var(--page)">0,1,2,3,4,5,6,7</td><td style="color:var(--muted2)">0 – 65,535</td><td style="color:var(--ext)">64KB</td></tr>
+          <tr><td style="color:var(--ext);font-weight:700">Extent 1</td><td>Pages 8–15</td><td style="color:var(--page)">8,9,10,11,12,13,14,15</td><td style="color:var(--muted2)">65,536 – 131,071</td><td style="color:var(--ext)">64KB</td></tr>
+          <tr><td style="color:var(--ext);font-weight:700">Extent 12</td><td>Pages 96–103</td><td style="color:var(--t1)">96,97,98,99,100,<strong>101</strong>,102,103</td><td style="color:var(--muted2)">786,432 – 851,967</td><td style="color:var(--ext)">64KB</td></tr>
+          <tr><td style="color:var(--ext);font-weight:700">Extent 13</td><td>Pages 104–111</td><td style="color:var(--t1)">104,105,106,107,108,109,110,111</td><td style="color:var(--muted2)">851,968 – 917,503</td><td style="color:var(--ext)">64KB</td></tr>
+          <tr><td style="color:var(--ext);font-weight:700">Extent 25</td><td>Pages 200–207</td><td style="color:var(--t2)">200,<strong>201</strong>,202,203,204,205,206,207</td><td style="color:var(--muted2)">1,638,400 – 1,703,935</td><td style="color:var(--ext)">64KB</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="info" style="margin-top:14px;">
+      💡 Employees first page = 101 → Extent 12-ல் இருக்கு (pages 96–103). Extent 12 Employees-க்கு allocated. அதனால் 101, 102, 103, 104, 105 consecutive ஆக வந்தது!
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     PAGE D — Table Insert → Pages
+══════════════════════════════════ -->
+<div class="pg" id="pg-d">
+  <div class="sh"><div class="sn snd">04</div><div>
+    <div class="st">Table CREATE → INSERT → Pages Allocated</div>
+    <div class="ss">நாம் CREATE TABLE பண்றோம் → SQL Server எப்படி pages allocate பண்றது — step by step</div>
+  </div></div>
+
+  <div class="card cd">
+    <!-- Step by step -->
+    <div style="margin-bottom:20px;">
+      <div class="step-box" style="border-color:rgba(167,139,250,.3);background:rgba(167,139,250,.05);">
+        <div style="display:flex;align-items:flex-start;gap:12px;">
+          <div class="sb-num" style="background:rgba(167,139,250,.2);color:var(--sys);">1</div>
+          <div style="flex:1;">
+            <div style="font-weight:800;font-size:14px;color:var(--sys);margin-bottom:6px;">CREATE TABLE dbo.Employees (...)</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--muted2);line-height:1.8;">
+              SQL Server system tables-ல் metadata store பண்ணும் (sys.objects, sys.columns).<br>
+              <strong style="color:var(--sys)">இந்த step-ல் data pages allocate ஆவதில்லை!</strong> Table structure மட்டும் register ஆகும்.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-box" style="border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.05);">
+        <div style="display:flex;align-items:flex-start;gap:12px;">
+          <div class="sb-num" style="background:rgba(34,197,94,.2);color:var(--ext);">2</div>
+          <div style="flex:1;">
+            <div style="font-weight:800;font-size:14px;color:var(--ext);margin-bottom:6px;">First INSERT INTO dbo.Employees VALUES (...)</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--muted2);line-height:1.8;">
+              SQL Server GAM page scan பண்ணி <strong style="color:var(--ext)">free mixed extent</strong> தேடும்.<br>
+              Free extent கிடைத்தால் → அந்த extent-ல் ஒரு page allocate பண்ணும்.<br>
+              <strong style="color:var(--page)">Page number = free extent-ல் உள்ள page-ன் sequential number</strong> in the file.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-box" style="border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.05);">
+        <div style="display:flex;align-items:flex-start;gap:12px;">
+          <div class="sb-num" style="background:rgba(245,158,11,.2);color:var(--page);">3</div>
+          <div style="flex:1;">
+            <div style="font-weight:800;font-size:14px;color:var(--page);margin-bottom:6px;">Page நிரம்ப → Next page allocate</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--muted2);line-height:1.8;">
+              ஒரு page full (8KB) ஆனால் → அடுத்த free page allocate ஆகும்.<br>
+              Small table: mixed extent-ல் next free page (not necessarily consecutive).<br>
+              Large table (>8 pages): <strong style="color:var(--page)">uniform extent</strong> — 8 consecutive pages ஒரேயடியா கிடைக்கும்.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-box" style="border-color:rgba(244,63,94,.3);background:rgba(244,63,94,.05);">
+        <div style="display:flex;align-items:flex-start;gap:12px;">
+          <div class="sb-num" style="background:rgba(244,63,94,.2);color:var(--t1);">4</div>
+          <div style="flex:1;">
+            <div style="font-weight:800;font-size:14px;color:var(--t1);margin-bottom:6px;">IAM Page — Table's page directory</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--muted2);line-height:1.8;">
+              SQL Server ஒவ்வொரு table-க்கும் <strong style="color:var(--t1)">IAM (Index Allocation Map)</strong> page maintain பண்ணும்.<br>
+              IAM = "இந்த table-க்கு எந்த எந்த extents/pages belong பண்றன" என்ற map.<br>
+              Table scan பண்ணும்போது, SQL Server IAM பார்த்து எந்த pages படிக்கணும் என்று decide பண்ணும்.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Animation -->
+    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+      <button class="anim-btn" onclick="animInsert()">▶ Animate INSERT row by row</button>
+      <button class="rst-btn" onclick="resetInsert()">↺ Reset</button>
+    </div>
+    <div class="stbox" id="insert-status">Press Animate to watch rows allocate pages step by step.</div>
+    <div style="margin-top:14px;font-family:var(--mono);font-size:10px;color:var(--muted2);letter-spacing:1px;margin-bottom:8px;">FILE PAGES — watch pages get claimed as we INSERT:</div>
+    <div class="pgrid" id="insertGrid" style="grid-template-columns:repeat(auto-fill,minmax(52px,1fr));"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     PAGE E — 1:101 எப்படி வந்தது?
+══════════════════════════════════ -->
+<div class="pg" id="pg-e">
+  <div class="sh"><div class="sn sna">05</div><div>
+    <div class="st">1:101 and 1:201 — இந்த exact numbers ஏன் வந்தது?</div>
+    <div class="ss">Employees-க்கு 101, Departments-க்கு 201 — இது fixed இல்லை, SQL Server freely choose பண்ணும்</div>
+  </div></div>
+
+  <div class="card ca">
+    <div class="warn" style="margin-top:0;margin-bottom:20px;">
+      ⚠️ <strong>முக்கியமான point:</strong> 1:101, 1:201 என்ற exact numbers example-க்காக நாம் use பண்ணோம். Real-world-ல் SQL Server எந்த free page கிடைக்குதோ அதை allocate பண்ணும் — numbers predict பண்ண முடியாது!
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:20px;">
+      <div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--t1);letter-spacing:1px;margin-bottom:10px;">🔴 Employees → Pages 1:101 to 1:105 — ஏன்?</div>
+        <div style="padding:14px;background:rgba(244,63,94,.06);border:1px solid rgba(244,63,94,.18);border-radius:9px;font-family:var(--mono);font-size:11px;color:var(--muted2);line-height:2;">
+          1. Database create ஆனபோது, pages 0–99 system காரணங்களுக்கு (system tables, metadata, PFS, GAM, SGAM pages) ஆனது.<br>
+          2. Employees table first row insert → SQL Server free page தேடுது → <strong style="color:var(--t1)">page 101</strong> கிடைத்தது (page 100 = another system thing).<br>
+          3. Row 11 → page full → <strong style="color:var(--t1)">page 102</strong> allocate.<br>
+          4. இப்படி consecutive ஆக 101, 102, 103, 104, 105 வந்தது.
+        </div>
+      </div>
+      <div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--t2);letter-spacing:1px;margin-bottom:10px;">🟠 Departments → Pages 1:201 to 1:202 — ஏன் 201?</div>
+        <div style="padding:14px;background:rgba(251,146,60,.06);border:1px solid rgba(251,146,60,.18);border-radius:9px;font-family:var(--mono);font-size:11px;color:var(--muted2);line-height:2;">
+          1. Employees table-க்கு pages 101–105 போனதால், 106–199 range other objects-க்கு போயிருக்கலாம் (indexes, other tables).<br>
+          2. Departments create பண்ணி first insert → next free page = <strong style="color:var(--t2)">page 201</strong>.<br>
+          3. இது <strong>coincidence அல்ல, not fixed</strong> — SQL Server-ல் run பண்ணும்போது வேற numbers வரலாம்.
+        </div>
+      </div>
+    </div>
+
+    <!-- DBCC EXTENTINFO -->
+    <div style="font-family:var(--mono);font-size:10px;color:var(--ext);letter-spacing:1px;margin-bottom:10px;">🔍 ACTUAL PAGE NUMBERS பார்க்க — SQL Server commands:</div>
+    <div class="code" style="margin-bottom:16px;">
+      <span class="cm">-- Table-ன் actual pages பார்க்க:</span><br>
+      <span class="kw">SELECT</span> extent_page_id, allocated_page_page_id, page_type_desc,<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; allocated_page_file_id<br>
+      <span class="kw">FROM</span> sys.dm_db_database_page_allocations(<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; DB_ID(), OBJECT_ID(<span class="str">'dbo.Employees'</span>), NULL, NULL, <span class="str">'DETAILED'</span>)<br>
+      <span class="kw">WHERE</span> page_type_desc = <span class="str">'DATA_PAGE'</span>;<br><br>
+      <span class="cm">-- Output sample (இது YOUR database-ல் வேற numbers வரும்):</span><br>
+      <span style="color:var(--t1)">-- allocated_page_file_id | allocated_page_page_id | page_type_desc</span><br>
+      <span style="color:var(--t1)">--          1             |          101           |    DATA_PAGE</span><br>
+      <span style="color:var(--t1)">--          1             |          102           |    DATA_PAGE</span><br>
+      <span style="color:var(--t1)">--          1             |          103           |    DATA_PAGE</span>
+    </div>
+
+    <!-- Summary table -->
+    <div style="font-family:var(--mono);font-size:10px;color:var(--file);letter-spacing:1px;margin-bottom:10px;">📋 FULL SUMMARY — Page Address-ல் என்ன என்ன decide பண்றது</div>
+    <div style="overflow-x:auto;">
+      <table class="ttbl">
+        <thead><tr><th>Part</th><th>Value</th><th>யார் decide பண்றது</th><th>Fixed-ஆ?</th><th>Example</th></tr></thead>
+        <tbody>
+          <tr>
+            <td style="color:var(--file);font-weight:700">FileID</td>
+            <td>1</td>
+            <td style="color:var(--muted2)">DBA — database files எத்தனை add பண்றோம்</td>
+            <td><span class="tag te">Yes</span></td>
+            <td style="color:var(--muted2)">Primary file always = 1</td>
+          </tr>
+          <tr>
+            <td style="color:var(--page);font-weight:700">PageNumber</td>
+            <td>101, 102...</td>
+            <td style="color:var(--muted2)">SQL Server — free pages எங்கே இருக்கு?</td>
+            <td><span class="tag t1">No — dynamic</span></td>
+            <td style="color:var(--muted2)">வேற system-ல் 354, 721 வரலாம்</td>
+          </tr>
+          <tr>
+            <td style="color:var(--ext);font-weight:700">Sequence</td>
+            <td>101,102,103...</td>
+            <td style="color:var(--muted2)">SQL Server extent allocation</td>
+            <td><span class="tag te">Usually yes</span></td>
+            <td style="color:var(--muted2)">Uniform extent → consecutive</td>
+          </tr>
+          <tr>
+            <td style="color:var(--sys);font-weight:700">Gap (101→201)</td>
+            <td>100 pages gap</td>
+            <td style="color:var(--muted2)">Other objects used pages 106–200</td>
+            <td><span class="tag t1">No — varies</span></td>
+            <td style="color:var(--muted2)">Index pages, other tables</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="good">
+      ✅ <strong>Bottom line:</strong><br>
+      • <strong style="color:var(--file)">FileID</strong> = எந்த .mdf file-ல் இருக்கு (usually 1)<br>
+      • <strong style="color:var(--page)">PageNumber</strong> = SQL Server free page கண்டுபிடிச்சு sequential number குடுக்கும்<br>
+      • 101, 102... → Employees uniform extent (consecutive pages)<br>
+      • 201, 202... → Departments different extent (gap ஏன்னா pages 106-200 other things-க்கு போயிருக்கு)<br>
+      • இந்த numbers நாம் control பண்ண முடியாது — SQL Server Storage Engine decide பண்ணும்!
+    </div>
+  </div>
+</div>
+
+</div><!-- /wrap -->
+
+<script>
+// NAV
+function go(id){
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('pg-'+id).classList.add('active');
+  document.getElementById('tab-'+id).classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// PAGE B — Interactive file grid
+const PAGE_TYPES = {
+  0:{type:'sys',label:'FileHdr',desc:'File Header — database metadata, version info'},
+  1:{type:'sys',label:'PFS',desc:'Page Free Space — tracks free/used pages'},
+  2:{type:'sys',label:'GAM',desc:'Global Allocation Map — extent allocation bitmap'},
+  3:{type:'sys',label:'SGAM',desc:'Shared GAM — mixed extent tracking'},
+  4:{type:'sys',label:'BCM',desc:'Bulk Changed Map'},
+  6:{type:'sys',label:'IAM',desc:'Index Allocation Map — Employees table page list'},
+  7:{type:'sys',label:'IAM',desc:'Index Allocation Map — Departments table page list'},
+  8:{type:'free',label:'free',desc:'Free / unallocated page'},
+  9:{type:'free',label:'free',desc:'Free / unallocated page'},
+  10:{type:'free',label:'free',desc:'Free / unallocated page'},
+};
+// mark Employees pages 101-105
+for(let i=101;i<=105;i++) PAGE_TYPES[i]={type:'t1',label:'Emp',desc:`Data page ${i} — dbo.Employees (rows ${(i-101)*10+1}–${(i-101)*10+10})`};
+// mark Departments pages 201-202
+PAGE_TYPES[201]={type:'t2',label:'Dept',desc:'Data page 201 — dbo.Departments (rows 1–10)'};
+PAGE_TYPES[202]={type:'t2',label:'Dept',desc:'Data page 202 — dbo.Departments (rows 11–20)'};
+// Index pages
+for(let i=106;i<=110;i++) PAGE_TYPES[i]={type:'sys',label:'IdxPg',desc:`Index page ${i} — Employees clustered index`};
+for(let i=203;i<=205;i++) PAGE_TYPES[i]={type:'sys',label:'IdxPg',desc:`Index page ${i} — Departments clustered index`};
+
+function buildFileGrid(){
+  const cont=document.getElementById('filePageGrid');
+  if(!cont)return;
+  cont.innerHTML='';
+  for(let p=0;p<=220;p++){
+    const info=PAGE_TYPES[p]||{type:'free',label:'free',desc:`Free page ${p} — not allocated yet`};
+    const div=document.createElement('div');
+    div.className=`pbox ${info.type==='sys'?'sys':info.type==='t1'?'t1p':info.type==='t2'?'t2p':'free'}`;
+    div.innerHTML=`<span class="pb-num" style="color:${info.type==='sys'?'var(--sys)':info.type==='t1'?'var(--t1)':info.type==='t2'?'var(--t2)':'var(--muted2)'}">${p}</span><span class="pb-lbl" style="color:${info.type==='sys'?'var(--sys)':info.type==='t1'?'var(--t1)':info.type==='t2'?'var(--t2)':'var(--muted2)'}">${info.label}</span>`;
+    div.onclick=()=>{
+      document.querySelectorAll('#filePageGrid .pbox').forEach(el=>el.classList.remove('active'));
+      div.classList.add('active');
+      document.getElementById('file-tooltip-box').innerHTML=`<span style="color:var(--page);font-weight:700">Page ${p} (1:${p})</span> — ${info.desc}<br><span style="color:var(--muted2)">Physical offset: ${(p*8192).toLocaleString()} bytes from start of .mdf file</span>`;
+    };
+    cont.appendChild(div);
+  }
+}
+
+// PAGE D — INSERT animation
+let insertRunning=false;
+function buildInsertGrid(){
+  const cont=document.getElementById('insertGrid');
+  if(!cont)return;
+  cont.innerHTML='';
+  // Show pages 0–130
+  for(let p=0;p<=130;p++){
+    const isSys=p<=10||p===6||p===7;
+    const div=document.createElement('div');
+    div.className=`pbox ${isSys?'sys':'free'}`;
+    div.id=`ig-${p}`;
+    const label=isSys?'sys':'free';
+    div.innerHTML=`<span class="pb-num" style="color:${isSys?'var(--sys)':'var(--muted2)'}">${p}</span><span class="pb-lbl" style="color:${isSys?'var(--sys)':'var(--muted2)'}; font-size:7px">${isSys?'sys':'—'}</span>`;
+    cont.appendChild(div);
+  }
+}
+function resetInsert(){
+  insertRunning=false;
+  buildInsertGrid();
+  document.getElementById('insert-status').innerHTML='Press Animate to watch rows allocate pages step by step.';
+}
+async function animInsert(){
+  if(insertRunning)return;
+  insertRunning=true;
+  const T=400;
+  const empPages=[101,102,103,104,105];
+  const statusEl=document.getElementById('insert-status');
+  for(let pi=0;pi<empPages.length;pi++){
+    const pg=empPages[pi];
+    const el=document.getElementById(`ig-${pg}`);
+    if(!el)continue;
+    // Allocate this page
+    el.className='pbox t1p active';
+    el.innerHTML=`<span class="pb-num" style="color:var(--t1)">${pg}</span><span class="pb-lbl" style="color:var(--t1);font-size:7px">Emp</span>`;
+    statusEl.innerHTML=`<span style="color:var(--ext)">📝 INSERT rows ${pi*10+1}–${pi*10+10} into Employees</span> → Page <span style="color:var(--t1)">${pg} (1:${pg})</span> allocated — this is row ${pi*10+1}'s home. <span style="color:var(--muted2)">Page fills up → next page needed.</span>`;
+    await sleep(T*2);
+    el.classList.remove('active');
+  }
+  statusEl.innerHTML=`<span style="color:var(--seek-c)">✅ Employees: 50 rows → 5 pages → Page numbers 101, 102, 103, 104, 105 — these were the next free pages SQL Server found!</span>`;
+  insertRunning=false;
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+// INIT
+buildFileGrid();
+buildInsertGrid();
+</script>
+</body>
+</html>
