@@ -1,0 +1,41 @@
+{
+  "lastUpdated": "2025-01-15T09:00:00Z",
+  "currency": "USD",
+  "priceUpdates": [
+    {
+      "ProductID": 101,
+      "Product": "Bottle",
+      "OldPrice": 10,
+      "NewPrice": 12,
+      "EffectiveDate": "2025-02-01"
+    },
+    {
+      "ProductID": 102,
+      "Product": "Tire",
+      "OldPrice": 15,
+      "NewPrice": 18,
+      "EffectiveDate": "2025-02-01"
+    },
+    {
+      "ProductID": 103,
+      "Product": "Socks",
+      "OldPrice": 20,
+      "NewPrice": 22,
+      "EffectiveDate": "2025-02-01"
+    },
+    {
+      "ProductID": 104,
+      "Product": "Caps",
+      "OldPrice": 25,
+      "NewPrice": 30,
+      "EffectiveDate": "2025-02-01"
+    },
+    {
+      "ProductID": 105,
+      "Product": "Gloves",
+      "OldPrice": 30,
+      "NewPrice": 34,
+      "EffectiveDate": "2025-02-01"
+    }
+  ]
+}

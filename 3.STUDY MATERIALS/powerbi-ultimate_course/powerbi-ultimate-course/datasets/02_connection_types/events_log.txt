@@ -1,0 +1,21 @@
+OrderID ; EventType ; EventTimestamp ; Description
+1 ; CREATED ; 2025-01-01T09:12:45 ; Order successfully created
+1 ; PAYMENT_RECEIVED ; 2025-01-01T09:13:22 ; Payment processed via credit card
+1 ; SHIPPED ; 2025-01-03T14:55:10 ; Order handed over to carrier
+1 ; DELIVERED ; 2025-01-05T11:02:55 ; Delivered to customer doorstep
+2 ; CREATED ; 2025-01-05T12:01:50 ; Order successfully created
+2 ; PAYMENT_FAILED ; 2025-01-05T12:02:14 ; Payment declined by bank
+2 ; PAYMENT_RECEIVED ; 2025-01-05T12:04:21 ; Retry successful
+2 ; SHIPPED ; 2025-01-07T10:45:02 ; Sent via standard shipping
+3 ; CREATED ; 2025-01-10T08:25:00 ; Order created
+3 ; PAYMENT_RECEIVED ; 2025-01-10T08:25:39 ; Payment confirmed
+3 ; SHIPPED ; 2025-01-12T16:15:30 ; Order shipped
+3 ; DELAYED ; 2025-01-14T08:34:10 ; Weather-related delay
+3 ; DELIVERED ; 2025-01-16T13:44:22 ; Delivered to customer address
+4 ; CREATED ; 2025-01-20T07:51:12 ; Order created
+4 ; PAYMENT_RECEIVED ; 2025-01-20T07:52:01 ; Payment received
+4 ; SHIPPED ; 2025-01-22T10:14:05 ; Shipment processed
+5 ; CREATED ; 2025-02-01T14:02:41 ; Order created
+5 ; PAYMENT_RECEIVED ; 2025-02-01T14:03:20 ; Payment success
+5 ; SHIPPED ; 2025-02-03T09:45:55 ; Order shipped
+5 ; DELIVERED ; 2025-02-05T15:20:13 ; Delivered successfully

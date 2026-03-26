@@ -1,0 +1,13 @@
+customer_id;first_name;last_name;country;state;city;score
+C001;Alex;Johnson;United States;CA;San Francisco;20
+C002;Maria;Garcia;United States;NY;New York;100
+C003;John;Smith;United States;TX;Dallas;
+C004;Li;Zhang;United States;WA;Seattle;30
+C005;Aarav;Kumar;United States;FL;Miami;150
+C006;Sofia;Lopez;United States;IL;Chicago;
+C007;Michael;Miller;United States;CA;Los Angeles;25
+C008;Wei;Wang;United States;NJ;Newark;
+C009;Priya;Singh;Germany;Bavaria;Munich;50
+C010;Emily;Brown;China;Guangdong;Shenzhen;350
+C011;David;Davis;India;Karnataka;Bengaluru;
+C012;Chen;Li;China;Shanghai;Shanghai;55
